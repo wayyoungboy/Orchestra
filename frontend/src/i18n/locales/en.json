@@ -1,0 +1,167 @@
+{
+  "app": {
+    "name": "Orchestra"
+  },
+  "auth": {
+    "subtitle": "Multi-Agent Collaboration Platform",
+    "username": "Username",
+    "password": "Password",
+    "usernamePlaceholder": "Enter username",
+    "passwordPlaceholder": "Enter password",
+    "signIn": "Sign In",
+    "invalidCredentials": "Invalid username or password",
+    "defaultCredentialsHint": "Default: orchestra / orchestra"
+  },
+  "friends": {
+    "title": "Friends",
+    "add": "Add",
+    "invite": "Invite"
+  },
+  "invite": {
+    "menu": {
+      "title": "Invite to Server",
+      "subtitle": "Generate a unique invite link",
+      "admin": "Invite as Admin",
+      "adminDesc": "Full server access",
+      "secretary": "Invite as Secretary",
+      "secretaryDesc": "Oversees assistants (workspace supervisor)",
+      "assistant": "Invite as Assistant",
+      "assistantDesc": "Moderation permissions",
+      "member": "General Member",
+      "memberDesc": "Standard access"
+    }
+  },
+  "chat": {
+    "empty": "Select a conversation to start chatting",
+    "channels": "Channels",
+    "directMessages": "Direct Messages",
+    "workspaceFallback": "Workspace",
+    "headerMembers": "Members",
+    "headerChannelInWorkspace": "Channel in {name}",
+    "headerDirectMessage": "Direct message",
+    "inputSend": "Send",
+    "inputHint": "Press Enter to send, Shift+Enter for new line",
+    "inputMessagePlaceholder": "Message {channel}"
+  },
+  "workspace": {
+    "noSelectionTitle": "No workspace selected",
+    "noSelectionHint": "Please select or create a workspace first",
+    "selectionOpenTitle": "Open workspace",
+    "selectionOpenSubtitle": "Choose a working directory on the server",
+    "selectionRecent": "Recent",
+    "selectionRecentEmpty": "No recent workspaces",
+    "switcherPlaceholder": "Select workspace",
+    "switcherNew": "New workspace"
+  },
+  "memberRow": {
+    "openTerminal": "Open Terminal",
+    "sendMessage": "Send Message",
+    "rename": "Rename",
+    "remove": "Remove",
+    "statusHeading": "Status",
+    "statusOnline": "Online",
+    "statusWorking": "Working",
+    "statusDnd": "Do Not Disturb",
+    "statusOffline": "Offline",
+    "badgeWsConnected": "Terminal WebSocket connected",
+    "badgeWsConnecting": "Connecting terminal…",
+    "badgeWsError": "Terminal connection error",
+    "badgeWsDisconnected": "Terminal disconnected",
+    "badgeServerPty": "PTY running on server — open terminal to attach",
+    "badgeNoSession": "No terminal session for this member yet",
+    "badgeWsPending": "Waiting for terminal connection",
+    "badgeWsWorking": "Terminal activity",
+    "terminalLinePending": "Terminal: pending",
+    "terminalLineConnecting": "Terminal: connecting",
+    "terminalLineConnected": "Terminal: connected",
+    "terminalLineWorking": "Terminal: working",
+    "terminalLineError": "Terminal: error",
+    "terminalLineDisconnected": "Terminal: disconnected",
+    "terminalLineIdle": "Terminal: not started",
+    "terminalLineServerPty": "Terminal: server PTY running (not attached)"
+  },
+  "terminal": {
+    "overlayPending": "Waiting…",
+    "overlayConnecting": "Connecting to terminal…",
+    "overlayError": "Terminal disconnected or unavailable",
+    "overlayErrorHint": "Check the server and WebSocket, or close the tab and try again"
+  },
+  "members": {
+    "title": "Members",
+    "addAssistant": "AI Assistant",
+    "addAdmin": "Admin",
+    "addMember": "Member",
+    "loading": "Loading members...",
+    "emptyRoleOwner": "No owner yet",
+    "emptyRoleAdmin": "No administrator yet",
+    "emptyRoleSecretary": "No secretary yet",
+    "emptyRoleAssistant": "No assistant yet",
+    "emptyRoleMember": "No member yet",
+    "memberAdded": "Member added",
+    "terminalAutostartFailed": "Member added, but the terminal could not start automatically. Open it from the member list when ready.",
+    "roleOwner": "Owner",
+    "roleAdmin": "Admin",
+    "roleAssistant": "Assistant",
+    "roleSecretary": "Secretary",
+    "roleMember": "Member",
+    "roleOther": "Uncategorized",
+    "emptyRoleOther": "No uncategorized members",
+    "unnamedMember": "Unnamed",
+    "addMemberModal": {
+      "titleAssistant": "Add AI Assistant",
+      "titleAdmin": "Add Admin",
+      "titleMember": "Add Member",
+      "titleSecretary": "Add Secretary",
+      "memberName": "Member name",
+      "memberNamePlaceholder": "Enter member name",
+      "adminName": "Admin name",
+      "adminNamePlaceholder": "Enter admin name",
+      "permissions": "Permissions",
+      "assistantDisplayName": "Display name",
+      "assistantDisplayNamePlaceholder": "Optional — defaults to the selected CLI name",
+      "selectAssistant": "Select AI assistant",
+      "selectSecretary": "Select runtime for secretary",
+      "selectMemberCli": "Select terminal / CLI (member collaborates via this process)",
+      "cancel": "Cancel",
+      "submitMember": "Add member",
+      "submitAdmin": "Add admin",
+      "submitAdd": "Add",
+      "permFullAccess": "Full access",
+      "permFullAccessDesc": "Can manage all workspace settings",
+      "permMemberManage": "Member management",
+      "permMemberManageDesc": "Can add and remove members",
+      "permBilling": "Billing access",
+      "permBillingDesc": "Can view and manage billing"
+    },
+    "editMemberModal": {
+      "title": "Edit member",
+      "displayName": "Display name",
+      "save": "Save changes",
+      "remove": "Remove member"
+    },
+    "assistantModels": {
+      "claude": "Claude Code",
+      "gemini": "Gemini CLI",
+      "aider": "Aider",
+      "cursor": "Cursor Agent",
+      "shell": "Custom shell"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "general": "General",
+    "language": "Language",
+    "terminal": "Terminal",
+    "workspace": "Workspace",
+    "keyboard": "Keyboard",
+    "security": "Security",
+    "about": "About",
+    "diagnostics": "Diagnostics",
+    "diagnosticsHint": "Recent API errors are logged here automatically.",
+    "clearLog": "Clear log"
+  },
+  "skills": {
+    "title": "Skills",
+    "webNote": "The reference desktop (Tauri) app's Skills / plugin marketplace depend on native capabilities. On Web, this screen documents the gap; a future HTTP-based plugin API may land here."
+  }
+}

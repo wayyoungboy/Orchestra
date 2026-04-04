@@ -1,0 +1,79 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Backend binary
+backend/server
+backend/orchestra
+backend/data/
+backend/workspaces/
+
+# Database
+*.db
+*.db-journal
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Config files with secrets
+configs/secrets.yaml
+configs/local.yaml
+
+# Test coverage
+coverage/
+*.coverprofile
+
+# Playwright (frontend/e2e)
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/artifacts/
+frontend/tests/
+
+# Temporary test files
+t.py
+*.pyc
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Lock files (optional - uncomment if you want to exclude)
+# package-lock.json
+# pnpm-lock.yaml
+
+# Development
+.reference-checkout/
+.claude/
+data/
+workspaces/
+
+# Debug
+__debug_bin*

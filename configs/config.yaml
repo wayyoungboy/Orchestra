@@ -1,0 +1,31 @@
+server:
+  http_addr: ":8080"
+  ws_addr: ":8081"
+
+terminal:
+  max_sessions: 10
+  idle_timeout: 30m
+
+security:
+  encryption_key: "${ORCHESTRA_ENCRYPTION_KEY}"
+  allowed_commands:
+    - /bin/bash
+    - /bin/zsh
+    - /usr/bin/env
+    - claude
+    - gemini
+    - codex
+    - qwen
+  allowed_paths:
+    - ~/projects
+    - ~/code
+    - ~
+  allowed_origins:
+    - "http://localhost:3000"
+    - "http://localhost:5173"
+    - "http://127.0.0.1:3000"
+    - "http://127.0.0.1:5173"
+
+storage:
+  database: "./data/orchestra.db"
+  workspaces: "./workspaces"
