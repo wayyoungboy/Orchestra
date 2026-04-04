@@ -228,7 +228,10 @@ export const useTerminalStore = defineStore('terminal', () => {
       await socket.connect(sessionId)
       socket.onMessage((msg: TerminalServerMessage) => {
         if (msg.type === 'terminal_chat_stream') {
-          notifyTerminalChatStream(sessionId, (msg as { payload: TerminalChatStreamPayload }).payload)
+          const payload = (msg as { payload?: TerminalChatStreamPayload }).payload
+          if (payload) {
+            notifyTerminalChatStream(sessionId, payload)
+          }
         }
       })
       connectionStatus.value[sessionId] = 'connected'

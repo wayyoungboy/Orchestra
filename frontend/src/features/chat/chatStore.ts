@@ -1006,6 +1006,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   const applyTerminalChatStreamEvent = (_sessionId: string, payload: TerminalChatStreamPayload) => {
+    if (!payload) return
     if (payload.mode === 'final') {
       applyTerminalStreamFinal(payload)
     } else {
