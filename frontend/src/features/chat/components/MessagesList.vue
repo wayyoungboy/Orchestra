@@ -1,225 +1,225 @@
 <template>
   <div
     ref="listRef"
-    class="flex-1 overflow-y-auto px-8 py-6 space-y-8"
+    class="messages-list-container"
   >
     <!-- Empty State -->
-    <div v-if="messages.length === 0" class="flex flex-col items-center justify-center h-full text-white/40">
-      <div class="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-4">
-        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
-      </div>
-      <p class="text-sm font-medium">No messages yet</p>
-      <p class="text-xs mt-1">Start the conversation!</p>
+    <div v-if="messages.length === 0" class="empty-messages">
+      <div class="empty-bubble">还没有消息。开始对话吧！</div>
     </div>
 
-    <!-- Message Groups -->
+    <!-- Messages Groups -->
     <template v-else>
-      <template v-for="item in groupedItems" :key="item.id">
-        <!-- Date Separator -->
-        <div v-if="item.type === 'separator'" class="relative flex py-2 items-center justify-center">
-          <div class="absolute inset-0 flex items-center">
-            <div class="w-full border-t border-white/5"></div>
-          </div>
-          <span class="relative px-4 bg-panel/30 rounded-full text-white/30 text-[11px] font-semibold backdrop-blur-md border border-white/5">
-            {{ item.label }}
-          </span>
+      <div v-for="(item, index) in groupedMessages" :key="index" class="message-group">
+        <!-- Date Divider -->
+        <div v-if="item.type === 'divider'" class="date-divider">
+          <span>{{ item.label }}</span>
         </div>
 
-        <!-- Message -->
+        <!-- Message Item -->
         <div
           v-else
-          :class="[
-            'flex gap-5 group -mx-6 px-6 py-2 rounded-2xl transition-all hover:bg-white/[0.02]',
-            isMe(item.message) ? 'flex-row-reverse' : ''
-          ]"
+          :class="['message-item', isMe(item.message) ? 'is-me' : 'is-other']"
         >
           <!-- Avatar -->
-          <div class="mt-1 shrink-0">
-            <div
-              :class="[
-                'w-11 h-11 rounded-[14px] shadow-lg flex items-center justify-center',
-                isMe(item.message) ? 'bg-primary/20' : 'bg-white/10'
-              ]"
-            >
-              <span class="text-sm font-bold text-white">
-                {{ getInitials(item.message.senderName) }}
-              </span>
+          <div class="avatar-wrap">
+            <div :class="['avatar', isMe(item.message) ? 'my-avatar' : 'other-avatar']">
+              {{ getInitials(item.message.senderName) }}
             </div>
           </div>
 
-          <!-- Message Content -->
-          <div :class="['flex flex-col flex-1 min-w-0', isMe(item.message) ? 'items-end' : '']">
-            <!-- Sender Info -->
-            <div :class="['flex items-baseline gap-2.5', isMe(item.message) ? 'flex-row-reverse' : '']">
-              <span class="text-white font-semibold text-[15px] cursor-pointer hover:underline tracking-tight">
-                {{ item.message.senderName }}
-              </span>
-              <span class="text-white/30 text-[11px] font-medium">
-                {{ formatTime(item.message.createdAt) }}
-              </span>
+          <!-- Content -->
+          <div class="message-content-wrap">
+            <div class="message-info">
+              <span class="sender-name">{{ item.message.senderName }}</span>
+              <span class="message-time">{{ formatTime(item.message.createdAt) }}</span>
             </div>
-
-            <!-- Message Bubble -->
-            <div
-              v-if="isMe(item.message)"
-              class="selectable mt-1 bg-white text-slate-900 px-5 py-3 rounded-2xl rounded-tr-sm shadow-lg max-w-[80%] text-[15px] leading-relaxed font-medium"
-            >
-              <p class="whitespace-pre-wrap">{{ stripAnsiForChat(item.message.content) }}</p>
-            </div>
-            <div v-else class="selectable text-white/90 text-[15px] leading-relaxed mt-1 font-light tracking-wide max-w-[80%]">
-              <p class="whitespace-pre-wrap">{{ stripAnsiForChat(item.message.content) }}</p>
+            
+            <div :class="['message-bubble', isMe(item.message) ? 'my-bubble' : 'other-bubble']">
+              <p class="message-text">{{ stripAnsiForChat(item.message.content) }}</p>
             </div>
           </div>
         </div>
-      </template>
+      </div>
     </template>
-
-    <!-- Jump to Latest Button -->
-    <button
-      v-if="showJumpButton"
-      type="button"
-      class="sticky bottom-6 self-end mr-2 px-4 py-2 rounded-full bg-panel/80 border border-white/10 text-white/70 hover:text-white hover:bg-panel/80 transition-all shadow-lg backdrop-blur"
-      @click="handleJumpToLatest"
-    >
-      <svg class="w-4 h-4 mr-1 inline-block align-middle" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-      </svg>
-      <span class="text-[12px] font-medium">Jump to latest</span>
-    </button>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import type { Message } from '@/shared/types/chat'
 import { stripAnsiForChat } from '@/shared/utils/stripAnsiForChat'
 
-interface DisplayMessage {
-  id: string
-  conversationId: string
-  senderId: string
-  senderName: string
-  senderAvatar?: string
-  content: string
-  createdAt: string
-}
-
 const props = defineProps<{
-  messages: DisplayMessage[]
+  messages: Message[]
   currentUserId: string
+  loading?: boolean
 }>()
 
-const listRef = ref<HTMLDivElement | null>(null)
-const isPinnedToBottom = ref(true)
-const showJumpButton = computed(() => !isPinnedToBottom.value)
+const listRef = ref<HTMLElement | null>(null)
 
-// Group messages by date
-interface SeparatorItem {
-  id: string
-  type: 'separator'
-  label: string
+function isMe(msg: Message) {
+  return msg.senderId === props.currentUserId
 }
 
-interface MessageItem {
-  id: string
-  type: 'message'
-  message: DisplayMessage
+function getInitials(name: string) {
+  return name ? name.charAt(0).toUpperCase() : '?'
 }
 
-type GroupedItem = SeparatorItem | MessageItem
+function formatTime(timestamp?: number) {
+  if (!timestamp) return ''
+  return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
 
-const groupedItems = computed<GroupedItem[]>(() => {
-  const items: GroupedItem[] = []
-  let lastDate = ''
-
-  for (const message of props.messages) {
-    const messageDate = formatDate(message.createdAt)
-    if (messageDate !== lastDate) {
-      items.push({
-        id: `separator-${message.id}`,
-        type: 'separator',
-        label: messageDate
-      })
-      lastDate = messageDate
-    }
-    items.push({
-      id: message.id,
-      type: 'message',
-      message
-    })
-  }
-
-  return items
+// Grouping logic (simplified)
+const groupedMessages = computed(() => {
+  return props.messages.map(m => ({ type: 'message', message: m }))
 })
-
-function isMe(message: DisplayMessage): boolean {
-  return message.senderId === props.currentUserId
-}
-
-function getInitials(name: string): string {
-  return name.charAt(0).toUpperCase()
-}
-
-function formatTime(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-
-  if (date.toDateString() === today.toDateString()) {
-    return 'Today'
-  }
-  if (date.toDateString() === yesterday.toDateString()) {
-    return 'Yesterday'
-  }
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
-}
-
-function updatePinnedState() {
-  if (!listRef.value) return
-  const threshold = 120
-  const distanceFromBottom = listRef.value.scrollHeight - listRef.value.scrollTop - listRef.value.clientHeight
-  isPinnedToBottom.value = distanceFromBottom < threshold
-}
 
 function scrollToBottom() {
-  if (!listRef.value) return
-  listRef.value.scrollTop = listRef.value.scrollHeight
-}
-
-function handleJumpToLatest() {
-  scrollToBottom()
-  isPinnedToBottom.value = true
-}
-
-// Auto-scroll on new messages
-watch(
-  () => props.messages.length,
-  async () => {
-    await nextTick()
-    if (isPinnedToBottom.value) {
-      scrollToBottom()
-    }
+  if (listRef.value) {
+    listRef.value.scrollTop = listRef.value.scrollHeight
   }
-)
+}
 
-onMounted(() => {
-  updatePinnedState()
-  listRef.value?.addEventListener('scroll', updatePinnedState, { passive: true })
-  scrollToBottom()
-})
+onMounted(scrollToBottom)
 
-onBeforeUnmount(() => {
-  listRef.value?.removeEventListener('scroll', updatePinnedState)
-})
-
-defineExpose({
-  jumpToLatest: handleJumpToLatest
-})
+defineExpose({ jumpToLatest: scrollToBottom })
 </script>
+
+<style scoped>
+.messages-list-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.empty-messages {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-bubble {
+  background: #f1f5f9;
+  padding: 12px 24px;
+  border-radius: 100px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.message-item {
+  display: flex;
+  gap: 16px;
+  max-width: 85%;
+}
+
+.is-me {
+  flex-direction: row-reverse;
+  align-self: flex-end;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 900;
+  color: white;
+}
+
+.my-avatar { background: #4f46e5; }
+.other-avatar { background: #e2e8f0; color: #64748b; }
+
+.message-content-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.is-me .message-content-wrap { align-items: flex-end; }
+
+.message-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sender-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.message-time {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
+
+.message-bubble {
+  padding: 14px 18px;
+  border-radius: 20px;
+  line-height: 1.5;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.my-bubble {
+  background: #4f46e5;
+  color: white;
+  border-bottom-right-radius: 4px;
+  box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.3);
+}
+
+.other-bubble {
+  background: white;
+  color: #334155;
+  border-bottom-left-radius: 4px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.02);
+}
+
+.message-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.date-divider {
+  text-align: center;
+  position: relative;
+  margin: 16px 0;
+}
+
+.date-divider span {
+  background: #f8fafc;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  position: relative;
+  z-index: 2;
+}
+
+.date-divider::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  height: 1px;
+  background: #f1f5f9;
+  z-index: 1;
+}
+</style>

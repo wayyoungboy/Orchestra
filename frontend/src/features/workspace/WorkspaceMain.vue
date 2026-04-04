@@ -1,14 +1,32 @@
 <template>
-  <div class="flex h-full w-full relative">
+  <div class="workspace-root" @mousemove="handleMouseMove">
+    <!-- Layer 0: Background Layer (1:1 Match with Login Page) -->
+    <div class="background-layer">
+      <div class="grid-pattern"></div>
+      <div class="bg-glow-center"></div>
+      
+      <!-- Parallax Orbs -->
+      <div class="orb orb-1" :style="parallaxStyle(0.05)"></div>
+      <div class="orb orb-2" :style="parallaxStyle(-0.03)"></div>
+      <div class="orb orb-3" :style="parallaxStyle(0.02)"></div>
+
+      <!-- Floating Particles (Optional for deeper consistency) -->
+      <div class="particles-container">
+        <div v-for="i in 15" :key="i" class="particle" :style="randomParticleStyle()"></div>
+      </div>
+    </div>
+
     <!-- Sidebar Navigation -->
-    <SidebarNav :active-tab="activeTab" :in-workspace="!showWorkspaceSelection && !!workspaceStore.currentWorkspace" @change="setActiveTab" />
+    <div class="nav-container">
+      <SidebarNav :active-tab="activeTab" :in-workspace="!showWorkspaceSelection && !!workspaceStore.currentWorkspace" @change="setActiveTab" />
+    </div>
 
     <!-- Main Content -->
-    <main class="flex-1 h-full overflow-hidden relative flex flex-col bg-panel/50">
-      <!-- Top Bar with Workspace Switcher (only when in workspace) -->
+    <main class="main-body">
+      <!-- Top Bar (Only in workspace) -->
       <header
         v-if="workspaceStore.currentWorkspace && !showWorkspaceSelection"
-        class="h-12 bg-panel/50 border-b border-white/5 flex items-center px-4"
+        class="workspace-header"
       >
         <WorkspaceSwitcher
           :current-workspace="workspaceStore.currentWorkspace"
@@ -19,130 +37,32 @@
       </header>
 
       <!-- Content Area -->
-      <div class="flex-1 overflow-hidden">
-        <!-- Workspace Selection -->
+      <div class="content-view">
         <WorkspaceSelection v-if="showWorkspaceSelection" />
-
-        <!-- Chat Interface -->
+        
         <ChatInterface v-else-if="activeTab === 'chat' && workspaceStore.currentWorkspace" />
-        <div v-else-if="activeTab === 'chat'" class="h-full flex items-center justify-center text-white/40">
-          <div class="text-center">
-            <p class="text-lg mb-2">{{ t('workspace.noSelectionTitle') }}</p>
-            <p class="text-sm">{{ t('workspace.noSelectionHint') }}</p>
-          </div>
-        </div>
-
-        <!-- Terminal Workspace -->
         <TerminalWorkspace v-else-if="activeTab === 'terminal' && workspaceStore.currentWorkspace" />
-        <div v-else-if="activeTab === 'terminal'" class="h-full flex items-center justify-center text-white/40">
-          <div class="text-center">
-            <p class="text-lg mb-2">{{ t('workspace.noSelectionTitle') }}</p>
-            <p class="text-sm">{{ t('workspace.noSelectionHint') }}</p>
-          </div>
-        </div>
-
-        <!-- Members Page -->
         <MembersPage v-else-if="activeTab === 'members' && workspaceStore.currentWorkspace" />
-        <div v-else-if="activeTab === 'members'" class="h-full flex items-center justify-center text-white/40">
-          <div class="text-center">
-            <p class="text-lg mb-2">{{ t('workspace.noSelectionTitle') }}</p>
-            <p class="text-sm">{{ t('workspace.noSelectionHint') }}</p>
-          </div>
-        </div>
-
-        <!-- Skills (Web placeholder, REQ-403) -->
         <SkillsPlaceholder v-else-if="activeTab === 'skills' && workspaceStore.currentWorkspace" />
-        <div v-else-if="activeTab === 'skills'" class="h-full flex items-center justify-center text-white/40">
-          <div class="text-center">
-            <p class="text-lg mb-2">{{ t('workspace.noSelectionTitle') }}</p>
-            <p class="text-sm">{{ t('workspace.noSelectionHint') }}</p>
+        <Settings v-else-if="activeTab === 'settings'" />
+
+        <!-- No Selection Placeholder -->
+        <div v-else-if="!showWorkspaceSelection" class="empty-state">
+          <div class="empty-glass-card">
+            <p class="text-lg font-bold text-slate-900 mb-2">{{ t('workspace.noSelectionTitle') }}</p>
+            <p class="text-sm text-slate-500">{{ t('workspace.noSelectionHint') }}</p>
           </div>
         </div>
-
-        <!-- Settings -->
-        <Settings v-else-if="activeTab === 'settings'" />
       </div>
     </main>
-
-    <!-- Keyboard Shortcuts Help Overlay -->
-    <div
-      v-if="helpVisible"
-      class="absolute inset-0 bg-black/50 flex items-center justify-center z-50"
-      @click="helpVisible = false"
-    >
-      <div
-        class="bg-panel rounded-xl border border-white/10 shadow-xl w-80 max-h-96 overflow-hidden"
-        @click.stop
-      >
-        <div class="p-4 border-b border-white/10">
-          <h3 class="text-lg font-bold text-white">Keyboard Shortcuts</h3>
-        </div>
-        <div class="p-4 space-y-3 overflow-y-auto">
-          <div class="flex items-center justify-between py-2">
-            <span class="text-sm text-white/80">Focus search</span>
-            <kbd class="px-2 py-1 rounded bg-surface border border-white/10 text-xs font-mono text-white/60">
-              Ctrl+K
-            </kbd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <span class="text-sm text-white/80">Toggle help</span>
-            <kbd class="px-2 py-1 rounded bg-surface border border-white/10 text-xs font-mono text-white/60">
-              Ctrl+/
-            </kbd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <span class="text-sm text-white/80">Close modal</span>
-            <kbd class="px-2 py-1 rounded bg-surface border border-white/10 text-xs font-mono text-white/60">
-              Esc
-            </kbd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <span class="text-sm text-white/80">Navigate to Chat</span>
-            <kbd class="px-2 py-1 rounded bg-surface border border-white/10 text-xs font-mono text-white/60">
-              Ctrl+1
-            </kbd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <span class="text-sm text-white/80">Navigate to Terminal</span>
-            <kbd class="px-2 py-1 rounded bg-surface border border-white/10 text-xs font-mono text-white/60">
-              Ctrl+2
-            </kbd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <span class="text-sm text-white/80">Navigate to Members</span>
-            <kbd class="px-2 py-1 rounded bg-surface border border-white/10 text-xs font-mono text-white/60">
-              Ctrl+3
-            </kbd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <span class="text-sm text-white/80">Navigate to Settings</span>
-            <kbd class="px-2 py-1 rounded bg-surface border border-white/10 text-xs font-mono text-white/60">
-              Ctrl+4
-            </kbd>
-          </div>
-          <div class="flex items-center justify-between py-2">
-            <span class="text-sm text-white/80">Navigate to Skills</span>
-            <kbd class="px-2 py-1 rounded bg-surface border border-white/10 text-xs font-mono text-white/60">
-              Ctrl+5
-            </kbd>
-          </div>
-        </div>
-        <div class="p-4 border-t border-white/10">
-          <p class="text-xs text-white/40 text-center">
-            Press <kbd class="px-1.5 py-0.5 rounded bg-surface border border-white/10 text-xs font-mono">Esc</kbd> to close
-          </p>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, reactive } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
-import { useAppShortcuts } from '@/shared/composables'
 import SidebarNav, { type TabId } from '@/shared/components/SidebarNav.vue'
 import WorkspaceSwitcher from '@/shared/components/WorkspaceSwitcher.vue'
 import WorkspaceSelection from '@/features/workspace/WorkspaceSelection.vue'
@@ -158,64 +78,37 @@ const router = useRouter()
 const workspaceStore = useWorkspaceStore()
 
 const activeTab = ref<TabId>('workspaces')
-const helpVisible = ref(false)
 
-// Keyboard shortcuts
-useAppShortcuts({
-  onFocusSearch: () => {
-    // Focus command palette or search - to be implemented
-    console.log('Focus search triggered')
-  },
-  onToggleHelp: () => {
-    helpVisible.value = !helpVisible.value
-  },
-  onCloseModal: () => {
-    helpVisible.value = false
-  },
-  onNavigateChat: () => {
-    if (workspaceStore.currentWorkspace) {
-      setActiveTab('chat')
-    }
-  },
-  onNavigateTerminal: () => {
-    if (workspaceStore.currentWorkspace) {
-      setActiveTab('terminal')
-    }
-  },
-  onNavigateMembers: () => {
-    if (workspaceStore.currentWorkspace) {
-      setActiveTab('members')
-    }
-  },
-  onNavigateSettings: () => {
-    setActiveTab('settings')
-  },
-  onNavigateSkills: () => {
-    if (workspaceStore.currentWorkspace) {
-      setActiveTab('skills')
-    }
-  },
-  helpVisible
-})
+// Mouse Parallax Logic (Identical to Login)
+const mouse = reactive({ x: 0, y: 0 })
+function handleMouseMove(e: MouseEvent) {
+  mouse.x = (e.clientX - window.innerWidth / 2) / 10
+  mouse.y = (e.clientY - window.innerHeight / 2) / 10
+}
+function parallaxStyle(factor: number) {
+  return { transform: `translate(${mouse.x * factor}px, ${mouse.y * factor}px)` }
+}
 
-// Only show workspace selection when on workspaces route
-const showWorkspaceSelection = computed(() => {
-  return activeTab.value === 'workspaces'
-})
+function randomParticleStyle() {
+  return {
+    left: `${Math.random() * 100}%`,
+    top: `${Math.random() * 100}%`,
+    width: `${Math.random() * 2 + 2}px`,
+    height: `${Math.random() * 2 + 2}px`,
+    animationDelay: `${Math.random() * 5}s`,
+    animationDuration: `${Math.random() * 10 + 10}s`
+  }
+}
+
+const showWorkspaceSelection = computed(() => activeTab.value === 'workspaces')
 
 function setActiveTab(tab: TabId) {
   activeTab.value = tab
-
-  // Update route based on tab
   const workspaceId = workspaceStore.currentWorkspace?.id
   if (workspaceId) {
-    if (tab === 'workspaces') {
-      router.push('/workspaces')
-    } else {
-      router.push(`/workspace/${workspaceId}/${tab}`)
-    }
+    if (tab === 'workspaces') router.push('/workspaces')
+    else router.push(`/workspace/${workspaceId}/${tab}`)
   } else if (tab !== 'workspaces' && tab !== 'settings') {
-    // If no workspace, redirect to workspaces
     router.push('/workspaces')
   }
 }
@@ -233,37 +126,131 @@ function handleCreateWorkspace() {
   router.push('/workspaces')
 }
 
-// Sync activeTab with route
-watch(
-  () => route.path,
-  (path) => {
-    if (path.includes('/terminal')) {
-      activeTab.value = 'terminal'
-    } else if (path.includes('/members')) {
-      activeTab.value = 'members'
-    } else if (path.includes('/skills')) {
-      activeTab.value = 'skills'
-    } else if (path.includes('/settings')) {
-      activeTab.value = 'settings'
-    } else if (path.includes('/chat')) {
-      activeTab.value = 'chat'
-    } else if (path.includes('/workspaces') || path === '/') {
-      activeTab.value = 'workspaces'
-    }
-  },
-  { immediate: true }
-)
+watch(() => route.path, (path) => {
+  if (path.includes('/terminal')) activeTab.value = 'terminal'
+  else if (path.includes('/members')) activeTab.value = 'members'
+  else if (path.includes('/skills')) activeTab.value = 'skills'
+  else if (path.includes('/settings')) activeTab.value = 'settings'
+  else if (path.includes('/chat')) activeTab.value = 'chat'
+  else if (path.includes('/workspaces') || path === '/') activeTab.value = 'workspaces'
+}, { immediate: true })
 
-// Load workspace on mount
-watch(
-  () => route.params.id,
-  async (workspaceId) => {
-    if (workspaceId && typeof workspaceId === 'string') {
-      if (!workspaceStore.currentWorkspace || workspaceStore.currentWorkspace.id !== workspaceId) {
-        await workspaceStore.openWorkspace(workspaceId)
-      }
+watch(() => route.params.id, async (workspaceId) => {
+  if (workspaceId && typeof workspaceId === 'string') {
+    if (!workspaceStore.currentWorkspace || workspaceStore.currentWorkspace.id !== workspaceId) {
+      await workspaceStore.openWorkspace(workspaceId)
     }
-  },
-  { immediate: true }
-)
+  }
+}, { immediate: true })
 </script>
+
+<style scoped>
+.workspace-root {
+  height: 100vh;
+  width: 100vw;
+  background-color: #f8fafc;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Layer 0: Background - EXACT MATCH with Login */
+.background-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.grid-pattern {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(to right, rgba(128, 128, 128, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(128, 128, 128, 0.07) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.bg-glow-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.05), transparent 70%);
+}
+
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.15;
+  transition: transform 0.2s ease-out;
+  pointer-events: none;
+}
+
+.orb-1 { top: -10%; left: -10%; width: 50%; height: 50%; background-color: #6366f1; }
+.orb-2 { bottom: -10%; right: -5%; width: 40%; height: 40%; background-color: #10b981; }
+.orb-3 { top: 40%; right: 20%; width: 20%; height: 20%; background-color: #8b5cf6; opacity: 0.1; }
+
+.particles-container { position: absolute; inset: 0; pointer-events: none; }
+.particle {
+  position: absolute; background: white; border-radius: 50%; opacity: 0.3;
+  box-shadow: 0 0 10px white; animation: float-up-ws infinite linear;
+}
+
+@keyframes float-up-ws {
+  from { transform: translateY(0); opacity: 0; }
+  20% { opacity: 0.4; }
+  80% { opacity: 0.4; }
+  to { transform: translateY(-100vh); opacity: 0; }
+}
+
+.nav-container {
+  position: relative;
+  z-index: 20;
+  height: 100%;
+}
+
+.main-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 10;
+  height: 100%;
+}
+
+.workspace-header {
+  height: 56px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(24px);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+}
+
+.content-view {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-glass-card {
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(40px);
+  border-radius: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  text-align: center;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.03);
+}
+</style>

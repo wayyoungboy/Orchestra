@@ -1,68 +1,84 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { notifyUserError } from '@/shared/notifyError'
+import client from '@/shared/api/client'
+import axios from 'axios'
 
 export const useAuthStore = defineStore('auth', () => {
-  const storedCredentials = localStorage.getItem('orchestra.credentials')
-  const defaultUsername = 'orchestra'
-  const defaultPassword = 'orchestra'
+  const isAuthEnabled = ref(true)
+  const initialized = ref(false)
+  const isAuthenticated = ref(!!localStorage.getItem('orchestra.auth.token'))
+  const currentUser = ref<string | null>(localStorage.getItem('orchestra.user'))
 
-  let savedUsername = defaultUsername
-  let savedPassword = defaultPassword
-
-  if (storedCredentials) {
+  /**
+   * Fetch authentication configuration from backend
+   */
+  async function fetchConfig() {
+    if (initialized.value) return
+    
     try {
-      const parsed = JSON.parse(storedCredentials)
-      savedUsername = parsed.username || defaultUsername
-      savedPassword = parsed.password || defaultPassword
+      const response = await client.get('/auth/config')
+      const { enabled } = response.data
+      isAuthEnabled.value = enabled
+
+      // If auth is disabled globally, treat as authenticated
+      if (!enabled) {
+        isAuthenticated.value = true
+        if (!currentUser.value) currentUser.value = 'guest'
+      }
     } catch (e) {
-      notifyUserError('Saved login credentials (orchestra.credentials)', e)
+      console.warn('Failed to fetch auth config, defaulting to enabled', e)
+    } finally {
+      initialized.value = true
     }
   }
 
-  const isAuthenticated = ref(localStorage.getItem('orchestra.auth') === 'true')
-  const currentUser = ref<string | null>(localStorage.getItem('orchestra.user'))
+  /**
+   * Perform login with username and password
+   */
+  async function login(username: string, password: string): Promise<boolean> {
+    try {
+      const response = await client.post('/auth/login', { username, password })
+      const { token, user } = response.data
 
-  const isLoggedIn = computed(() => isAuthenticated.value)
+      // Handle special "disabled-auth-mode" token
+      if (token === 'disabled-auth-mode') {
+        isAuthenticated.value = true
+        currentUser.value = username || 'guest'
+        localStorage.setItem('orchestra.auth.token', 'disabled-auth-mode')
+        localStorage.setItem('orchestra.user', currentUser.value)
+        return true
+      }
 
-  function login(username: string, password: string): boolean {
-    if (username === savedUsername && password === savedPassword) {
       isAuthenticated.value = true
-      currentUser.value = username
-      localStorage.setItem('orchestra.auth', 'true')
-      localStorage.setItem('orchestra.user', username)
+      currentUser.value = user.username
+      
+      localStorage.setItem('orchestra.auth.token', token)
+      localStorage.setItem('orchestra.user', user.username)
       return true
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+        // Return false to let component show error message
+      } else {
+        notifyUserError('Login failed', error)
+      }
+      return false
     }
-    return false
   }
 
   function logout() {
     isAuthenticated.value = false
     currentUser.value = null
-    localStorage.removeItem('orchestra.auth')
+    localStorage.removeItem('orchestra.auth.token')
     localStorage.removeItem('orchestra.user')
   }
 
-  function updateCredentials(newUsername: string, newPassword: string) {
-    savedUsername = newUsername
-    savedPassword = newPassword
-    localStorage.setItem('orchestra.credentials', JSON.stringify({
-      username: newUsername,
-      password: newPassword
-    }))
-  }
-
-  function getCredentials() {
-    return { username: savedUsername, password: savedPassword }
-  }
-
   return {
+    isAuthEnabled,
     isAuthenticated,
     currentUser,
-    isLoggedIn,
+    fetchConfig,
     login,
-    logout,
-    updateCredentials,
-    getCredentials
+    logout
   }
 })

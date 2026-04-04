@@ -7,11 +7,11 @@ type Config struct {
 	Terminal TerminalConfig `yaml:"terminal"`
 	Security SecurityConfig `yaml:"security"`
 	Storage  StorageConfig  `yaml:"storage"`
+	Auth     AuthConfig     `yaml:"auth"`
 }
 
 type ServerConfig struct {
 	HTTPAddr string `yaml:"http_addr"`
-	WSAddr   string `yaml:"ws_addr"`
 }
 
 type TerminalConfig struct {
@@ -31,11 +31,17 @@ type StorageConfig struct {
 	Workspaces string `yaml:"workspaces"`
 }
 
+type AuthConfig struct {
+	Enabled           bool          `yaml:"enabled"`
+	JWTSecret         string        `yaml:"jwt_secret"`
+	JWTExpiration     time.Duration `yaml:"jwt_expiration"`
+	AllowRegistration bool          `yaml:"allow_registration"`
+}
+
 func Default() *Config {
 	return &Config{
 		Server: ServerConfig{
 			HTTPAddr: ":8080",
-			WSAddr:   ":8081",
 		},
 		Terminal: TerminalConfig{
 			MaxSessions: 10,
@@ -50,6 +56,12 @@ func Default() *Config {
 		Storage: StorageConfig{
 			Database:   "./data/orchestra.db",
 			Workspaces: "./workspaces",
+		},
+		Auth: AuthConfig{
+			Enabled:           false,
+			JWTSecret:         "",
+			JWTExpiration:     24 * time.Hour,
+			AllowRegistration: false,
 		},
 	}
 }

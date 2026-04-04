@@ -17,12 +17,23 @@ export default {
         background: 'rgb(var(--color-background) / <alpha-value>)',
         overlay: 'rgb(var(--color-overlay) / <alpha-value>)',
       },
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-primary': 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+        'gradient-glass': 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 100%)',
+      },
       fontFamily: {
         sans: ['Be Vietnam Pro', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'Menlo', 'monospace'],
       },
       boxShadow: {
-        glow: '0 0 20px rgb(var(--color-primary) / 0.4)',
+        glow: '0 0 20px rgb(99 102 241 / 0.3)',
+        'glow-primary': '0 0 30px rgb(99 102 241 / 0.4)',
+        glass: '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
+      },
+      borderRadius: {
+        '2xl': '1rem',
+        '3xl': '1.5rem',
       },
       animation: {
         'fade-in': 'fadeIn 0.2s ease-out',

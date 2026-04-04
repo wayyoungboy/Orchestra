@@ -27,12 +27,26 @@ func Load(path string) (*Config, error) {
 		}
 	}
 
-	// 从环境变量读取加密密钥
+	// Read encryption key from environment
 	if key := os.Getenv("ORCHESTRA_ENCRYPTION_KEY"); key != "" {
 		cfg.Security.EncryptionKey = key
 	}
 
-	// 解析路径中的环境变量
+	// Auth configuration from environment
+	if secret := os.Getenv("ORCHESTRA_JWT_SECRET"); secret != "" {
+		cfg.Auth.JWTSecret = secret
+		cfg.Auth.Enabled = true
+	}
+
+	if os.Getenv("ORCHESTRA_AUTH_DISABLED") == "true" {
+		cfg.Auth.Enabled = false
+	}
+
+	if os.Getenv("ORCHESTRA_ALLOW_REGISTRATION") == "true" {
+		cfg.Auth.AllowRegistration = true
+	}
+
+	// Expand paths
 	cfg.Storage.Database = expandPath(cfg.Storage.Database)
 	cfg.Storage.Workspaces = expandPath(cfg.Storage.Workspaces)
 

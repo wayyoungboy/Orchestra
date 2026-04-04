@@ -1,265 +1,160 @@
 <template>
-  <div class="h-full flex flex-col">
-    <!-- Header -->
-    <header class="px-6 py-4 border-b border-white/5">
-      <div class="flex items-center justify-between">
-        <h1 class="text-lg font-bold text-white">{{ t('members.title') }}</h1>
-        <div class="relative">
-          <button
-            type="button"
-            data-invite-menu-toggle
-            class="w-9 h-9 rounded-xl border flex items-center justify-center transition-colors"
-            :class="
-              showInviteMenu
-                ? 'bg-primary/20 text-primary border-primary/30'
-                : 'bg-white/10 border-white/10 text-white/70 hover:bg-white/20 hover:text-white'
-            "
-            :title="t('friends.invite')"
-            @click.stop="showInviteMenu = !showInviteMenu"
-          >
-            <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
-              />
-            </svg>
-          </button>
-          <template v-if="showInviteMenu">
-            <div
-              class="fixed inset-0 bg-background/60 backdrop-blur-[2px] z-40"
-              aria-hidden="true"
-              @click="showInviteMenu = false"
-            />
-            <InviteMenu position-class="absolute right-0 top-full mt-2 z-50" @select="handleInviteMenuSelect" />
-          </template>
+  <div class="members-page-root animate-in fade-in zoom-in-95 duration-500">
+    <div class="page-header">
+      <div class="header-info">
+        <h1 class="page-title">团队成员</h1>
+        <p class="page-subtitle">{{ workspaceStore.currentWorkspace?.name }} · {{ members.length }} 位协作成员</p>
+      </div>
+      <button @click="showAddModal = true" class="add-member-btn">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+        </svg>
+        <span>邀请成员</span>
+      </button>
+    </div>
+
+    <div class="members-content">
+      <div class="members-grid">
+        <div v-for="member in members" :key="member.id" class="member-card">
+          <div class="card-top">
+            <div :class="['member-avatar', member.roleType === 'owner' ? 'is-owner' : '']">
+              {{ member.name.charAt(0).toUpperCase() }}
+            </div>
+            <div class="member-badge" :class="member.roleType">
+              {{ roleLabel(member.roleType) }}
+            </div>
+          </div>
+          
+          <div class="member-info">
+            <h3 class="member-name">{{ member.name }}</h3>
+            <p class="member-id">ID: {{ member.id.slice(0, 8) }}...</p>
+          </div>
+
+          <div class="member-actions">
+            <button @click="handleEdit(member)" class="action-btn">编辑</button>
+            <button v-if="member.roleType !== 'owner'" @click="handleDelete(member.id)" class="action-btn is-danger">移除</button>
+          </div>
         </div>
-      </div>
-    </header>
-
-    <!-- Members List -->
-    <div class="flex-1 overflow-y-auto px-6 py-4">
-      <div v-if="projectStore.loading" class="flex items-center justify-center h-full">
-        <div class="text-white/40">{{ t('members.loading') }}</div>
-      </div>
-
-      <div v-else-if="projectStore.error" class="flex items-center justify-center h-full">
-        <div class="text-red-400">{{ projectStore.error }}</div>
-      </div>
-
-      <div v-else class="space-y-8 pb-6">
-        <section
-          v-for="sec in roleSections"
-          :key="sec.key"
-          class="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4"
-        >
-          <h2 class="text-white/30 text-[10px] font-bold uppercase tracking-widest mb-3">
-            {{ t(sec.titleKey) }}
-            <span class="tabular-nums text-white/45">({{ sec.members.length }})</span>
-          </h2>
-          <div v-if="sec.members.length === 0" class="py-6 text-center text-sm text-white/30">
-            {{ t(sec.emptyKey) }}
-          </div>
-          <div v-else class="space-y-2">
-            <MemberRow
-              v-for="member in sec.members"
-              :key="member.id"
-              :member="member"
-              :current-user-id="currentUserId"
-              :menu-open="openMenuId === member.id"
-              @toggle-menu="toggleMenu"
-              @action="handleAction"
-            />
-          </div>
-        </section>
       </div>
     </div>
 
-    <!-- Add Member Modal -->
-    <AddMemberModal
-      v-if="showAddModal"
-      :mode="showAddModal"
-      @close="showAddModal = null"
-      @invite="handleInvite"
-    />
-
-    <!-- Edit Member Modal -->
-    <EditMemberModal
-      v-if="editingMember"
-      :member="editingMember"
-      :show-remove="editingMember.id !== currentUserId"
-      @close="editingMember = null"
-      @save="handleSave"
-      @remove="handleRemove"
-    />
+    <!-- Modals -->
+    <AddMemberModal v-if="showAddModal" @close="showAddModal = false" @add="loadMembers" />
+    <EditMemberModal v-if="editingMember" :member="editingMember" @close="editingMember = null" @update="loadMembers" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { storeToRefs } from 'pinia'
-import { useRoute } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { ref, onMounted } from 'vue'
 import { useProjectStore } from '@/features/workspace/projectStore'
-import { useChatStore } from '@/features/chat/chatStore'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
-import { useTerminalMemberStore, hasTerminalConfig } from '@/features/terminal/terminalMemberStore'
-import MemberRow from './MemberRow.vue'
 import AddMemberModal from './AddMemberModal.vue'
 import EditMemberModal from './EditMemberModal.vue'
-import InviteMenu from '@/features/chat/components/InviteMenu.vue'
-import type { Member, MemberRole, MemberStatus } from '@/shared/types/member'
 
-const { t } = useI18n()
-const route = useRoute()
 const projectStore = useProjectStore()
-const { members: projectMembers } = storeToRefs(projectStore)
 const workspaceStore = useWorkspaceStore()
+const members = ref<any[]>([])
+const showAddModal = ref(false)
+const editingMember = ref<any>(null)
 
-const routeWorkspaceId = computed(() => {
-  const p = route.params.id
-  if (typeof p === 'string' && p) return p
-  if (Array.isArray(p) && p[0]) return p[0]
-  return undefined
-})
-const terminalMemberStore = useTerminalMemberStore()
-const chatStore = useChatStore()
-
-const showAddModal = ref<'assistant' | 'admin' | 'member' | 'secretary' | null>(null)
-const showInviteMenu = ref(false)
-
-function handleInviteMenuSelect(type: 'admin' | 'secretary' | 'assistant' | 'member') {
-  showInviteMenu.value = false
-  showAddModal.value = type
-}
-const editingMember = ref<Member | null>(null)
-const openMenuId = ref<string | null>(null)
-
-// Current user ID - for now, we'll use the first owner as current user
-const currentUserId = computed(() => {
-  const owners = projectMembers.value.filter((m) => m.roleType === 'owner')
-  return owners[0]?.id || ''
-})
-
-// Group members by role
-const owners = computed(() => projectMembers.value.filter((m) => m.roleType === 'owner'))
-const admins = computed(() => projectMembers.value.filter((m) => m.roleType === 'admin'))
-const secretaries = computed(() => projectMembers.value.filter((m) => m.roleType === 'secretary'))
-const assistants = computed(() => projectMembers.value.filter((m) => m.roleType === 'assistant'))
-const membersGroup = computed(() => projectMembers.value.filter((m) => m.roleType === 'member'))
-
-const knownMemberRoles = new Set<MemberRole>(['owner', 'admin', 'secretary', 'assistant', 'member'])
-const otherRoles = computed(() =>
-  projectMembers.value.filter((m) => !knownMemberRoles.has(m.roleType as MemberRole))
-)
-
-const roleSections = computed(() => [
-  { key: 'owner', titleKey: 'members.roleOwner', emptyKey: 'members.emptyRoleOwner', members: owners.value },
-  { key: 'admin', titleKey: 'members.roleAdmin', emptyKey: 'members.emptyRoleAdmin', members: admins.value },
-  {
-    key: 'secretary',
-    titleKey: 'members.roleSecretary',
-    emptyKey: 'members.emptyRoleSecretary',
-    members: secretaries.value
-  },
-  {
-    key: 'assistant',
-    titleKey: 'members.roleAssistant',
-    emptyKey: 'members.emptyRoleAssistant',
-    members: assistants.value
-  },
-  { key: 'member', titleKey: 'members.roleMember', emptyKey: 'members.emptyRoleMember', members: membersGroup.value },
-  {
-    key: 'other',
-    titleKey: 'members.roleOther',
-    emptyKey: 'members.emptyRoleOther',
-    members: otherRoles.value
-  }
-])
-
-function toggleMenu(member: Member) {
-  openMenuId.value = openMenuId.value === member.id ? null : member.id
-}
-
-interface ActionPayload {
-  action: string
-  member: Member
-  status?: MemberStatus
-}
-
-function handleAction(payload: ActionPayload) {
-  openMenuId.value = null
-
-  switch (payload.action) {
-    case 'open-terminal':
-      if (payload.member) {
-        terminalMemberStore.openMemberTerminal(payload.member)
-      }
-      break
-    case 'rename':
-      editingMember.value = payload.member
-      break
-    case 'set-status':
-      if (payload.status) {
-        projectStore.updateMember(payload.member.id, { manualStatus: payload.status }, routeWorkspaceId.value)
-      }
-      break
-    case 'remove':
-      editingMember.value = payload.member
-      break
+async function loadMembers() {
+  if (workspaceStore.currentWorkspace) {
+    const res = await projectStore.loadMembers(workspaceStore.currentWorkspace.id)
+    members.value = res || []
   }
 }
 
-async function handleInvite(data: { name: string; roleType: MemberRole; command?: string; terminalType?: string }) {
-  const newMember = await projectStore.addMember(
-    {
-      name: data.name,
-      roleType: data.roleType,
-      terminalType: data.terminalType,
-      terminalCommand: data.command
-    },
-    routeWorkspaceId.value
-  )
+function roleLabel(role: string) {
+  const map: any = { owner: '所有者', admin: '管理员', assistant: 'AI 助手', member: '成员' }
+  return map[role] || role
+}
 
-  if (newMember) {
-    showAddModal.value = null
-  }
-
-  // Auto-start terminal when role has CLI config (assistant / secretary / member)
-  if (
-    newMember &&
-    (data.roleType === 'assistant' || data.roleType === 'secretary' || data.roleType === 'member') &&
-    hasTerminalConfig(data.terminalType, data.command)
-  ) {
-    await terminalMemberStore.startMemberSession(newMember, { openTab: true, quietAutostart: true })
+function handleEdit(member: any) { editingMember.value = member }
+async function handleDelete(id: string) {
+  if (confirm('确定要移除该成员吗？')) {
+    await projectStore.deleteMember(workspaceStore.currentWorkspace!.id, id)
+    await loadMembers()
   }
 }
 
-function handleSave(id: string, name: string) {
-  projectStore.updateMember(id, { name }, routeWorkspaceId.value)
-  editingMember.value = null
-}
-
-async function handleRemove(id: string) {
-  const cleaned = await chatStore.deleteMemberConversations(id)
-  if (!cleaned) return
-  await projectStore.removeMember(id, routeWorkspaceId.value)
-  editingMember.value = null
-}
-
-// Ensure GET workspace (owner bootstrap) completes before listing members; avoids empty list races.
-watch(
-  () => routeWorkspaceId.value ?? workspaceStore.currentWorkspace?.id,
-  async (workspaceId) => {
-    showInviteMenu.value = false
-    if (!workspaceId) {
-      projectStore.reset()
-      return
-    }
-    await workspaceStore.openWorkspace(workspaceId)
-    await projectStore.loadMembers(workspaceId)
-  },
-  { immediate: true }
-)
+onMounted(loadMembers)
 </script>
+
+<style scoped>
+.members-page-root {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 24px;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.page-title { font-size: 28px; font-weight: 900; color: #0f172a; }
+.page-subtitle { font-size: 14px; font-weight: 600; color: #64748b; margin-top: 4px; }
+
+.add-member-btn {
+  display: flex; align-items: center; gap: 8px; padding: 10px 20px;
+  background: #4f46e5; color: white; border-radius: 14px;
+  font-size: 14px; font-weight: 800; border: none; cursor: pointer;
+  box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4);
+  transition: all 0.3s;
+}
+.add-member-btn:hover { background: #4338ca; transform: translateY(-2px); }
+
+.members-content { flex: 1; overflow-y: auto; }
+
+.members-grid {
+  display: grid;
+  grid-template-cols: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.member-card {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(24px);
+  border-radius: 24px;
+  padding: 24px;
+  border: 1px solid white;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  transition: all 0.3s;
+}
+.member-card:hover { transform: translateY(-4px); background: white; box-shadow: 0 20px 40px rgba(0,0,0,0.04); }
+
+.card-top { display: flex; align-items: flex-start; justify-content: space-between; }
+
+.member-avatar {
+  width: 48px; height: 48px; border-radius: 14px;
+  background: #f1f5f9; color: #64748b;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 900;
+}
+.member-avatar.is-owner { background: rgba(99, 102, 241, 0.1); color: #4f46e5; }
+
+.member-badge {
+  padding: 4px 10px; border-radius: 100px; font-size: 10px; font-weight: 900;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.member-badge.owner { background: #fee2e2; color: #ef4444; }
+.member-badge.assistant { background: #dcfce7; color: #10b981; }
+.member-badge.member { background: #f1f5f9; color: #64748b; }
+
+.member-info h3 { font-size: 16px; font-weight: 800; color: #0f172a; }
+.member-id { font-size: 11px; font-weight: 600; color: #94a3b8; font-family: monospace; }
+
+.member-actions { display: flex; gap: 8px; }
+.action-btn {
+  flex: 1; padding: 8px; border-radius: 10px; border: 1px solid #e2e8f0;
+  background: white; color: #64748b; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+}
+.action-btn:hover { background: #f8fafc; color: #0f172a; border-color: #cbd5e1; }
+.action-btn.is-danger:hover { background: #fef2f2; color: #ef4444; border-color: #fecaca; }
+</style>

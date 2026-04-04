@@ -3,14 +3,15 @@
     "name": "Orchestra"
   },
   "auth": {
-    "subtitle": "多智能体协作平台",
+    "subtitle": "协作平台已就绪",
+    "accessRequired": "开始你的交响乐",
     "username": "用户名",
     "password": "密码",
-    "usernamePlaceholder": "输入用户名",
-    "passwordPlaceholder": "输入密码",
+    "usernamePlaceholder": "输入您的用户名",
+    "passwordPlaceholder": "输入您的密码",
     "signIn": "登录",
     "invalidCredentials": "用户名或密码错误",
-    "defaultCredentialsHint": "默认账号：orchestra / orchestra"
+    "restrictedAccess": "私有部署 · 仅限受邀访问"
   },
   "friends": {
     "title": "好友",

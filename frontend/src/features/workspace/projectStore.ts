@@ -73,7 +73,11 @@ export const useProjectStore = defineStore('project', () => {
       members.value = nextList
       queueMicrotask(() => {
         void import('@/features/terminal/terminalMemberStore').then(({ useTerminalMemberStore }) => {
-          void useTerminalMemberStore().autoStartMemberTerminals()
+          const terminalMemberStore = useTerminalMemberStore()
+          // 先恢复已有终端（页面刷新后重连），再 autostart 新终端
+          void terminalMemberStore.refreshServerTerminalStatus().then(() => {
+            void terminalMemberStore.autoStartMemberTerminals()
+          })
         })
       })
     } catch (e) {

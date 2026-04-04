@@ -9,6 +9,15 @@ const client = axios.create({
   },
 })
 
+// Request Interceptor: Attach Authorization token if available
+client.interceptors.request.use((config) => {
+  const token = localStorage.getItem('orchestra.auth.token')
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 /** GET .../members/:id/terminal-session returns 404 when no server PTY yet; client then POST /terminals. Not an error. */
 function isExpectedTerminalAttachProbe404(err: unknown): boolean {
   if (!axios.isAxiosError(err)) return false
@@ -28,6 +37,11 @@ client.interceptors.response.use(
 
     const skipByConfig = !!(ax?.config as { skipErrorToast?: boolean } | undefined)?.skipErrorToast
     if (!skipNoise && !skipByConfig) {
+      // Avoid toasting on 401 login failures to prevent double notifications
+      if (url.includes('/auth/login') && ax?.response?.status === 401) {
+        return Promise.reject(error)
+      }
+      
       const label = `API ${method} ${url || '(no url)'}`
       notifyUserError(label, error)
     }

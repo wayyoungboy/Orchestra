@@ -3,32 +3,50 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: 99 102 241;
-  --color-primary-hover: 79 70 229;
+  --color-primary: 79 70 229; /* Indigo-600 - slightly darker */
+  --color-primary-hover: 67 56 202; /* Indigo-700 */
   --color-on-primary: 255 255 255;
-  --color-panel: 30 30 46;
-  --color-surface: 40 40 60;
-  --color-background: 20 20 30;
-  --color-overlay: 255 255 255;
-  --scrollbar-thumb: 100 100 120;
-  --scrollbar-thumb-hover: 120 120 140;
+  --color-panel: 255 255 255;
+  --color-surface: 226 232 240; /* Slate 200 */
+  --color-background: 241 245 249; /* Slate 100 - Stronger Light */
+  --color-overlay: 15 23 42; /* Slate 900 */
+  --scrollbar-thumb: 148 163 184; /* Slate 400 */
+  --scrollbar-thumb-hover: 100 116 139; /* Slate 500 */
 }
 
 body {
-  font-family: 'Be Vietnam Pro', sans-serif;
+  font-family: 'Be Vietnam Pro', 'system-ui', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  margin: 0;
+  padding: 0;
+  background-color: rgb(var(--color-background));
+  color: rgb(var(--color-overlay));
 }
 
-/* Glass panel effect */
+/* Base scrollbar styles - keep them minimal */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+/* Glass panel effect (Frosted Light) */
 .glass-panel {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .glass-modal {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid rgba(255, 255, 255, 1);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
 }
 
 /* Terminal styles */

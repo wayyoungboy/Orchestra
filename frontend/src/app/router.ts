@@ -65,8 +65,13 @@ const router = createRouter({
 })
 
 // Auth guard
-router.beforeEach((to, _from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore()
+
+  // Ensure config is fetched before the first routing decision
+  if (!authStore.initialized) {
+    await authStore.fetchConfig()
+  }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'login' })

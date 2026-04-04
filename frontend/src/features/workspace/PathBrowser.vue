@@ -1,67 +1,97 @@
 <template>
-  <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-panel rounded-3xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-white/10">
+  <div class="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+    <div class="bg-white/80 backdrop-blur-2xl rounded-[2.5rem] w-full max-w-3xl max-h-[85vh] flex flex-col border border-white shadow-[0_40px_100px_-20px_rgba(0,0,0,0.15)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
       <!-- 头部 -->
-      <div class="flex items-center justify-between p-4 border-b border-white/5">
-        <h2 class="text-lg font-bold text-white">选择工作目录</h2>
-        <button @click="$emit('close')" class="text-white/40 hover:text-white">
+      <div class="flex items-center justify-between px-8 py-6 border-b border-slate-100">
+        <div>
+          <h2 class="text-xl font-black text-slate-900 tracking-tight">选择工作目录</h2>
+          <p class="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Select Server Directory</p>
+        </div>
+        <button @click="$emit('close')" class="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-900 transition-all">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <!-- 路径输入 -->
-      <div class="p-4 border-b border-white/5">
-        <input
-          v-model="currentPath"
-          type="text"
-          class="w-full bg-surface text-white rounded-xl px-4 py-3 border border-white/10 focus:border-primary/50 focus:outline-none"
-          placeholder="输入路径..."
-          @keyup.enter="loadDirectory(currentPath)"
-        />
+      <!-- 路径导航输入 -->
+      <div class="px-8 py-5 bg-slate-50/50 border-b border-slate-100">
+        <div class="relative group">
+          <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+          </div>
+          <input
+            v-model="currentPath"
+            type="text"
+            class="w-full bg-white border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-slate-900 text-sm font-medium placeholder-slate-300 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
+            placeholder="输入或粘贴服务器路径..."
+            @keyup.enter="loadDirectory(currentPath)"
+          />
+        </div>
       </div>
 
-      <!-- 目录列表（仅文件夹，由 API 过滤） -->
-      <div class="flex-1 overflow-y-auto p-4">
-        <div v-if="loading" class="text-center py-8 text-white/50">
-          加载中...
+      <!-- 目录列表 -->
+      <div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div v-if="loading" class="flex flex-col items-center justify-center py-20 text-slate-400">
+          <div class="animate-spin h-8 w-8 border-4 border-primary/20 border-t-primary rounded-full mb-4"></div>
+          <p class="text-sm font-bold tracking-widest uppercase">Scanning Directory...</p>
         </div>
-        <div v-else-if="error" class="text-center py-8 text-red-400">
-          {{ error }}
+        
+        <div v-else-if="error" class="bg-red-50 border border-red-100 rounded-2xl p-8 text-center">
+          <svg class="w-12 h-12 text-red-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <p class="text-red-500 font-bold">{{ error }}</p>
         </div>
-        <div v-else-if="!files.length" class="text-center py-8 text-white/50">
-          空目录
+
+        <div v-else-if="!files.length" class="flex flex-col items-center justify-center py-20 text-slate-300">
+          <svg class="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0l-8 8-8-8" />
+          </svg>
+          <p class="text-lg font-bold">空目录</p>
         </div>
-        <div v-else class="space-y-1">
+
+        <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-2">
           <button
             v-for="file in files"
             :key="file.path"
             @click="handleFileClick(file)"
-            class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors"
+            class="group w-full flex items-center gap-4 px-4 py-3 rounded-xl hover:bg-primary/5 border border-transparent hover:border-primary/10 transition-all duration-200 text-left"
           >
-            <svg class="w-5 h-5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-            </svg>
-            <span class="text-white/80">{{ file.name }}</span>
+            <div class="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center group-hover:bg-white group-hover:shadow-sm transition-all">
+              <svg class="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            </div>
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-bold text-slate-700 group-hover:text-slate-900 truncate">{{ file.name }}</p>
+              <p class="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">Folder</p>
+            </div>
           </button>
         </div>
       </div>
 
-      <!-- 底部 -->
-      <div class="flex items-center justify-between p-4 border-t border-white/5">
-        <input
-          v-model="workspaceName"
-          type="text"
-          class="flex-1 bg-surface text-white rounded-xl px-4 py-2 mr-4 border border-white/10 focus:border-primary/50 focus:outline-none"
-          placeholder="工作区名称"
-        />
+      <!-- 底部操作栏 -->
+      <div class="p-8 bg-slate-50/80 border-t border-slate-100 flex items-center gap-4">
+        <div class="flex-1 relative">
+          <input
+            v-model="workspaceName"
+            type="text"
+            class="w-full bg-white border border-slate-200 rounded-2xl px-5 py-3 text-slate-900 font-bold placeholder-slate-300 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
+            placeholder="工作区显示名称..."
+          />
+        </div>
         <button
           @click="confirm"
-          :disabled="!currentPath || !workspaceName"
-          class="px-6 py-2 bg-primary text-white rounded-xl font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary-hover transition-colors"
+          :disabled="!currentPath || !workspaceName || loading"
+          class="px-10 py-3 bg-gradient-primary text-white rounded-2xl font-black text-sm shadow-glow-primary hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed flex items-center gap-2"
         >
-          确认
+          <span>创建工作区</span>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
         </button>
       </div>
     </div>
@@ -85,7 +115,6 @@ const files = ref<FileInfo[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-/** 工作区名称默认 = 当前目录文件夹名（支持 / 与 \\，忽略末尾分隔符） */
 function defaultWorkspaceNameFromPath(path: string): string {
   const trimmed = path.replace(/[/\\]+$/, '')
   const parts = trimmed.split(/[/\\]/)
@@ -95,6 +124,7 @@ function defaultWorkspaceNameFromPath(path: string): string {
 function applyPathAndDefaultName(basePath: string, entries: FileInfo[]) {
   currentPath.value = basePath
   files.value = entries
+  // If user hasn't typed a name yet, or we're just loading, update the name
   workspaceName.value = defaultWorkspaceNameFromPath(basePath)
 }
 

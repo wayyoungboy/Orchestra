@@ -1,40 +1,38 @@
 <template>
-  <div class="p-6 pb-8">
+  <div class="chat-input-wrapper">
     <!-- Input Container -->
-    <div
-      class="relative bg-white/5 backdrop-blur-md rounded-2xl shadow-lg flex items-end p-2 gap-3 border border-white/5 focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/25 focus-within:bg-white/[0.07] transition-all duration-300 group"
-    >
+    <div class="chat-input-root">
       <!-- Mention Suggestions Dropdown -->
       <div
         v-if="showMentionSuggestions && mentionSuggestions.length"
-        class="absolute bottom-full left-0 mb-2 w-64 bg-panel/95 border border-white/10 rounded-xl shadow-2xl overflow-hidden z-20"
+        class="mention-dropdown"
       >
+        <div class="dropdown-header">
+          <span>{{ t('chat.mentionSuggestions') }}</span>
+        </div>
         <button
           v-for="(member, index) in mentionSuggestions"
           :key="member.id"
           type="button"
-          :class="[
-            'w-full px-3 py-2 flex items-center gap-3 text-left transition-colors',
-            index === activeMentionIndex ? 'bg-white/10' : 'hover:bg-white/5'
-          ]"
+          :class="['mention-item', index === activeMentionIndex ? 'is-active' : '']"
           @click="applyMention(member)"
         >
-          <div class="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-            <span class="text-xs font-bold text-white">{{ member.name.charAt(0) }}</span>
+          <div class="mention-avatar">
+            <span>{{ member.name.charAt(0).toUpperCase() }}</span>
           </div>
-          <div>
-            <div class="text-xs font-semibold text-white">@{{ member.name }}</div>
-            <div class="text-[10px] text-white/40">{{ roleTypeLabel(member.roleType) }}</div>
+          <div class="mention-info">
+            <div class="mention-name">@{{ member.name }}</div>
+            <div class="mention-role">{{ roleTypeLabel(member.roleType) }}</div>
           </div>
         </button>
       </div>
 
       <!-- Text Input -->
-      <div class="flex-1 min-h-[44px] max-h-40 overflow-y-auto py-2.5">
+      <div class="input-area custom-scrollbar">
         <textarea
           ref="inputRef"
           :value="modelValue"
-          class="w-full bg-transparent border-none p-0 text-white placeholder-white/30 focus:ring-0 outline-none text-[15px] font-light resize-none min-h-[24px]"
+          class="chat-textarea"
           :placeholder="placeholder"
           :maxlength="maxLength"
           spellcheck="false"
@@ -47,26 +45,29 @@
       </div>
 
       <!-- Action Buttons -->
-      <div class="flex items-center shrink-0 mb-0.5">
-        <!-- Send Button -->
+      <div class="action-area">
         <button
           type="button"
+          class="send-btn"
           :disabled="!modelValue.trim()"
-          :class="[
-            'h-10 px-5 bg-primary hover:bg-primary-hover text-white text-sm font-bold rounded-xl shadow-glow flex items-center gap-2 transition-all active:scale-95 transform',
-            !modelValue.trim() ? 'opacity-50 cursor-not-allowed' : ''
-          ]"
           @click="handleSend"
         >
-          {{ t('chat.inputSend') }}
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+          </svg>
         </button>
       </div>
     </div>
 
     <!-- Character Count -->
-    <div class="mt-2 flex items-center justify-between px-2 text-[11px] text-white/30 font-medium tracking-wide">
-      <span>{{ t('chat.inputHint') }}</span>
-      <span>{{ modelValue.length }}/{{ maxLength }}</span>
+    <div class="input-footer">
+      <div class="footer-hint">
+        <div class="hint-dot"></div>
+        <span>{{ t('chat.inputHint') }}</span>
+      </div>
+      <span :class="['char-count', modelValue.length > maxLength * 0.9 ? 'is-near-limit' : '']">
+        {{ modelValue.length }} / {{ maxLength }}
+      </span>
     </div>
   </div>
 </template>
@@ -79,18 +80,12 @@ const { t } = useI18n()
 
 function roleTypeLabel(roleType: string) {
   switch (roleType) {
-    case 'owner':
-      return t('members.roleOwner')
-    case 'admin':
-      return t('members.roleAdmin')
-    case 'assistant':
-      return t('members.roleAssistant')
-    case 'secretary':
-      return t('members.roleSecretary')
-    case 'member':
-      return t('members.roleMember')
-    default:
-      return roleType
+    case 'owner': return t('members.roleOwner')
+    case 'admin': return t('members.roleAdmin')
+    case 'assistant': return t('members.roleAssistant')
+    case 'secretary': return t('members.roleSecretary')
+    case 'member': return t('members.roleMember')
+    default: return roleType
   }
 }
 
@@ -120,37 +115,22 @@ const cursorIndex = ref(0)
 const activeMentionIndex = ref(0)
 const mentionQuery = ref('')
 
-// Computed for mention suggestions
 const mentionSuggestions = computed(() => {
   const query = mentionQuery.value.toLowerCase()
-  // Show all members when query is empty (just typed @), otherwise filter by query
-  if (!query) {
-    return props.members.slice(0, 6)
-  }
-  return props.members
-    .filter(m => m.name.toLowerCase().includes(query))
-    .slice(0, 6)
+  if (!query) return props.members.slice(0, 6)
+  return props.members.filter(m => m.name.toLowerCase().includes(query)).slice(0, 6)
 })
 
 const showMentionSuggestions = computed(() => {
-  // Show dropdown when we're in a mention context (typed @ with optional query)
   const inMentionContext = props.modelValue.slice(0, cursorIndex.value).match(/@([^\s]*)$/)
   return inMentionContext !== null && mentionSuggestions.value.length > 0
 })
 
-// Watch for @ symbol
-watch(
-  () => props.modelValue,
-  (value) => {
-    // Detect @mention pattern
-    const match = value.slice(0, cursorIndex.value).match(/@([^\s]*)$/)
-    if (match) {
-      mentionQuery.value = match[1] || ''
-    } else {
-      mentionQuery.value = ''
-    }
-  }
-)
+watch(() => props.modelValue, (value) => {
+  const match = value.slice(0, cursorIndex.value).match(/@([^\s]*)$/)
+  if (match) mentionQuery.value = match[1] || ''
+  else mentionQuery.value = ''
+})
 
 watch(mentionSuggestions, (list) => {
   if (activeMentionIndex.value >= list.length) {
@@ -165,29 +145,22 @@ function updateCursorIndex() {
 function syncCursorFromInput() {
   if (inputRef.value) {
     const start = inputRef.value.selectionStart
-    if (typeof start === 'number') {
-      cursorIndex.value = start
-    }
+    if (typeof start === 'number') cursorIndex.value = start
   }
 }
 
 function handleInput(event: Event) {
   const target = event.target as HTMLTextAreaElement
-  // Update cursor index BEFORE emitting value, so watcher can detect @ correctly
   cursorIndex.value = target.selectionStart
   emit('update:modelValue', target.value)
   resizeInput()
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  // IME：回车用于选词/上屏，不能拦截，否则中文 @ 提及后无法继续输入或提交
-  if (event.isComposing || event.key === 'Process') {
-    return
-  }
+  if (event.isComposing || event.key === 'Process') return
 
   syncCursorFromInput()
 
-  // Handle mention suggestion navigation
   if (showMentionSuggestions.value && mentionSuggestions.value.length > 0) {
     if (event.key === 'ArrowDown') {
       event.preventDefault()
@@ -207,7 +180,6 @@ function handleKeydown(event: KeyboardEvent) {
         applyMention(pick)
         return
       }
-      // 无有效候选项时不吞掉 Enter，交给下方发送逻辑
     }
     if (event.key === 'Escape') {
       mentionQuery.value = ''
@@ -229,7 +201,6 @@ function applyMention(member: Member) {
   mentionQuery.value = ''
   activeMentionIndex.value = 0
 
-  // Focus back to input and set cursor position after the mention
   nextTick(() => {
     if (inputRef.value) {
       const newCursorPos = beforeMention.length + member.name.length + 2
@@ -240,9 +211,7 @@ function applyMention(member: Member) {
 }
 
 function handleSend() {
-  if (props.modelValue.trim()) {
-    emit('send')
-  }
+  if (props.modelValue.trim()) emit('send')
 }
 
 function resizeInput() {
@@ -251,17 +220,219 @@ function resizeInput() {
   inputRef.value.style.height = `${Math.min(inputRef.value.scrollHeight, 160)}px`
 }
 
-watch(
-  () => props.modelValue,
-  async () => {
-    await nextTick()
-    resizeInput()
-  }
-)
+watch(() => props.modelValue, async () => {
+  await nextTick()
+  resizeInput()
+})
 </script>
 
 <style scoped>
-.shadow-glow {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+.chat-input-wrapper {
+  padding: 0 24px 24px;
+}
+
+.chat-input-root {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border-radius: 24px;
+  border: 1px solid white;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.04);
+  padding: 8px 8px 8px 24px;
+  gap: 16px;
+  transition: all 0.3s ease;
+}
+
+.chat-input-root:focus-within {
+  box-shadow: 0 25px 60px rgba(79, 70, 229, 0.08), 0 0 0 4px rgba(79, 70, 229, 0.1);
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+.mention-dropdown {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 0;
+  width: 320px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(24px);
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  z-index: 20;
+}
+
+.dropdown-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.dropdown-header span {
+  font-size: 10px;
+  font-weight: 900;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.mention-item {
+  width: 100%;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  transition: all 0.2s;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.mention-item:hover, .mention-item.is-active {
+  background: #f8fafc;
+}
+
+.mention-item.is-active {
+  background: rgba(79, 70, 229, 0.05);
+}
+
+.mention-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #4f46e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.mention-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mention-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+  truncate: true;
+}
+
+.mention-role {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.input-area {
+  flex: 1;
+  min-height: 56px;
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 18px 0;
+  display: flex;
+  align-items: center;
+}
+
+.chat-textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #0f172a;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+}
+
+.chat-textarea::placeholder {
+  color: #94a3b8;
+}
+
+.action-area {
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+
+.send-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: #4f46e5;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.4);
+}
+
+.send-btn:hover:not(:disabled) {
+  background: #4338ca;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 25px -5px rgba(79, 70, 229, 0.5);
+}
+
+.send-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.send-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(1);
+  box-shadow: none;
+}
+
+.input-footer {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+}
+
+.footer-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hint-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #64748b;
+}
+
+.footer-hint span {
+  font-size: 10px;
+  font-weight: 800;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.char-count {
+  font-size: 10px;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.1em;
+}
+
+.is-near-limit {
+  color: #ef4444;
 }
 </style>

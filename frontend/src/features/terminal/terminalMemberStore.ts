@@ -65,7 +65,8 @@ export const useTerminalMemberStore = defineStore('terminal-member', () => {
     }
   }
 
-  const refreshServerTerminalStatus = async () => {
+  /** 只获取服务端 PTY 状态，不恢复终端（用于轮询） */
+  const fetchServerPTYStatus = async () => {
     const wid = workspaceStore.currentWorkspace?.id
     if (!wid) {
       serverPTYByMember.value = {}
@@ -83,6 +84,56 @@ export const useTerminalMemberStore = defineStore('terminal-member', () => {
     }
   }
 
+  /** 恢复已有终端到 terminalStore（页面刷新后重连，需 members 已加载） */
+  const restoreTerminalSessions = async () => {
+    const wid = workspaceStore.currentWorkspace?.id
+    if (!wid) return
+
+    const sessions = Object.entries(serverPTYByMember.value)
+    for (const [memberId, { sessionId }] of sessions) {
+      const member = projectStore.members.find((m) => m.id === memberId)
+      if (!member) continue
+
+      const key = buildMemberKey(memberId, wid)
+      // 已有本地 session 记录则跳过
+      if (memberSessions.value[key]?.terminalId === sessionId) continue
+
+      // 建立本地 session 记录
+      memberSessions.value[key] = {
+        memberId,
+        terminalId: sessionId,
+        title: member.name,
+        workspaceId: wid,
+        status: 'connecting'
+      }
+
+      // 恢复 tab（不自动激活，避免抢占焦点）
+      terminalStore.openTab(sessionId, {
+        title: member.name,
+        memberId,
+        terminalType: member.terminalType as 'native' | 'web' | 'claude' | 'custom',
+        keepAlive: true,
+        activate: false
+      })
+
+      // 建立 WebSocket 连接（scrollback 自动 replay）
+      try {
+        await terminalStore.createConnection(sessionId)
+        memberSessions.value[key].status = 'connected'
+      } catch {
+        memberSessions.value[key].status = 'disconnected'
+      }
+
+      projectStore.updateMember(memberId, { status: 'online' })
+    }
+  }
+
+  /** 兼容旧调用：获取状态并恢复（用于 loadMembers 后一次性调用） */
+  const refreshServerTerminalStatus = async () => {
+    await fetchServerPTYStatus()
+    await restoreTerminalSessions()
+  }
+
   const getServerTerminalForMember = (memberId: string) => serverPTYByMember.value[memberId] ?? null
 
   watch(
@@ -91,8 +142,10 @@ export const useTerminalMemberStore = defineStore('terminal-member', () => {
       stopServerPoll()
       serverPTYByMember.value = {}
       if (!wid) return
-      void refreshServerTerminalStatus()
-      pollTimer = setInterval(() => void refreshServerTerminalStatus(), 8000)
+      // 只获取状态，不恢复终端（members 可能还没加载）
+      void fetchServerPTYStatus()
+      // 轮询只更新状态，不重复恢复 tabs
+      pollTimer = setInterval(() => void fetchServerPTYStatus(), 8000)
     },
     { immediate: true }
   )
