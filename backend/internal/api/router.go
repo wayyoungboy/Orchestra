@@ -1,6 +1,8 @@
 package api
 
 import (
+	"encoding/json"
+
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -8,6 +10,7 @@ import (
 	"github.com/orchestra/backend/internal/a2a"
 	"github.com/orchestra/backend/internal/api/handlers"
 	"github.com/orchestra/backend/internal/api/middleware"
+	"github.com/orchestra/backend/internal/chatbridge"
 	"github.com/orchestra/backend/internal/config"
 	"github.com/orchestra/backend/internal/filesystem"
 	"github.com/orchestra/backend/internal/security"
@@ -43,7 +46,7 @@ func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, c
 
 	// Initialize handlers
 	wsHandler := handlers.NewWorkspaceHandler(wsRepo, memberRepo, msgRepo, browser)
-	memberHandler := handlers.NewMemberHandler(memberRepo, wsRepo)
+	memberHandler := handlers.NewMemberHandler(memberRepo, wsRepo, ws.GlobalChatHub)
 	terminalHandler := handlers.NewTerminalHandler(a2aPool, wsRepo)
 	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, a2aPool, ws.GlobalChatHub)
 	attachmentHandler := handlers.NewAttachmentHandler(msgRepo, convRepo, attachRepo, cfg.Server.UploadDir)
@@ -173,5 +176,43 @@ func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, c
 	r.GET("/ws/terminal/:sessionId", wsAuth, gateway.HandleTerminal)
 	r.GET("/ws/chat/:workspaceId", wsAuth, gateway.HandleChat)
 
+	// Wire up AgentBridge: A2A output → database chat messages + WebSocket broadcasts
+	bridge := chatbridge.NewAgentBridge(msgRepo, ws.GlobalChatHub)
+	a2aPool.SetOutputHook(func(sess *a2a.Session, msg *a2a.ACPMessage) {
+		bridge.OnMessage(sess, msg)
+	})
+
+	// Wire up ToolHandler: agent tool calls → Orchestra operations
+	// Wrap ChatHub to satisfy ChatBroadcaster interface (interface{} → ChatEvent)
+	chatBroadcaster := &chatEventAdapter{hub: ws.GlobalChatHub}
+	toolHandler := a2a.NewToolHandler(msgRepo, taskRepo, memberRepo, convRepo, chatBroadcaster, browser, validator)
+	a2aPool.SetToolHandler(toolHandler)
+
 	return r
+}
+
+// chatEventAdapter wraps ws.ChatHub to satisfy a2a.ChatBroadcaster interface.
+// The ToolHandler passes raw maps which this adapter converts to ChatEvent structs.
+type chatEventAdapter struct {
+	hub *ws.ChatHub
+}
+
+func (a *chatEventAdapter) BroadcastToWorkspace(workspaceID string, event interface{}) {
+	// If it's already a ChatEvent, pass it through directly
+	if ce, ok := event.(ws.ChatEvent); ok {
+		a.hub.BroadcastToWorkspace(workspaceID, ce)
+		return
+	}
+	// Otherwise serialize the raw map and re-emit as raw JSON to the workspace
+	if raw, ok := event.(map[string]interface{}); ok {
+		// Add "type" field as ChatEventType for frontend parsing
+		if eventType, hasType := raw["type"].(string); hasType {
+			raw["type"] = ws.ChatEventType(eventType)
+		}
+		jsonBytes, err := json.Marshal(raw)
+		if err != nil {
+			return
+		}
+		a.hub.BroadcastRawToWorkspace(workspaceID, jsonBytes)
+	}
 }

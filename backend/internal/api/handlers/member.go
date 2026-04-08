@@ -10,16 +10,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/orchestra/backend/internal/models"
 	"github.com/orchestra/backend/internal/storage/repository"
+	"github.com/orchestra/backend/internal/ws"
 	"github.com/orchestra/backend/pkg/utils"
 )
 
 type MemberHandler struct {
-	repo   repository.MemberRepository
-	wsRepo repository.WorkspaceRepository
+	repo    repository.MemberRepository
+	wsRepo  repository.WorkspaceRepository
+	chatHub *ws.ChatHub
 }
 
-func NewMemberHandler(repo repository.MemberRepository, wsRepo repository.WorkspaceRepository) *MemberHandler {
-	return &MemberHandler{repo: repo, wsRepo: wsRepo}
+func NewMemberHandler(repo repository.MemberRepository, wsRepo repository.WorkspaceRepository, chatHub *ws.ChatHub) *MemberHandler {
+	return &MemberHandler{repo: repo, wsRepo: wsRepo, chatHub: chatHub}
 }
 
 // List lists all members in a workspace
@@ -258,8 +260,17 @@ func (h *MemberHandler) UpdatePresence(c *gin.Context) {
 		Timestamp:   time.Now().UnixMilli(),
 	}
 
-	// TODO: Broadcast to WebSocket clients
-	// For now, just return the presence update
+	// Broadcast to WebSocket clients
+	if h.chatHub != nil {
+		h.chatHub.BroadcastToWorkspace(workspaceID, ws.ChatEvent{
+			Type:        ws.EventNewMessage, // Reuse new_message type with presence metadata
+			WorkspaceID: workspaceID,
+			SenderID:    memberID,
+			Content:     req.Activity,
+			Status:      req.TargetType + ":" + req.TargetID,
+			CreatedAt:   presence.Timestamp,
+		})
+	}
 
 	c.JSON(http.StatusOK, presence)
 }

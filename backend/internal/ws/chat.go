@@ -111,6 +111,30 @@ func (h *ChatHub) BroadcastToWorkspace(workspaceID string, event ChatEvent) {
 	}
 }
 
+// BroadcastRawToWorkspace broadcasts pre-serialized JSON bytes to all clients in a workspace.
+func (h *ChatHub) BroadcastRawToWorkspace(workspaceID string, rawJSON []byte) {
+	h.mu.RLock()
+	subs := h.workspaceSubs[workspaceID]
+	h.mu.RUnlock()
+
+	if len(subs) == 0 {
+		return
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for cid := range subs {
+		if c, ok := h.clients[cid]; ok {
+			select {
+			case c.Send <- rawJSON:
+			default:
+				log.Printf("[ChatHub] client %s channel full, dropped message", cid)
+			}
+		}
+	}
+}
+
 // BroadcastToConversation broadcasts an event to all clients subscribed to a conversation
 func (h *ChatHub) BroadcastToConversation(workspaceID, conversationID string, event ChatEvent) {
 	event.ConversationID = conversationID

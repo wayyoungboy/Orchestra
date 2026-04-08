@@ -1119,8 +1119,18 @@ func (h *ConversationHandler) UpdateAgentStatus(c *gin.Context) {
 		Timestamp:      time.Now(),
 	}
 
-	// TODO: Broadcast to WebSocket clients via chat gateway
-	// This would require passing the gateway to the handler
+	// Broadcast to WebSocket clients
+	if h.chatHub != nil {
+		h.chatHub.BroadcastToWorkspace(req.WorkspaceID, ws.ChatEvent{
+			Type:           ws.EventMessageStatus,
+			WorkspaceID:    req.WorkspaceID,
+			ConversationID: req.ConversationID,
+			SenderID:       req.MemberID,
+			Status:         req.Status,
+			Content:        req.Message,
+			CreatedAt:      status.Timestamp.UnixMilli(),
+		})
+	}
 
 	c.JSON(http.StatusOK, status)
 }
