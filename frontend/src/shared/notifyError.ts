@@ -18,7 +18,7 @@ export function notifyUserError(source: string, err: unknown, options?: { skipTo
   }
   if (options?.skipToast) return
   try {
-    useToastStore().pushToast(line, { tone: 'error', duration: 8000 })
+    useToastStore().error(line, 8000)
   } catch {
     /* Pinia not ready */
   }

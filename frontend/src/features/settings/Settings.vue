@@ -14,6 +14,8 @@
         >
           <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path v-if="tab.id === 'general'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path v-else-if="tab.id === 'apiKeys'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l3.354-3.354A6 6 0 1121 9z" />
+            <path v-else-if="tab.id === 'workspace'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H5a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
           {{ tab.label }}
@@ -22,7 +24,7 @@
     </aside>
 
     <!-- Settings Content -->
-    <main class="settings-content">
+    <main class="settings-content custom-scrollbar">
       <div v-if="activeTab === 'general'" class="settings-section">
         <h3 class="section-title">通用设置</h3>
         <div class="settings-grid">
@@ -42,6 +44,37 @@
         </div>
       </div>
 
+      <div v-if="activeTab === 'apiKeys'" class="settings-section">
+        <ApiKeysSection />
+      </div>
+
+      <div v-if="activeTab === 'workspace'" class="settings-section">
+        <h3 class="section-title">工作区配置</h3>
+        <form @submit.prevent="handleUpdateWorkspace" class="settings-grid">
+          <div class="setting-card">
+            <label>工作区名称</label>
+            <input
+              v-model="editWorkspace.name"
+              class="setting-input"
+              placeholder="例如: Orchestra Backend"
+            />
+          </div>
+          <div class="setting-card">
+            <label>物理路径 (Server Path)</label>
+            <input
+              v-model="editWorkspace.path"
+              class="setting-input"
+              placeholder="/volumes/code/project"
+            />
+          </div>
+          <div class="form-actions">
+            <button type="submit" :disabled="isSaving" class="save-btn">
+              {{ isSaving ? '保存中...' : '保存更改' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
       <div v-if="activeTab === 'account'" class="settings-section">
         <h3 class="section-title">账号与安全</h3>
         <div class="settings-grid">
@@ -57,18 +90,52 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/features/auth/authStore'
+import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
+import ApiKeysSection from './ApiKeysSection.vue'
 
 const authStore = useAuthStore()
+const workspaceStore = useWorkspaceStore()
 const router = useRouter()
 const activeTab = ref('general')
+const isSaving = ref(false)
+
+const editWorkspace = reactive({
+  name: '',
+  path: ''
+})
 
 const tabs = [
   { id: 'general', label: '通用' },
+  { id: 'apiKeys', label: 'API 密钥' },
+  { id: 'workspace', label: '工作区' },
   { id: 'account', label: '账号' }
 ]
+
+onMounted(() => {
+  if (workspaceStore.currentWorkspace) {
+    editWorkspace.name = workspaceStore.currentWorkspace.name
+    editWorkspace.path = workspaceStore.currentWorkspace.path
+  }
+})
+
+async function handleUpdateWorkspace() {
+  if (!workspaceStore.currentWorkspace) return
+  
+  isSaving.value = true
+  try {
+    await workspaceStore.updateWorkspace(workspaceStore.currentWorkspace.id, {
+      name: editWorkspace.name,
+      path: editWorkspace.path
+    })
+  } catch (e) {
+    // Error handled by store
+  } finally {
+    isSaving.value = false
+  }
+}
 
 function handleLogout() {
   authStore.logout()
@@ -77,72 +144,57 @@ function handleLogout() {
 </script>
 
 <style scoped>
-.settings-page-root {
-  height: 100%;
-  display: flex;
-  gap: 24px;
-  padding: 24px;
-}
+.settings-page-root { height: 100%; display: flex; gap: 24px; padding: 24px; }
 
 .settings-nav {
-  width: 240px;
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(24px);
-  border-radius: 24px;
-  padding: 24px;
-  border: 1px solid white;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  width: 240px; background: rgba(255, 255, 255, 0.45); backdrop-filter: blur(32px);
+  border-radius: 32px; padding: 24px; border: 1px solid white;
+  display: flex; flex-direction: column; gap: 24px;
 }
 
 .nav-title { font-size: 18px; font-weight: 900; color: #0f172a; }
-
 .nav-items { display: flex; flex-direction: column; gap: 6px; }
 .nav-item {
   width: 100%; height: 44px; display: flex; align-items: center; padding: 0 16px;
-  border-radius: 12px; border: none; background: transparent; color: #64748b;
+  border-radius: 14px; border: none; background: transparent; color: #64748b;
   font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
 }
 .nav-item:hover { background: rgba(255, 255, 255, 0.6); color: #0f172a; }
 .nav-item.is-active { background: #4f46e5; color: white; shadow: 0 10px 20px -5px rgba(79, 70, 229, 0.3); }
 
 .settings-content {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(32px);
-  border-radius: 32px;
-  padding: 40px;
-  border: 1px solid white;
-  overflow-y: auto;
+  flex: 1; background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(40px);
+  border-radius: 40px; padding: 48px; border: 1px solid white; overflow-y: auto;
 }
 
-.section-title { font-size: 22px; font-weight: 900; color: #0f172a; margin-bottom: 32px; }
+.section-title { font-size: 24px; font-weight: 950; color: #0f172a; margin-bottom: 40px; letter-spacing: -0.02em; }
+.settings-grid { display: flex; flex-direction: column; gap: 32px; max-width: 520px; }
 
-.settings-grid { display: flex; flex-direction: column; gap: 24px; max-width: 500px; }
+.setting-card { display: flex; flex-direction: column; gap: 12px; }
+.setting-card label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.15em; margin-left: 4px; }
 
-.setting-card {
-  display: flex; flex-direction: column; gap: 10px;
+.setting-input, .setting-select {
+  width: 100%; padding: 14px 18px; border-radius: 16px; border: 1px solid #e2e8f0;
+  background: white; color: #0f172a; font-size: 15px; font-weight: 600; outline: none;
+  transition: all 0.2s;
 }
-.setting-card label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; }
+.setting-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.05); }
 
-.setting-select {
-  width: 100%; padding: 12px 16px; border-radius: 14px; border: 1px solid #e2e8f0;
-  background: white; color: #0f172a; font-weight: 600; outline: none;
+.form-actions { margin-top: 12px; }
+.save-btn {
+  padding: 14px 32px; background: #4f46e5; color: white; border-radius: 16px;
+  font-size: 14px; font-weight: 900; border: none; cursor: pointer;
+  box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4); transition: all 0.3s;
 }
+.save-btn:hover { background: #4338ca; transform: translateY(-1px); }
+.save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .setting-value { font-size: 16px; font-weight: 700; color: #0f172a; }
-
-.theme-toggle {
-  padding: 4px; background: #f1f5f9; border-radius: 12px; width: fit-content;
-}
-.toggle-active {
-  padding: 8px 16px; background: white; border-radius: 10px; shadow: 0 2px 8px rgba(0,0,0,0.05);
-  font-size: 13px; font-weight: 700; color: #4f46e5;
-}
+.theme-toggle { padding: 4px; background: #f1f5f9; border-radius: 12px; width: fit-content; }
+.toggle-active { padding: 8px 16px; background: white; border-radius: 10px; font-size: 13px; font-weight: 700; color: #4f46e5; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
 
 .logout-btn {
-  margin-top: 20px; padding: 14px; border-radius: 14px; border: 1px solid #fee2e2;
+  margin-top: 20px; padding: 14px; border-radius: 16px; border: 1px solid #fee2e2;
   background: #fef2f2; color: #ef4444; font-weight: 800; cursor: pointer; transition: all 0.2s;
 }
 .logout-btn:hover { background: #fee2e2; transform: translateY(-1px); }

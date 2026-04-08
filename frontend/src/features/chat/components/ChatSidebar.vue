@@ -101,7 +101,7 @@ defineEmits<{
 }>()
 
 const channelConversations = computed(() =>
-  props.conversations.filter((c) => c.type === 'channel' || c.type === 'thread')
+  props.conversations.filter((c) => c.type === 'channel')
 )
 
 const dmConversations = computed(() => props.conversations.filter((c) => c.type === 'dm'))

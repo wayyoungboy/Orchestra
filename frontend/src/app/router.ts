@@ -22,12 +22,12 @@ const routes = [
   },
   {
     path: '/workspace/:id',
-    name: 'workspace',
     component: () => import('@/features/workspace/WorkspaceMain.vue'),
     meta: { requiresAuth: true },
     children: [
       {
         path: '',
+        name: 'workspace',
         redirect: { name: 'chat' },
       },
       {
@@ -51,9 +51,9 @@ const routes = [
         component: () => import('@/features/settings/Settings.vue'),
       },
       {
-        path: 'skills',
-        name: 'skills',
-        component: () => import('@/features/skills/SkillsPlaceholder.vue'),
+        path: 'tasks',
+        name: 'tasks',
+        component: () => import('@/features/tasks/TasksPage.vue'),
       },
     ],
   },

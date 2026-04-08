@@ -1,45 +1,25 @@
+import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { acceptHMRUpdate, defineStore } from 'pinia'
 
 export type ToastTone = 'info' | 'success' | 'warning' | 'error'
-
-export interface ToastOptions {
-  tone?: ToastTone
-  duration?: number
-}
 
 export interface Toast {
   id: number
   message: string
   tone: ToastTone
-  duration: number
-  createdAt: number
+  duration?: number
 }
-
-const DEFAULT_DURATION = 3000
-const DEFAULT_TONE: ToastTone = 'info'
-
-let toastIdCounter = 0
 
 export const useToastStore = defineStore('toast', () => {
   const toasts = ref<Toast[]>([])
+  let nextId = 1
 
-  const pushToast = (message: string, options?: ToastOptions): number => {
-    const id = ++toastIdCounter
-    const tone = options?.tone ?? DEFAULT_TONE
-    const duration = options?.duration ?? DEFAULT_DURATION
+  const activeToasts = computed(() => toasts.value)
 
-    const toast: Toast = {
-      id,
-      message,
-      tone,
-      duration,
-      createdAt: Date.now()
-    }
+  function addToast(message: string, tone: ToastTone = 'info', duration: number = 5000): number {
+    const id = nextId++
+    toasts.value.push({ id, message, tone, duration })
 
-    toasts.value.push(toast)
-
-    // Auto-dismiss after duration
     if (duration > 0) {
       setTimeout(() => {
         removeToast(id)
@@ -49,30 +29,34 @@ export const useToastStore = defineStore('toast', () => {
     return id
   }
 
-  const removeToast = (id: number): boolean => {
-    const index = toasts.value.findIndex((t) => t.id === id)
-    if (index !== -1) {
-      toasts.value.splice(index, 1)
-      return true
-    }
-    return false
+  function removeToast(id: number) {
+    toasts.value = toasts.value.filter(t => t.id !== id)
   }
 
-  const clearAll = () => {
-    toasts.value = []
+  function info(message: string, duration?: number) {
+    return addToast(message, 'info', duration)
   }
 
-  const activeToasts = computed(() => toasts.value)
+  function success(message: string, duration?: number) {
+    return addToast(message, 'success', duration)
+  }
+
+  function warning(message: string, duration?: number) {
+    return addToast(message, 'warning', duration)
+  }
+
+  function error(message: string, duration?: number) {
+    return addToast(message, 'error', duration ?? 8000)
+  }
 
   return {
     toasts,
     activeToasts,
-    pushToast,
+    addToast,
     removeToast,
-    clearAll
+    info,
+    success,
+    warning,
+    error
   }
 })
-
-if (import.meta.hot) {
-  import.meta.hot.accept(acceptHMRUpdate(useToastStore, import.meta.hot))
-}

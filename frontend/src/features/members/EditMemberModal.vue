@@ -1,42 +1,55 @@
 <template>
-  <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-    <div class="w-full max-w-sm bg-panel/90 border border-white/10 rounded-2xl shadow-2xl p-6">
-      <div class="flex justify-between items-center mb-6">
-        <h3 class="text-white font-bold text-lg">{{ t('members.editMemberModal.title') }}</h3>
-        <button type="button" @click="$emit('close')" class="text-white/40 hover:text-white transition-colors">
+  <div class="modal-overlay">
+    <div class="modal-container animate-in fade-in zoom-in-95 duration-300">
+      <!-- Header -->
+      <div class="modal-header">
+        <div class="header-text">
+          <h3 class="modal-title">{{ t('members.editMemberModal.title') }}</h3>
+          <p class="modal-subtitle">Update member details and access</p>
+        </div>
+        <button type="button" @click="$emit('close')" class="close-btn">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       </div>
 
-      <div class="mb-6 text-center">
-        <div class="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-3">
-          <span class="text-2xl font-bold text-primary">{{ member.name.charAt(0).toUpperCase() }}</span>
+      <div class="modal-content">
+        <!-- Identity Preview -->
+        <div class="identity-preview">
+          <div class="preview-avatar">
+            <span>{{ member.name.charAt(0).toUpperCase() }}</span>
+          </div>
+          <div class="preview-meta">
+            <span class="meta-role">{{ roleLabel }}</span>
+            <span class="meta-id">ID: {{ member.id.slice(0, 8) }}</span>
+          </div>
         </div>
-        <p class="text-white/40 text-xs uppercase font-bold tracking-widest">{{ roleLabel }}</p>
+
+        <div class="form-sections">
+          <div class="input-group">
+            <label>{{ t('members.editMemberModal.displayName') }}</label>
+            <input
+              v-model="name"
+              class="modal-input"
+              placeholder="Enter display name"
+            />
+          </div>
+        </div>
       </div>
 
-      <div class="space-y-4">
-        <div>
-          <label class="text-xs font-bold text-white/50 uppercase tracking-wider mb-1.5 block">{{
-            t('members.editMemberModal.displayName')
-          }}</label>
-          <input
-            v-model="name"
-            class="w-full bg-surface/80 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-primary/50 focus:ring-1 focus:ring-primary/50 outline-none transition-all"
-          />
+      <!-- Footer Actions -->
+      <div class="modal-footer">
+        <div class="footer-primary-actions">
+          <button type="button" @click="handleSave" class="modal-btn-primary">
+            {{ t('members.editMemberModal.save') }}
+          </button>
         </div>
-
-        <button type="button" @click="handleSave" class="w-full py-2.5 bg-primary text-on-primary font-bold rounded-xl hover:bg-primary-hover transition-colors">
-          {{ t('members.editMemberModal.save') }}
-        </button>
-
+        
         <template v-if="showRemove">
-          <div class="h-px bg-white/5 my-2"></div>
-
-          <button type="button" @click="handleRemove" class="w-full py-2.5 text-red-400 hover:bg-red-500/10 font-medium rounded-xl transition-colors flex items-center justify-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="footer-divider"></div>
+          <button type="button" @click="handleRemove" class="modal-btn-danger">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
             </svg>
             {{ t('members.editMemberModal.remove') }}
@@ -69,18 +82,12 @@ const name = ref(props.member.name)
 
 const roleLabel = computed(() => {
   switch (props.member.roleType) {
-    case 'owner':
-      return t('members.roleOwner')
-    case 'admin':
-      return t('members.roleAdmin')
-    case 'assistant':
-      return t('members.roleAssistant')
-    case 'secretary':
-      return t('members.roleSecretary')
-    case 'member':
-      return t('members.roleMember')
-    default:
-      return t('members.roleMember')
+    case 'owner': return t('members.roleOwner')
+    case 'admin': return t('members.roleAdmin')
+    case 'assistant': return t('members.roleAssistant')
+    case 'secretary': return t('members.roleSecretary')
+    case 'member': return t('members.roleMember')
+    default: return t('members.roleMember')
   }
 })
 
@@ -96,3 +103,79 @@ function handleRemove() {
   emit('remove', props.member.id)
 }
 </script>
+
+<style scoped>
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+  background: rgba(15, 23, 42, 0.15); backdrop-filter: blur(8px); padding: 24px;
+}
+
+.modal-container {
+  width: 100%; max-width: 440px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(40px);
+  border-radius: 40px; border: 1px solid white; shadow: 0 40px 100px -20px rgba(0,0,0,0.15);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+
+.modal-header {
+  padding: 32px 40px; border-bottom: 1px solid rgba(15, 23, 42, 0.05);
+  display: flex; align-items: center; justify-content: space-between;
+}
+
+.modal-title { font-size: 22px; font-weight: 950; color: #0f172a; letter-spacing: -0.02em; }
+.modal-subtitle { font-size: 11px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.15em; margin-top: 4px; }
+
+.close-btn {
+  width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: #cbd5e1; transition: all 0.2s; border: none; background: transparent; cursor: pointer;
+}
+.close-btn:hover { background: #f1f5f9; color: #0f172a; }
+
+.modal-content { padding: 32px 40px; }
+
+.identity-preview {
+  display: flex; align-items: center; gap: 20px; margin-bottom: 32px;
+  background: white; padding: 16px; border-radius: 20px; border: 1px solid #f1f5f9;
+}
+
+.preview-avatar {
+  width: 56px; height: 56px; border-radius: 16px; background: rgba(99, 102, 241, 0.1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 900; color: #4f46e5;
+}
+
+.preview-meta { display: flex; flex-direction: column; gap: 2px; }
+.meta-role { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; }
+.meta-id { font-size: 13px; font-weight: 700; color: #0f172a; }
+
+.form-sections { display: flex; flex-direction: column; gap: 24px; }
+.input-group { display: flex; flex-direction: column; gap: 10px; }
+.input-group label { font-size: 11px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; margin-left: 4px; }
+
+.modal-input {
+  width: 100%; padding: 14px 18px; border-radius: 16px; border: 1px solid #e2e8f0;
+  background: white; color: #0f172a; font-size: 15px; font-weight: 600; outline: none;
+}
+.modal-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.05); }
+
+.modal-footer {
+  padding: 0 40px 40px; display: flex; flex-direction: column; gap: 16px;
+}
+
+.footer-primary-actions { display: flex; gap: 12px; }
+
+.modal-btn-primary {
+  flex: 1; padding: 14px; background: #4f46e5; color: white; border-radius: 16px;
+  font-size: 15px; font-weight: 900; border: none; cursor: pointer;
+  box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.4); transition: all 0.3s;
+}
+.modal-btn-primary:hover { background: #4338ca; transform: translateY(-1px); }
+
+.footer-divider { height: 1px; background: rgba(15, 23, 42, 0.05); margin: 8px 0; }
+
+.modal-btn-danger {
+  width: 100%; padding: 12px; background: #fef2f2; color: #ef4444; border-radius: 14px;
+  font-size: 13px; font-weight: 800; border: 1px solid #fee2e2; cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-btn-danger:hover { background: #fee2e2; border-color: #fecaca; }
+</style>

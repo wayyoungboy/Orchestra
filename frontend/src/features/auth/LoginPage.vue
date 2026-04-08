@@ -5,10 +5,10 @@
       <div class="grid-pattern"></div>
       <div class="bg-glow-center"></div>
       
-      <!-- Parallax Orbs -->
-      <div class="orb orb-1" :style="parallaxStyle(0.05)"></div>
-      <div class="orb orb-2" :style="parallaxStyle(-0.03)"></div>
-      <div class="orb orb-3" :style="parallaxStyle(0.02)"></div>
+      <!-- Parallax Orbs with Fluid Motion -->
+      <div class="orb orb-1 orb-animate-1" :style="parallaxStyle(0.05)"></div>
+      <div class="orb orb-2 orb-animate-2" :style="parallaxStyle(-0.03)"></div>
+      <div class="orb orb-3 orb-animate-3" :style="parallaxStyle(0.02)"></div>
 
       <!-- Floating Particles -->
       <div class="particles-container">

@@ -1,167 +1,83 @@
 <template>
   <div
     :class="[
-      'relative flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 group transition-all duration-200',
-      menuOpen ? 'z-40' : 'z-0 group-hover:z-30'
+      'member-row-root group',
+      menuOpen ? 'is-menu-open' : ''
     ]"
     @contextmenu.prevent="handleContextMenu"
   >
-    <div class="relative shrink-0">
-      <div class="w-10 h-10 rounded-full flex items-center justify-center shadow-md" :class="avatarClass">
-        <span class="text-sm font-bold" :class="avatarTextClass">{{ initials }}</span>
+    <div class="avatar-container">
+      <div :class="['avatar-circle', avatarClass]">
+        <span :class="['avatar-text', avatarTextClass]">{{ initials }}</span>
       </div>
-      <div
-        :class="[
-          'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-panel',
-          statusColor
-        ]"
-      />
+      <div :class="['status-dot', statusColor]"></div>
     </div>
 
-    <div class="flex items-center justify-between gap-2 min-w-0 flex-1">
-      <div class="flex flex-col min-w-0">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span
-            :class="[
-              'text-[13px] leading-none transition-colors',
-              member.roleType === 'owner' ? 'text-primary font-bold' : 'text-white font-medium group-hover:text-primary'
-            ]"
-          >
-            {{ displayName }}
-          </span>
-          <span
-            v-if="terminalBadge"
-            class="text-[9px] px-1.5 py-0.5 rounded-md border font-bold uppercase tracking-wide shrink-0"
-            :class="terminalBadge.cls"
-            :title="terminalBadge.title"
-          >
-            {{ terminalBadge.text }}
-          </span>
-          <span
-            v-if="member.roleType === 'owner'"
-            class="px-1.5 py-0.5 bg-yellow-500/20 text-yellow-500 text-[9px] rounded border border-yellow-500/20 font-bold uppercase tracking-wide"
-          >
-            {{ t('members.roleOwner') }}
-          </span>
-          <span
-            v-if="member.roleType === 'admin'"
-            class="px-1.5 py-0.5 bg-primary/20 text-primary text-[9px] rounded border border-primary/20 font-bold uppercase tracking-wide"
-          >
-            {{ t('members.roleAdmin') }}
-          </span>
-          <span
-            v-if="member.roleType === 'secretary'"
-            class="px-1.5 py-0.5 bg-sky-500/15 text-sky-400 text-[9px] rounded border border-sky-500/25 font-bold uppercase tracking-wide"
-          >
-            {{ t('members.roleSecretary') }}
-          </span>
-          <span
-            v-if="!isKnownMemberRole"
-            class="px-1.5 py-0.5 bg-amber-500/15 text-amber-400 text-[9px] rounded border border-amber-500/25 font-bold uppercase tracking-wide"
-          >
-            {{ t('members.roleOther') }}
-          </span>
-        </div>
-        <span v-if="subtitleSecondary" class="text-white/30 text-[10px] mt-1.5 font-medium truncate block">
-          {{ subtitleSecondary }}
+    <div class="member-main-info">
+      <div class="name-badge-row">
+        <span :class="['member-display-name', member.roleType === 'owner' ? 'is-owner' : '']">
+          {{ displayName }}
+        </span>
+        
+        <!-- Role Badges -->
+        <span v-if="member.roleType === 'owner'" class="role-badge owner">{{ t('members.roleOwner') }}</span>
+        <span v-if="member.roleType === 'admin'" class="role-badge admin">{{ t('members.roleAdmin') }}</span>
+        <span v-if="member.roleType === 'assistant'" class="role-badge assistant">{{ t('members.roleAssistant') }}</span>
+        <span v-if="member.roleType === 'secretary'" class="role-badge secretary">{{ t('members.roleSecretary') }}</span>
+        
+        <!-- Terminal Status Badge -->
+        <span v-if="terminalBadge" :class="['terminal-status-badge', terminalBadge.cls]" :title="terminalBadge.title">
+          {{ terminalBadge.text }}
         </span>
       </div>
+      <span v-if="subtitleSecondary" class="member-status-line truncate">
+        {{ subtitleSecondary }}
+      </span>
+    </div>
 
-      <div class="relative shrink-0">
-        <button
-          type="button"
-          @click.stop="$emit('toggle-menu', member)"
-          :class="[
-            'w-8 h-8 rounded-lg flex items-center justify-center transition-colors',
-            menuOpen ? 'bg-white/10 text-white' : 'text-white/30 hover:text-white hover:bg-white/10'
-          ]"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-          </svg>
-        </button>
+    <div class="member-actions-trigger">
+      <button
+        type="button"
+        @click.stop="$emit('toggle-menu', member)"
+        :class="['more-btn', menuOpen ? 'is-active' : '']"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+        </svg>
+      </button>
 
-        <!-- Dropdown Menu -->
-        <div
-          v-if="menuOpen"
-          class="absolute right-0 top-full mt-2 w-52 rounded-xl bg-panel-strong/95 flex flex-col py-1.5 shadow-2xl overflow-hidden z-50 ring-1 ring-white/10"
-          @click.stop
-        >
-          <!-- Open Terminal for assistants -->
-          <template v-if="canOpenTerminal">
-            <button
-              type="button"
-              class="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-white/15 transition-colors flex items-center gap-3"
-              @click="$emit('action', { action: 'open-terminal', member })"
-            >
-              <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              {{ t('memberRow.openTerminal') }}
-            </button>
-            <div class="h-px bg-white/10 my-1 mx-2" />
-          </template>
-
-          <button
-            v-if="canSendMessage"
-            type="button"
-            class="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-white/15 transition-colors flex items-center gap-3"
-            @click="$emit('action', { action: 'send-message', member })"
-          >
-            <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
+      <!-- Dropdown Menu (Light Glass) -->
+      <div v-if="menuOpen" class="member-dropdown-menu animate-in fade-in zoom-in-95 duration-200" @click.stop>
+        <div class="menu-group">
+          <button v-if="canOpenTerminal" @click="$emit('action', { action: 'open-terminal', member })" class="menu-item">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            {{ t('memberRow.openTerminal') }}
+          </button>
+          <button v-if="canSendMessage" @click="$emit('action', { action: 'send-message', member })" class="menu-item">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
             {{ t('memberRow.sendMessage') }}
           </button>
-
-          <button
-            v-if="canRename"
-            type="button"
-            class="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-white/15 transition-colors flex items-center gap-3"
-            @click="$emit('action', { action: 'rename', member })"
-          >
-            <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            {{ t('memberRow.rename') }}
+          <button v-if="canMention" @click="$emit('action', { action: 'mention', member })" class="menu-item">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" /></svg>
+            {{ t('memberRow.mention') }}
           </button>
-
-          <div class="h-px bg-white/10 my-1 mx-2" />
-
-          <div class="px-4 py-1 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-            {{ t('memberRow.statusHeading') }}
-          </div>
-
-          <button
-            v-for="option in statusOptions"
-            :key="option.id"
-            type="button"
-            class="w-full text-left px-4 py-2.5 text-xs font-bold text-white hover:bg-white/15 transition-colors flex items-center gap-3"
-            @click="$emit('action', { action: 'set-status', member, status: option.id })"
-          >
-            <span :class="['w-2.5 h-2.5 rounded-full', option.dotClass]" />
-            {{ option.label }}
-            <span v-if="coercedStatus === option.id" class="ml-auto text-white/60">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
-          </button>
-
-          <template v-if="canRemove">
-            <div class="h-px bg-white/10 my-1 mx-2" />
-            <button
-              type="button"
-              class="w-full text-left px-4 py-2.5 text-xs font-bold text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-3"
-              @click="$emit('action', { action: 'remove', member })"
-            >
-              <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
-              </svg>
-              {{ t('memberRow.remove') }}
-            </button>
-          </template>
         </div>
+        <div class="menu-divider"></div>
+        <div class="menu-label">{{ t('memberRow.statusHeading') }}</div>
+        <div class="menu-group">
+          <button v-for="option in statusOptions" :key="option.id" @click="$emit('action', { action: 'set-status', member, status: option.id })" class="menu-item">
+            <span :class="['status-dot-small', option.dotClass]"></span>
+            {{ option.label }}
+            <svg v-if="coercedStatus === option.id" class="ml-auto w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+          </button>
+        </div>
+        <template v-if="canRemove">
+          <div class="menu-divider"></div>
+          <button @click="$emit('action', { action: 'remove', member })" class="menu-item is-danger">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" /></svg>
+            {{ t('memberRow.remove') }}
+          </button>
+        </template>
       </div>
     </div>
   </div>
@@ -171,7 +87,6 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Member, MemberStatus } from '@/shared/types/member'
-import { useContextMenu } from '@/shared/context-menu/useContextMenu'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
 import { useTerminalStore } from '@/features/terminal/terminalStore'
 import { hasTerminalConfig, useTerminalMemberStore } from '@/features/terminal/terminalMemberStore'
@@ -188,254 +103,154 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const { openMenu } = useContextMenu()
 const workspaceStore = useWorkspaceStore()
 const terminalStore = useTerminalStore()
 const terminalMemberStore = useTerminalMemberStore()
 
-const knownMemberRoles = new Set(['owner', 'admin', 'secretary', 'assistant', 'member'])
-const isKnownMemberRole = computed(() => knownMemberRoles.has(props.member.roleType))
-const displayName = computed(() => {
-  const n = props.member.name?.trim()
-  return n || t('members.unnamedMember')
-})
-
+const displayName = computed(() => props.member.name?.trim() || t('members.unnamedMember'))
 const menuOpen = computed(() => props.menuOpen ?? false)
 const canRemove = computed(() => props.currentUserId ? props.member.id !== props.currentUserId : true)
-const canRename = computed(() => props.currentUserId ? props.member.id !== props.currentUserId : true)
-const canMention = computed(() => props.currentUserId ? props.member.id !== props.currentUserId : true)
 const canSendMessage = computed(() => props.currentUserId ? props.member.id !== props.currentUserId : true)
-const canOpenTerminal = computed(() =>
-  hasTerminalConfig(props.member.terminalType, props.member.terminalCommand)
-)
+const canOpenTerminal = computed(() => hasTerminalConfig(props.member.terminalType, props.member.terminalCommand))
+// 只有有 PTY 配置的成员才能被 @ 提及（assistant/secretary）
+const canMention = computed(() => hasTerminalConfig(props.member.terminalType, props.member.terminalCommand))
 
-/** 本地 WebSocket 态 + 服务端 PTY 轮询（REQ-303） */
 const terminalBadge = computed(() => {
   if (!canOpenTerminal.value) return null
   const wid = workspaceStore.currentWorkspace?.id
   const sess = terminalMemberStore.getSession(props.member.id, wid)
-  const server = terminalMemberStore.getServerTerminalForMember(props.member.id)
-
   if (sess) {
-    const st = terminalStore.connectionStatus[sess.terminalId] ?? 'pending'
-    const styles: Record<string, { text: string; title: string; cls: string }> = {
-      pending: {
-        text: '···',
-        title: t('memberRow.badgeWsPending'),
-        cls: 'border-slate-500/40 text-slate-300 bg-slate-500/10'
-      },
-      connected: {
-        text: 'tty',
-        title: t('memberRow.badgeWsConnected'),
-        cls: 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
-      },
-      working: {
-        text: '»',
-        title: t('memberRow.badgeWsWorking'),
-        cls: 'border-amber-500/40 text-amber-300 bg-amber-500/10'
-      },
-      connecting: {
-        text: '···',
-        title: t('memberRow.badgeWsConnecting'),
-        cls: 'border-amber-500/40 text-amber-300 bg-amber-500/10'
-      },
-      error: {
-        text: 'err',
-        title: t('memberRow.badgeWsError'),
-        cls: 'border-red-500/40 text-red-400 bg-red-500/10'
-      },
-      disconnected: {
-        text: 'off',
-        title: t('memberRow.badgeWsDisconnected'),
-        cls: 'border-white/15 text-white/45 bg-white/5'
-      }
+    const session = terminalStore.sessions.find(s => s.id === sess.terminalId)
+    const st = session?.status ?? 'disconnected'
+    const styles: any = {
+      connected: { text: 'tty', cls: 'bg-green-50 text-green-600 border-green-100' },
+      error: { text: 'err', cls: 'bg-red-50 text-red-600 border-red-100' },
+      disconnected: { text: 'off', cls: 'bg-slate-100 text-slate-400 border-slate-200' }
     }
-    return styles[st] ?? styles.pending
+    return styles[st] || { text: '...', cls: 'bg-indigo-50 text-primary border-indigo-100' }
   }
-
-  if (server) {
-    return {
-      text: 'pty',
-      title: t('memberRow.badgeServerPty'),
-      cls: 'border-sky-500/40 text-sky-300 bg-sky-500/10'
-    }
-  }
-
-  return {
-    text: 'tty',
-    title: t('memberRow.badgeNoSession'),
-    cls: 'border-white/10 text-white/35 bg-white/5'
-  }
+  return { text: 'pty', cls: 'bg-slate-50 text-slate-400 border-slate-100' }
 })
-
-const handleContextMenu = (event: MouseEvent) => {
-  const entries: { id: string; label: string; icon?: string; danger?: boolean; action?: () => void }[] = []
-
-  // Open Terminal for assistants
-  if (canOpenTerminal.value) {
-    entries.push({
-      id: 'open-terminal',
-      label: t('memberRow.openTerminal'),
-      icon: 'terminal',
-      action: () => emit('action', { action: 'open-terminal', member: props.member })
-    })
-  }
-
-  if (canSendMessage.value) {
-    entries.push({
-      id: 'send-message',
-      label: t('memberRow.sendMessage'),
-      icon: 'chat_bubble',
-      action: () => emit('action', { action: 'send-message', member: props.member })
-    })
-  }
-
-  if (canMention.value) {
-    entries.push({
-      id: 'mention',
-      label: `@${displayName.value}`,
-      icon: 'alternate_email',
-      action: () => emit('action', { action: 'mention', member: props.member })
-    })
-  }
-
-  if (canRename.value) {
-    entries.push({
-      id: 'rename',
-      label: t('memberRow.rename'),
-      icon: 'edit',
-      action: () => emit('action', { action: 'rename', member: props.member })
-    })
-  }
-
-  if (canRemove.value) {
-    entries.push({
-      id: 'remove',
-      label: t('memberRow.remove'),
-      icon: 'person_remove',
-      danger: true,
-      action: () => emit('action', { action: 'remove', member: props.member })
-    })
-  }
-
-  openMenu(event.clientX, event.clientY, entries)
-}
 
 const initials = computed(() => {
   const n = displayName.value.trim()
-  if (!n) return '?'
-  const ch = n.charAt(0).toUpperCase()
-  return /[\w\u4e00-\u9fff]/.test(ch) ? ch : '?'
+  return n ? n.charAt(0).toUpperCase() : '?'
 })
 
-/** 后端可能省略 status 或旧数据异常；UI 上统一映射到四种 presence，避免副标题空白 */
-const coercedStatus = computed((): MemberStatus => {
-  const raw = props.member.manualStatus ?? props.member.status
-  if (raw === 'online' || raw === 'working' || raw === 'dnd' || raw === 'offline') {
-    return raw
-  }
-  return 'online'
-})
+const coercedStatus = computed((): MemberStatus => ((props.member.manualStatus ?? props.member.status) || 'online') as MemberStatus)
 
 const statusOptions = computed(() => [
-  { id: 'online' as MemberStatus, label: t('memberRow.statusOnline'), dotClass: 'bg-green-500' },
+  { id: 'online' as MemberStatus, label: t('memberRow.statusOnline'), dotClass: 'bg-green-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' },
   { id: 'working' as MemberStatus, label: t('memberRow.statusWorking'), dotClass: 'bg-amber-400' },
   { id: 'dnd' as MemberStatus, label: t('memberRow.statusDnd'), dotClass: 'bg-red-500' },
-  { id: 'offline' as MemberStatus, label: t('memberRow.statusOffline'), dotClass: 'bg-slate-500' }
+  { id: 'offline' as MemberStatus, label: t('memberRow.statusOffline'), dotClass: 'bg-slate-400' }
 ])
 
-const statusColor = computed(() => {
-  const option = statusOptions.value.find((o) => o.id === coercedStatus.value)
-  return option?.dotClass || 'bg-slate-500'
-})
+const statusColor = computed(() => statusOptions.value.find(o => o.id === coercedStatus.value)?.dotClass || 'bg-slate-400')
 
 const avatarClass = computed(() => {
   switch (props.member.roleType) {
-    case 'owner':
-      return 'bg-primary/20'
-    case 'admin':
-      return 'bg-white/10'
-    case 'assistant':
-      return 'bg-emerald-500/20'
-    case 'secretary':
-      return 'bg-sky-500/20'
-    default:
-      return 'bg-white/10'
+    case 'owner': return 'bg-indigo-100'
+    case 'assistant': return 'bg-green-100'
+    case 'secretary': return 'bg-amber-100'
+    default: return 'bg-slate-100'
   }
 })
 
 const avatarTextClass = computed(() => {
   switch (props.member.roleType) {
-    case 'owner':
-      return 'text-white'
-    case 'admin':
-      return 'text-white/60'
-    case 'assistant':
-      return 'text-emerald-400'
-    case 'secretary':
-      return 'text-sky-400'
-    default:
-      return 'text-white/60'
+    case 'owner': return 'text-indigo-600'
+    case 'assistant': return 'text-green-600'
+    case 'secretary': return 'text-amber-600'
+    default: return 'text-slate-600'
   }
-})
-
-const terminalStateLabel = computed(() => {
-  if (!canOpenTerminal.value) return ''
-  const wid = workspaceStore.currentWorkspace?.id
-  const sess = terminalMemberStore.getSession(props.member.id, wid)
-  const server = terminalMemberStore.getServerTerminalForMember(props.member.id)
-  if (sess) {
-    const st = terminalStore.connectionStatus[sess.terminalId] ?? 'pending'
-    switch (st) {
-      case 'pending':
-        return t('memberRow.terminalLinePending')
-      case 'connecting':
-        return t('memberRow.terminalLineConnecting')
-      case 'error':
-        return t('memberRow.terminalLineError')
-      case 'disconnected':
-        return t('memberRow.terminalLineDisconnected')
-      case 'working':
-        return t('memberRow.terminalLineWorking')
-      case 'connected':
-        return t('memberRow.terminalLineConnected')
-      default:
-        return t('memberRow.terminalLinePending')
-    }
-  }
-  if (server) return t('memberRow.terminalLineServerPty')
-  return t('memberRow.terminalLineIdle')
 })
 
 const subtitleSecondary = computed(() => {
-  const presence = statusOptions.value.find((o) => o.id === coercedStatus.value)?.label ?? ''
-
-  if (canOpenTerminal.value) {
-    const term = terminalStateLabel.value
-    if (term) return presence ? `${presence} · ${term}` : term
-    return presence
-  }
-
-  const roleTag = (): string => {
+  const presence = statusOptions.value.find(o => o.id === coercedStatus.value)?.label ?? ''
+  const roleLabel = () => {
     switch (props.member.roleType) {
-      case 'assistant':
-        return t('members.roleAssistant')
-      case 'secretary':
-        return t('members.roleSecretary')
-      case 'member':
-        return t('members.roleMember')
-      case 'admin':
-        return t('members.roleAdmin')
-      case 'owner':
-        return ''
-      default:
-        return isKnownMemberRole.value ? '' : t('members.roleOther')
+      case 'assistant': return t('members.roleAssistant')
+      case 'secretary': return t('members.roleSecretary')
+      case 'admin': return t('members.roleAdmin')
+      default: return ''
     }
   }
-
-  const tag = roleTag()
-  if (tag && presence) return `${presence} · ${tag}`
-  if (tag) return tag
-  return presence
+  const tag = roleLabel()
+  return tag ? `${presence} · ${tag}` : presence
 })
+
+function handleContextMenu(_event: MouseEvent) {
+  // Use emitting for simplicity in this visual refactor
+  emit('toggle-menu', props.member)
+}
 </script>
+
+<style scoped>
+.member-row-root {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+  border-radius: 14px; transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+  cursor: pointer; position: relative;
+}
+.member-row-root:hover { background: rgba(15, 23, 42, 0.04); }
+.member-row-root.is-menu-open { background: rgba(15, 23, 42, 0.06); z-index: 40; }
+
+.avatar-container { position: relative; flex-shrink: 0; }
+.avatar-circle { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; shadow: 0 4px 10px rgba(0,0,0,0.02); }
+.avatar-text { font-size: 15px; font-weight: 900; }
+
+.status-dot {
+  position: absolute; bottom: -2px; right: -2px; width: 10px; height: 10px;
+  border-radius: 50%; border: 2px solid white;
+}
+
+.member-main-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.name-badge-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+.member-display-name { font-size: 13.5px; font-weight: 700; color: #334155; }
+.member-display-name.is-owner { color: #4f46e5; }
+
+.role-badge {
+  font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 6px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.role-badge.owner { background: #fee2e2; color: #ef4444; }
+.role-badge.admin { background: #e0e7ff; color: #4338ca; }
+.role-badge.assistant { background: #dcfce7; color: #10b981; }
+.role-badge.secretary { background: #fef9c3; color: #ca8a04; }
+
+.terminal-status-badge { font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 6px; border: 1px solid transparent; }
+
+.member-status-line { font-size: 11px; font-weight: 600; color: #94a3b8; }
+
+.member-actions-trigger { position: relative; }
+.more-btn {
+  width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  color: #cbd5e1; transition: all 0.2s; border: none; background: transparent; cursor: pointer;
+}
+.member-row-root:hover .more-btn { color: #94a3b8; }
+.more-btn:hover, .more-btn.is-active { background: white; color: #0f172a; shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+.member-dropdown-menu {
+  position: absolute; top: 100%; right: 0; margin-top: 8px; width: 200px;
+  background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(24px);
+  border-radius: 16px; border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1); z-index: 100; padding: 6px;
+}
+
+.menu-group { display: flex; flex-direction: column; gap: 2px; }
+.menu-item {
+  width: 100%; padding: 10px 12px; border-radius: 10px; display: flex; align-items: center; gap: 10px;
+  font-size: 12px; font-weight: 700; color: #475569; border: none; background: transparent; cursor: pointer;
+  transition: all 0.2s;
+}
+.menu-item:hover { background: #f8fafc; color: #0f172a; }
+.menu-item svg { width: 16px; height: 16px; opacity: 0.6; }
+.menu-item.is-danger { color: #ef4444; }
+.menu-item.is-danger:hover { background: #fef2f2; }
+
+.menu-divider { height: 1px; background: #f1f5f9; margin: 4px 8px; }
+.menu-label { font-size: 9px; font-weight: 900; color: #cbd5e1; text-transform: uppercase; padding: 4px 12px; letter-spacing: 0.1em; }
+
+.status-dot-small { width: 8px; height: 8px; border-radius: 50%; }
+</style>

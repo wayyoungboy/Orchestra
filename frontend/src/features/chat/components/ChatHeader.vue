@@ -7,6 +7,17 @@
 
     <div class="header-right">
       <button
+        type="button"
+        class="action-btn search-btn"
+        @click="$emit('open-search')"
+        title="Search Messages"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </button>
+
+      <button
         v-if="memberCount !== undefined"
         type="button"
         class="members-btn"
@@ -22,10 +33,6 @@
 </template>
 
 <script setup lang="ts">
-import { useI18n } from 'vue-i18n'
-
-const { t } = useI18n()
-
 defineProps<{
   title: string
   description?: string
@@ -34,6 +41,7 @@ defineProps<{
 
 defineEmits<{
   (e: 'open-members'): void
+  (e: 'open-search'): void
 }>()
 </script>
 
@@ -80,18 +88,41 @@ defineEmits<{
 .header-right {
   display: flex;
   align-items: center;
+  gap: 12px;
+}
+
+.action-btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.action-btn:hover {
+  background: #f8fafc;
+  color: #4f46e5;
+  border-color: #cbd5e1;
 }
 
 .members-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  border-radius: 12px;
+  padding: 0 12px;
+  height: 36px;
+  border-radius: 10px;
   border: 1px solid #e2e8f0;
   background: white;
   color: #64748b;
   transition: all 0.2s;
+  cursor: pointer;
 }
 
 .members-btn:hover {

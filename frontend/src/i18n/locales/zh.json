@@ -42,7 +42,8 @@
     "headerDirectMessage": "私信",
     "inputSend": "发送",
     "inputHint": "Enter 发送，Shift+Enter 换行",
-    "inputMessagePlaceholder": "发送到 {channel}"
+    "inputPlaceholder": "发送到 {name}",
+    "mentionSuggestions": "选择要提及的成员"
   },
   "workspace": {
     "noSelectionTitle": "未选择工作区",
@@ -57,6 +58,7 @@
   "memberRow": {
     "openTerminal": "打开终端",
     "sendMessage": "发消息",
+    "mention": "@ 提及",
     "rename": "重命名",
     "remove": "移除",
     "statusHeading": "状态",

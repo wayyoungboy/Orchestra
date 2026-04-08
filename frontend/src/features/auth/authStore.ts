@@ -4,18 +4,46 @@ import { notifyUserError } from '@/shared/notifyError'
 import client from '@/shared/api/client'
 import axios from 'axios'
 
+export interface UserInfo {
+  id: string
+  username: string
+}
+
 export const useAuthStore = defineStore('auth', () => {
   const isAuthEnabled = ref(true)
   const initialized = ref(false)
   const isAuthenticated = ref(!!localStorage.getItem('orchestra.auth.token'))
   const currentUser = ref<string | null>(localStorage.getItem('orchestra.user'))
+  const currentUserId = ref<string | null>(null)
+
+  /**
+   * Fetch current user info including user ID
+   */
+  async function fetchCurrentUser(): Promise<UserInfo | null> {
+    if (!isAuthenticated.value) return null
+    try {
+      const response = await client.get('/auth/me')
+      const user = response.data?.user
+      if (user) {
+        currentUserId.value = user.id || user.ID || 'default'
+        currentUser.value = user.username || user.Username || 'anonymous'
+        return {
+          id: currentUserId.value as string,
+          username: currentUser.value as string
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch current user', e)
+    }
+    return null
+  }
 
   /**
    * Fetch authentication configuration from backend
    */
   async function fetchConfig() {
     if (initialized.value) return
-    
+
     try {
       const response = await client.get('/auth/config')
       const { enabled } = response.data
@@ -25,6 +53,10 @@ export const useAuthStore = defineStore('auth', () => {
       if (!enabled) {
         isAuthenticated.value = true
         if (!currentUser.value) currentUser.value = 'guest'
+        currentUserId.value = 'default'
+      } else if (isAuthenticated.value) {
+        // Fetch actual user info when auth is enabled
+        await fetchCurrentUser()
       }
     } catch (e) {
       console.warn('Failed to fetch auth config, defaulting to enabled', e)
@@ -75,9 +107,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     isAuthEnabled,
+    initialized,
     isAuthenticated,
     currentUser,
+    currentUserId,
     fetchConfig,
+    fetchCurrentUser,
     login,
     logout
   }

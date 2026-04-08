@@ -3,7 +3,8 @@
  */
 const orphanTTY = /\[(?:\?[0-9]+[A-Za-z]+|[0-9][\d;]*[A-Za-z])/g
 
-export function stripAnsiForChat(input: string): string {
+export function stripAnsiForChat(input: unknown): string {
+  if (typeof input !== 'string') return ''
   if (!input) return ''
   let s = input.replace(/\r/g, '')
   let prev = ''

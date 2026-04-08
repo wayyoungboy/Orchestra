@@ -1,25 +1,25 @@
 <template>
   <aside
     :class="[
-      'bg-panel/50 border-l border-white/5 shrink-0 flex-col py-6 px-4 h-full',
-      variant === 'drawer' ? 'flex w-72' : 'hidden md:flex w-[280px]'
+      'members-sidebar-root',
+      variant === 'drawer' ? 'is-drawer' : 'is-sidebar'
     ]"
   >
     <!-- Header -->
-    <div class="mb-6 flex items-center justify-between px-2">
-      <h2 class="text-white font-bold text-[15px]">{{ t('members.title') }}</h2>
+    <div class="sidebar-header">
+      <h2 class="header-title">{{ t('members.title') }}</h2>
       <slot name="header-action">
         <button
           type="button"
-          class="w-9 h-9 rounded-xl bg-white/10 border border-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-colors flex items-center justify-center"
+          class="invite-btn"
           :title="t('friends.invite')"
           @click="$emit('open-invite')"
         >
-          <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               stroke-linecap="round"
               stroke-linejoin="round"
-              stroke-width="2"
+              stroke-width="2.5"
               d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
             />
           </svg>
@@ -28,112 +28,25 @@
     </div>
 
     <!-- Members List -->
-    <div class="space-y-6 overflow-y-auto flex-1">
-      <!-- Owners -->
-      <div v-if="owners.length">
-        <h3 class="text-white/30 text-[10px] font-bold uppercase tracking-widest mb-3 px-2">
-          Owner {{ owners.length > 1 ? `(${owners.length})` : '' }}
-        </h3>
-        <div class="space-y-1">
-          <MemberRow
-            v-for="member in owners"
-            :key="member.id"
-            :member="member"
-            :current-user-id="currentUserId"
-            :menu-open="openMenuId === member.id"
-            @toggle-menu="toggleMenu"
-            @action="handleAction"
-          />
-        </div>
-      </div>
-
-      <!-- Admins -->
-      <div v-if="admins.length">
-        <h3 class="text-white/30 text-[10px] font-bold uppercase tracking-widest mb-3 px-2">
-          Admin {{ admins.length > 1 ? `(${admins.length})` : '' }}
-        </h3>
-        <div class="space-y-1">
-          <MemberRow
-            v-for="member in admins"
-            :key="member.id"
-            :member="member"
-            :current-user-id="currentUserId"
-            :menu-open="openMenuId === member.id"
-            @toggle-menu="toggleMenu"
-            @action="handleAction"
-          />
-        </div>
-      </div>
-
-      <!-- Secretary -->
-      <div v-if="secretaries.length">
-        <h3 class="text-white/30 text-[10px] font-bold uppercase tracking-widest mb-3 px-2">
-          {{ t('members.roleSecretary') }}{{ secretaries.length > 1 ? ` (${secretaries.length})` : '' }}
-        </h3>
-        <div class="space-y-1">
-          <MemberRow
-            v-for="member in secretaries"
-            :key="member.id"
-            :member="member"
-            :current-user-id="currentUserId"
-            :menu-open="openMenuId === member.id"
-            @toggle-menu="toggleMenu"
-            @action="handleAction"
-          />
-        </div>
-      </div>
-
-      <!-- Assistants -->
-      <div v-if="assistants.length">
-        <h3 class="text-white/30 text-[10px] font-bold uppercase tracking-widest mb-3 px-2">
-          Assistant {{ assistants.length > 1 ? `(${assistants.length})` : '' }}
-        </h3>
-        <div class="space-y-1">
-          <MemberRow
-            v-for="member in assistants"
-            :key="member.id"
-            :member="member"
-            :current-user-id="currentUserId"
-            :menu-open="openMenuId === member.id"
-            @toggle-menu="toggleMenu"
-            @action="handleAction"
-          />
-        </div>
-      </div>
-
-      <!-- Members -->
-      <div v-if="membersGroup.length">
-        <h3 class="text-white/30 text-[10px] font-bold uppercase tracking-widest mb-3 px-2">
-          Member {{ membersGroup.length > 1 ? `(${membersGroup.length})` : '' }}
-        </h3>
-        <div class="space-y-1">
-          <MemberRow
-            v-for="member in membersGroup"
-            :key="member.id"
-            :member="member"
-            :current-user-id="currentUserId"
-            :menu-open="openMenuId === member.id"
-            @toggle-menu="toggleMenu"
-            @action="handleAction"
-          />
-        </div>
-      </div>
-
-      <!-- Unknown / legacy rows (empty roleType in DB, etc.) -->
-      <div v-if="otherRoles.length">
-        <h3 class="text-white/30 text-[10px] font-bold uppercase tracking-widest mb-3 px-2">
-          {{ t('members.roleOther') }}{{ otherRoles.length > 1 ? ` (${otherRoles.length})` : '' }}
-        </h3>
-        <div class="space-y-1">
-          <MemberRow
-            v-for="member in otherRoles"
-            :key="member.id"
-            :member="member"
-            :current-user-id="currentUserId"
-            :menu-open="openMenuId === member.id"
-            @toggle-menu="toggleMenu"
-            @action="handleAction"
-          />
+    <div class="sidebar-content custom-scrollbar">
+      <!-- Role Sections -->
+      <div v-for="section in roleSections" :key="section.label" class="section-container">
+        <div v-if="section.members.length">
+          <div class="section-label">
+            <span>{{ section.label }}</span>
+            <span class="count-badge">{{ section.members.length }}</span>
+          </div>
+          <div class="member-list">
+            <MemberRow
+              v-for="member in section.members"
+              :key="member.id"
+              :member="member"
+              :current-user-id="currentUserId"
+              :menu-open="openMenuId === member.id"
+              @toggle-menu="toggleMenu"
+              @action="handleAction"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -144,7 +57,7 @@
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import MemberRow from '@/features/members/MemberRow.vue'
-import type { Member, MemberRole, MemberStatus } from '@/shared/types/member'
+import type { Member, MemberStatus } from '@/shared/types/member'
 
 const { t } = useI18n()
 
@@ -163,14 +76,17 @@ const emit = defineEmits<{
 const variant = computed(() => props.variant ?? 'sidebar')
 const openMenuId = ref<string | null>(null)
 
-const owners = computed(() => props.members.filter((m) => m.roleType === 'owner'))
-const admins = computed(() => props.members.filter((m) => m.roleType === 'admin'))
-const secretaries = computed(() => props.members.filter((m) => m.roleType === 'secretary'))
-const assistants = computed(() => props.members.filter((m) => m.roleType === 'assistant'))
-const membersGroup = computed(() => props.members.filter((m) => m.roleType === 'member'))
-
-const knownMemberRoles = new Set<MemberRole>(['owner', 'admin', 'secretary', 'assistant', 'member'])
-const otherRoles = computed(() => props.members.filter((m) => !knownMemberRoles.has(m.roleType as MemberRole)))
+const roleSections = computed(() => [
+  { label: 'Owners', members: props.members.filter(m => m.roleType === 'owner') },
+  { label: 'Admins', members: props.members.filter(m => m.roleType === 'admin') },
+  { label: 'Secretaries', members: props.members.filter(m => m.roleType === 'secretary') },
+  { label: 'Assistants', members: props.members.filter(m => m.roleType === 'assistant') },
+  { label: 'Members', members: props.members.filter(m => m.roleType === 'member') },
+  { 
+    label: 'Others', 
+    members: props.members.filter(m => !['owner', 'admin', 'secretary', 'assistant', 'member'].includes(m.roleType)) 
+  }
+])
 
 function toggleMenu(member: Member) {
   openMenuId.value = openMenuId.value === member.id ? null : member.id
@@ -184,14 +100,100 @@ interface ActionPayload {
 
 function handleAction(payload: ActionPayload) {
   openMenuId.value = null
-
-  switch (payload.action) {
-    case 'mention':
-      emit('mention', payload.member.id)
-      break
-    default:
-      emit('member-action', payload)
-      break
-  }
+  if (payload.action === 'mention') emit('mention', payload.member.id)
+  else emit('member-action', payload)
 }
 </script>
+
+<style scoped>
+.members-sidebar-root {
+  height: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border-left: 1px solid rgba(15, 23, 42, 0.05);
+  padding: 24px 16px;
+  gap: 24px;
+}
+
+.is-sidebar { width: 280px; display: none; }
+@media (min-width: 768px) { .is-sidebar { display: flex; } }
+.is-drawer { width: 280px; display: flex; }
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
+.header-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.invite-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.invite-btn:hover {
+  background: #f8fafc;
+  color: #4f46e5;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.section-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-label {
+  font-size: 10px;
+  font-weight: 900;
+  color: #94a3b8;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0 8px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.count-badge {
+  font-size: 9px;
+  background: rgba(15, 23, 42, 0.05);
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: #64748b;
+}
+
+.member-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+</style>

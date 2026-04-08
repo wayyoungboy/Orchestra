@@ -116,7 +116,7 @@ export const useProjectStore = defineStore('project', () => {
       members.value.push(created)
       await nextTick()
       try {
-        useToastStore().pushToast(i18n.global.t('members.memberAdded'), { tone: 'success', duration: 3500 })
+        useToastStore().success(i18n.global.t('members.memberAdded'), 3500)
       } catch {
         /* Pinia not ready */
       }

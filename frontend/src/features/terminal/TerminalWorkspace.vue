@@ -39,17 +39,43 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useTerminalStore } from './terminalStore'
+import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
+import { useProjectStore } from '@/features/workspace/projectStore'
 import TerminalPane from './TerminalPane.vue'
 
+const route = useRoute()
 const terminalStore = useTerminalStore()
+const workspaceStore = useWorkspaceStore()
+const projectStore = useProjectStore()
 
 function handleCreateSession() {
+  // Create a generic bash terminal (for manual use)
   terminalStore.createSession('bash')
 }
 
-onMounted(() => {
-  terminalStore.loadSessions()
+onMounted(async () => {
+  const workspaceId = route.params.id as string
+  if (workspaceId) {
+    // Ensure workspace is loaded
+    await workspaceStore.openWorkspace(workspaceId)
+    // Load members first (required for member terminal autoStart)
+    await projectStore.loadMembers(workspaceId)
+
+    // Load existing terminal sessions from server
+    await terminalStore.loadSessions(workspaceId)
+
+    // Wait for member terminal autoStart to complete
+    // (triggered by projectStore.loadMembers via queueMicrotask)
+    // Give it a moment to process
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    // Only create generic bash if no member terminals exist
+    if (terminalStore.sessions.length === 0) {
+      await terminalStore.createSession('bash')
+    }
+  }
 })
 </script>
 
@@ -148,19 +174,29 @@ onMounted(() => {
   justify-content: center;
 }
 
-.empty-glass-card { text-align: center; max-width: 360px; }
-.terminal-icon-placeholder {
-  width: 64px; height: 64px; background: #f1f5f9; border-radius: 20px;
-  display: flex; align-items: center; justify-content: center;
-  margin: 0 auto 24px; color: #94a3b8;
+.empty-glass-card { 
+  text-align: center; 
+  max-width: 360px; 
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(32px);
+  padding: 48px;
+  border-radius: 32px;
+  border: 1px solid white;
+  box-shadow: 0 30px 60px -12px rgba(0,0,0,0.05);
 }
-.terminal-icon-placeholder svg { width: 32px; height: 32px; }
-.empty-glass-card h3 { font-size: 18px; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
-.empty-glass-card p { font-size: 14px; color: #64748b; line-height: 1.6; }
+.terminal-icon-placeholder {
+  width: 80px; height: 80px; background: #f1f5f9; border-radius: 24px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 32px; color: #4f46e5;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.03);
+}
+.terminal-icon-placeholder svg { width: 40px; height: 40px; }
+.empty-glass-card h3 { font-size: 20px; font-weight: 900; color: #0f172a; margin-bottom: 12px; }
+.empty-glass-card p { font-size: 15px; color: #475569; line-height: 1.6; font-weight: 500; }
 
 .terminal-canvas-box {
   height: 100%;
   width: 100%;
-  background: #0f172a; /* Dark PTY background remains */
+  background: #0b0f14; /* Match TerminalPane background */
 }
 </style>

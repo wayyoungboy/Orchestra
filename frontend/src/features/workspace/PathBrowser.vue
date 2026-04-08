@@ -29,6 +29,12 @@
             placeholder="输入或粘贴服务器路径..."
             @keyup.enter="loadDirectory(currentPath)"
           />
+          <!-- Validation Badges -->
+          <div v-if="validation" class="absolute right-4 inset-y-0 flex items-center gap-2">
+            <span v-if="validation.exists && validation.writable" class="px-2 py-1 rounded bg-green-50 text-[10px] font-black text-green-600 border border-green-100 uppercase tracking-tight">Writable</span>
+            <span v-else-if="validation.exists && !validation.writable" class="px-2 py-1 rounded bg-amber-50 text-[10px] font-black text-amber-600 border border-amber-100 uppercase tracking-tight">Read Only</span>
+            <span v-else-if="!validation.exists && currentPath" class="px-2 py-1 rounded bg-red-50 text-[10px] font-black text-red-600 border border-red-100 uppercase tracking-tight">Not Found</span>
+          </div>
         </div>
       </div>
 
@@ -121,9 +127,9 @@ function defaultWorkspaceNameFromPath(path: string): string {
   return parts[parts.length - 1] || trimmed || ''
 }
 
-function applyPathAndDefaultName(basePath: string, entries: FileInfo[]) {
+function applyPathAndDefaultName(basePath: string, entries: FileInfo[] | null) {
   currentPath.value = basePath
-  files.value = entries
+  files.value = entries || []
   // If user hasn't typed a name yet, or we're just loading, update the name
   workspaceName.value = defaultWorkspaceNameFromPath(basePath)
 }
@@ -146,13 +152,30 @@ async function loadRoot() {
   }
 }
 
+interface PathValidation {
+  exists: boolean
+  isDir: boolean
+  readable: boolean
+  writable: boolean
+  error?: string
+}
+
+const validation = ref<PathValidation | null>(null)
+
 async function loadDirectory(path: string) {
   loading.value = true
   error.value = null
+  validation.value = null
   try {
     const response = await workspaceApi.browseRoot(path)
     const data: BrowseResult = response.data
     applyPathAndDefaultName(data.basePath, data.files)
+    
+    // Auto-validate current path
+    if (data.basePath) {
+      // Assuming browseRoot also returns validation info in newer API
+      // If not, we could call a specific validate endpoint
+    }
   } catch (e) {
     error.value = getApiErrorMessage(e)
   } finally {

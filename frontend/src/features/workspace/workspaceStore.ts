@@ -1,32 +1,24 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { useSettingsStore } from '@/features/settings/settingsStore'
-import { workspaceApi } from '@/shared/api/workspace'
-import { getApiErrorMessage } from '@/shared/api/errors'
+import { ref } from 'vue'
+import client from '@/shared/api/client'
+import { notifyUserError } from '@/shared/notifyError'
 import type { Workspace } from '@/shared/types/workspace'
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   const workspaces = ref<Workspace[]>([])
+  const recentWorkspaces = ref<Workspace[]>([])
   const currentWorkspace = ref<Workspace | null>(null)
   const loading = ref(false)
-  const error = ref<string | null>(null)
-
-  const recentWorkspaces = computed(() =>
-    [...workspaces.value].sort((a, b) => {
-      const timeA = a.lastOpenedAt ? new Date(a.lastOpenedAt).getTime() : 0
-      const timeB = b.lastOpenedAt ? new Date(b.lastOpenedAt).getTime() : 0
-      return timeB - timeA
-    })
-  )
+  const searchResults = ref<any[]>([])
 
   async function loadWorkspaces() {
     loading.value = true
-    error.value = null
     try {
-      const response = await workspaceApi.list()
-      workspaces.value = response.data
+      const response = await client.get('/workspaces')
+      workspaces.value = response.data || []
+      recentWorkspaces.value = workspaces.value.slice(0, 6)
     } catch (e) {
-      error.value = getApiErrorMessage(e)
+      notifyUserError('Failed to load workspaces', e)
     } finally {
       loading.value = false
     }
@@ -34,67 +26,81 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   async function openWorkspace(id: string) {
     try {
-      const response = await workspaceApi.get(id)
+      const response = await client.get(`/workspaces/${id}`)
       currentWorkspace.value = response.data
+      return response.data
     } catch (e) {
-      error.value = getApiErrorMessage(e)
+      notifyUserError('Failed to open workspace', e)
     }
   }
 
   async function createWorkspace(name: string, path: string) {
-    loading.value = true
-    error.value = null
     try {
-      const settingsStore = useSettingsStore()
-      const ownerDisplayName = settingsStore.settings.account.displayName?.trim() || undefined
-      const response = await workspaceApi.create({ name, path, ownerDisplayName })
-      workspaces.value.push(response.data)
+      const response = await client.post('/workspaces', { name, path })
+      await loadWorkspaces()
       return response.data
     } catch (e) {
-      error.value = getApiErrorMessage(e)
-      return null
-    } finally {
-      loading.value = false
+      notifyUserError('Failed to create workspace', e)
+    }
+  }
+
+  /**
+   * New: Update workspace properties (PUT /api/workspaces/{id})
+   */
+  async function updateWorkspace(id: string, data: { name?: string, path?: string }) {
+    try {
+      const response = await client.put(`/workspaces/${id}`, data)
+      if (currentWorkspace.value?.id === id) {
+        currentWorkspace.value = response.data
+      }
+      await loadWorkspaces()
+      return response.data
+    } catch (e) {
+      notifyUserError('Failed to update workspace', e)
+    }
+  }
+
+  /**
+   * New: Search messages in workspace (GET /api/workspaces/{id}/search)
+   */
+  async function searchWorkspace(query: string) {
+    if (!currentWorkspace.value || !query.trim()) {
+      searchResults.value = []
+      return
+    }
+    
+    try {
+      const response = await client.get(`/workspaces/${currentWorkspace.value.id}/search`, {
+        params: { q: query, limit: 50 }
+      })
+      searchResults.value = response.data || []
+      return searchResults.value
+    } catch (e) {
+      notifyUserError('Search failed', e)
     }
   }
 
   async function deleteWorkspace(id: string) {
     try {
-      await workspaceApi.delete(id)
-      workspaces.value = workspaces.value.filter((w) => w.id !== id)
-      if (currentWorkspace.value?.id === id) {
-        currentWorkspace.value = null
-      }
+      await client.delete(`/workspaces/${id}`)
+      if (currentWorkspace.value?.id === id) currentWorkspace.value = null
+      await loadWorkspaces()
     } catch (e) {
-      error.value = getApiErrorMessage(e)
+      notifyUserError('Failed to delete workspace', e)
     }
-  }
-
-  async function browseWorkspace(workspaceId: string, path?: string) {
-    try {
-      const response = await workspaceApi.browse(workspaceId, path)
-      return response.data
-    } catch (e) {
-      error.value = getApiErrorMessage(e)
-      return null
-    }
-  }
-
-  function closeWorkspace() {
-    currentWorkspace.value = null
   }
 
   return {
     workspaces,
-    currentWorkspace,
-    loading,
-    error,
     recentWorkspaces,
+    currentWorkspace,
+    searchResults,
+    loading,
     loadWorkspaces,
     openWorkspace,
     createWorkspace,
-    deleteWorkspace,
-    browseWorkspace,
-    closeWorkspace,
+    updateWorkspace,
+    searchWorkspace,
+    deleteWorkspace
   }
 })

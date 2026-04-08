@@ -75,8 +75,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useProjectStore } from '@/features/workspace/projectStore'
 
 const { t } = useI18n()
+const projectStore = useProjectStore()
 
 function roleTypeLabel(roleType: string) {
   switch (roleType) {
@@ -115,10 +117,18 @@ const cursorIndex = ref(0)
 const activeMentionIndex = ref(0)
 const mentionQuery = ref('')
 
+// Use projectStore.members directly if props.members is empty
+const effectiveMembers = computed(() => {
+  if (props.members && props.members.length > 0) {
+    return props.members
+  }
+  return projectStore.members || []
+})
+
 const mentionSuggestions = computed(() => {
   const query = mentionQuery.value.toLowerCase()
-  if (!query) return props.members.slice(0, 6)
-  return props.members.filter(m => m.name.toLowerCase().includes(query)).slice(0, 6)
+  if (!query) return effectiveMembers.value.slice(0, 6)
+  return effectiveMembers.value.filter(m => m.name.toLowerCase().includes(query)).slice(0, 6)
 })
 
 const showMentionSuggestions = computed(() => {

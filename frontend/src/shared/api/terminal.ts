@@ -38,6 +38,24 @@ export const terminalApi = {
     return response.data
   },
 
+  /** 获取或创建成员的终端会话（后端自动判断是否存在） */
+  async getOrCreateSessionForMember(
+    workspaceId: string,
+    memberId: string,
+    options?: {
+      terminalType?: string
+      command?: string
+      args?: string[]
+      memberName?: string
+    }
+  ): Promise<CreateSessionResponse> {
+    const response = await client.post<CreateSessionResponse>(
+      `/workspaces/${workspaceId}/members/${memberId}/terminal-session`,
+      options || {}
+    )
+    return response.data
+  },
+
   async createSession(
     data: CreateSessionRequest,
     options?: { skipErrorToast?: boolean }

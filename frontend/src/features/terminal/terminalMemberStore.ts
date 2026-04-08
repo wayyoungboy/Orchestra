@@ -200,22 +200,21 @@ export const useTerminalMemberStore = defineStore('terminal-member', () => {
 
     const promise = (async (): Promise<MemberSession | null> => {
       try {
-        const attached = await terminalApi.getSessionForMember(workspace.id, member.id)
-        const skipToast = merge.quietAutostart
-        const { command, args } = member.terminalCommand ? splitCommand(member.terminalCommand) : { command: undefined, args: undefined }
-        const response =
-          attached ??
-          (await terminalApi.createSession(
-            {
-              workspaceId: workspace.id,
-              terminalType: member.terminalType || 'native',
-              memberId: member.id,
-              command,
-              args,
-              memberName: member.name // For introduction prompt to AI assistant
-            },
-            { skipErrorToast: skipToast }
-          ))
+        // 使用新的一体化端点：自动获取或创建会话
+        const { command, args } = member.terminalCommand
+          ? splitCommand(member.terminalCommand)
+          : { command: undefined, args: undefined }
+
+        const response = await terminalApi.getOrCreateSessionForMember(
+          workspace.id,
+          member.id,
+          {
+            terminalType: member.terminalType || 'zsh',
+            command,
+            args,
+            memberName: member.name
+          }
+        )
 
         const terminalId = response.sessionId
         const title = member.name
@@ -253,10 +252,7 @@ export const useTerminalMemberStore = defineStore('terminal-member', () => {
         if (merge.quietAutostart) {
           notifyUserError('Assistant terminal', error, { skipToast: true })
           try {
-            useToastStore().pushToast(i18n.global.t('members.terminalAutostartFailed'), {
-              tone: 'warning',
-              duration: 7000
-            })
+            useToastStore().warning(i18n.global.t('members.terminalAutostartFailed'), 7000)
           } catch {
             /* Pinia not ready */
           }

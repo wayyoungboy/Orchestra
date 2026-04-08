@@ -41,7 +41,8 @@
     "headerDirectMessage": "Direct message",
     "inputSend": "Send",
     "inputHint": "Press Enter to send, Shift+Enter for new line",
-    "inputMessagePlaceholder": "Message {channel}"
+    "inputPlaceholder": "Message {name}",
+    "mentionSuggestions": "Select a member to mention"
   },
   "workspace": {
     "noSelectionTitle": "No workspace selected",
@@ -56,6 +57,7 @@
   "memberRow": {
     "openTerminal": "Open Terminal",
     "sendMessage": "Send Message",
+    "mention": "Mention",
     "rename": "Rename",
     "remove": "Remove",
     "statusHeading": "Status",

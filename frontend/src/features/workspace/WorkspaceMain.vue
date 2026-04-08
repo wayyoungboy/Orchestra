@@ -5,10 +5,10 @@
       <div class="grid-pattern"></div>
       <div class="bg-glow-center"></div>
       
-      <!-- Parallax Orbs -->
-      <div class="orb orb-1" :style="parallaxStyle(0.05)"></div>
-      <div class="orb orb-2" :style="parallaxStyle(-0.03)"></div>
-      <div class="orb orb-3" :style="parallaxStyle(0.02)"></div>
+      <!-- Parallax Orbs with Fluid Motion -->
+      <div class="orb orb-1 orb-animate-1" :style="parallaxStyle(0.05)"></div>
+      <div class="orb orb-2 orb-animate-2" :style="parallaxStyle(-0.03)"></div>
+      <div class="orb orb-3 orb-animate-3" :style="parallaxStyle(0.02)"></div>
 
       <!-- Floating Particles (Optional for deeper consistency) -->
       <div class="particles-container">
@@ -43,7 +43,7 @@
         <ChatInterface v-else-if="activeTab === 'chat' && workspaceStore.currentWorkspace" />
         <TerminalWorkspace v-else-if="activeTab === 'terminal' && workspaceStore.currentWorkspace" />
         <MembersPage v-else-if="activeTab === 'members' && workspaceStore.currentWorkspace" />
-        <SkillsPlaceholder v-else-if="activeTab === 'skills' && workspaceStore.currentWorkspace" />
+        <TasksPage v-else-if="activeTab === 'tasks' && workspaceStore.currentWorkspace" />
         <Settings v-else-if="activeTab === 'settings'" />
 
         <!-- No Selection Placeholder -->
@@ -70,7 +70,7 @@ import ChatInterface from '@/features/chat/ChatInterface.vue'
 import TerminalWorkspace from '@/features/terminal/TerminalWorkspace.vue'
 import Settings from '@/features/settings/Settings.vue'
 import MembersPage from '@/features/members/MembersPage.vue'
-import SkillsPlaceholder from '@/features/skills/SkillsPlaceholder.vue'
+import TasksPage from '@/features/tasks/TasksPage.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -106,10 +106,10 @@ function setActiveTab(tab: TabId) {
   activeTab.value = tab
   const workspaceId = workspaceStore.currentWorkspace?.id
   if (workspaceId) {
-    if (tab === 'workspaces') router.push('/workspaces')
-    else router.push(`/workspace/${workspaceId}/${tab}`)
+    if (tab === 'workspaces') router.push('/workspaces').catch(() => {})
+    else router.push(`/workspace/${workspaceId}/${tab}`).catch(() => {})
   } else if (tab !== 'workspaces' && tab !== 'settings') {
-    router.push('/workspaces')
+    router.push('/workspaces').catch(() => {})
   }
 }
 
@@ -129,7 +129,7 @@ function handleCreateWorkspace() {
 watch(() => route.path, (path) => {
   if (path.includes('/terminal')) activeTab.value = 'terminal'
   else if (path.includes('/members')) activeTab.value = 'members'
-  else if (path.includes('/skills')) activeTab.value = 'skills'
+  else if (path.includes('/tasks')) activeTab.value = 'tasks'
   else if (path.includes('/settings')) activeTab.value = 'settings'
   else if (path.includes('/chat')) activeTab.value = 'chat'
   else if (path.includes('/workspaces') || path === '/') activeTab.value = 'workspaces'
