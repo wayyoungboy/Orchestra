@@ -1,0 +1,30 @@
+{
+  "pinned": [],
+  "timeline": [
+    {
+      "id": "conv_e4882ccb",
+      "type": "channel",
+      "memberIds": null,
+      "pinned": false,
+      "muted": false,
+      "unreadCount": 0
+    },
+    {
+      "id": "conv_3b791e8e",
+      "type": "",
+      "memberIds": null,
+      "pinned": false,
+      "muted": false,
+      "unreadCount": 0
+    },
+    {
+      "id": "conv_e4991630",
+      "type": "",
+      "memberIds": null,
+      "pinned": false,
+      "muted": false,
+      "unreadCount": 0
+    }
+  ],
+  "totalUnreadCount": 0
+}

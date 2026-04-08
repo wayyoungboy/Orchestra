@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "workloads": [
+    {
+      "completedTaskCount": 1,
+      "currentTaskCount": 0,
+      "memberId": "01KNFDXDQBYN45FF8EZR8AE75D",
+      "name": "Assistant-1",
+      "pendingTaskCount": 0,
+      "status": "idle"
+    }
+  ]
+}

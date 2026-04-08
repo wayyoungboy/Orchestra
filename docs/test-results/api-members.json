@@ -1,0 +1,29 @@
+[
+  {
+    "id": "01KNFDXDJWAVRYKQ31VBDTZTE3",
+    "workspaceId": "01KNFDXDJ1S63WT1VG2EQGPFC8",
+    "name": "Owner",
+    "roleType": "owner",
+    "autoStartTerminal": false,
+    "status": "online",
+    "createdAt": "2026-04-06T02:19:07+08:00"
+  },
+  {
+    "id": "01KNFDXDNSX714FYVCD5A65GDN",
+    "workspaceId": "01KNFDXDJ1S63WT1VG2EQGPFC8",
+    "name": "Secretary",
+    "roleType": "secretary",
+    "autoStartTerminal": true,
+    "status": "online",
+    "createdAt": "2026-04-06T02:19:07+08:00"
+  },
+  {
+    "id": "01KNFDXDQBYN45FF8EZR8AE75D",
+    "workspaceId": "01KNFDXDJ1S63WT1VG2EQGPFC8",
+    "name": "Assistant-1",
+    "roleType": "assistant",
+    "autoStartTerminal": true,
+    "status": "online",
+    "createdAt": "2026-04-06T02:19:07+08:00"
+  }
+]

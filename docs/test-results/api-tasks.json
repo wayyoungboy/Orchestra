@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "tasks": [
+    {
+      "id": "task_01KNFE2JH4RRRRRRRRRR",
+      "workspaceId": "01KNFDXDJ1S63WT1VG2EQGPFC8",
+      "conversationId": "conv_3b791e8e",
+      "secretaryId": "01KNFDXDNSX714FYVCD5A65GDN",
+      "title": "失败的测试任务",
+      "status": "failed",
+      "assigneeId": "01KNFDXDQBYN45FF8EZR8AE75D",
+      "priority": 0,
+      "assignedAt": 1775413316132,
+      "startedAt": 1775413316184,
+      "completedAt": 1775413316216,
+      "errorMessage": "遇到了无法解决的问题",
+      "createdAt": 1775413316132,
+      "updatedAt": 1775413316216
+    },
+    {
+      "id": "task_01KNFE1SWZR000000000",
+      "workspaceId": "01KNFDXDJ1S63WT1VG2EQGPFC8",
+      "conversationId": "conv_e4991630",
+      "secretaryId": "01KNFDXDNSX714FYVCD5A65GDN",
+      "title": "实现登录功能",
+      "description": "创建登录页面和API",
+      "status": "completed",
+      "assigneeId": "01KNFDXDQBYN45FF8EZR8AE75D",
+      "priority": 0,
+      "assignedAt": 1775413290911,
+      "startedAt": 1775413291012,
+      "completedAt": 1775413291043,
+      "resultSummary": "登录功能已完成，包含页面和API",
+      "createdAt": 1775413290911,
+      "updatedAt": 1775413291043
+    }
+  ]
+}
