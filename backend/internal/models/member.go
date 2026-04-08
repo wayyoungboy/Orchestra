@@ -32,10 +32,10 @@ type Member struct {
 	ACPArgs    []string `json:"acpArgs,omitempty"`    // e.g., ["--input-format", "stream-json", "--output-format", "stream-json"]
 
 	// A2A configuration - Agent-to-Agent Protocol
-	A2AEnabled  bool   `json:"a2aEnabled"`             // Use A2A protocol
-	A2AAgentURL string `json:"a2aAgentUrl,omitempty"`  // A2A agent service endpoint
-	A2AAuthType string `json:"a2aAuthType,omitempty"`  // "none", "api_key", "oauth2"
-	A2AAuthToken string `json:"a2aAuthToken,omitempty"` // Auth token for A2A requests
+	A2AEnabled   bool    `json:"a2aEnabled"`
+	A2AAgentURL  *string `json:"a2aAgentUrl,omitempty"`  // A2A agent service endpoint
+	A2AAuthType  *string `json:"a2aAuthType,omitempty"`  // "none", "api_key", "oauth2"
+	A2AAuthToken *string `json:"a2aAuthToken,omitempty"` // Auth token for A2A requests
 }
 
 type MemberCreate struct {

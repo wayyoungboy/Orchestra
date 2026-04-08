@@ -202,6 +202,50 @@ func (h *MemberHandler) Update(c *gin.Context) {
 	} else if v, ok := patch["manualStatus"].(string); ok {
 		m.Status = v
 	}
+	// ACP fields
+	if v, ok := patch["acpEnabled"].(bool); ok {
+		m.ACPEnabled = v
+	}
+	if v, ok := patch["acpCommand"].(string); ok {
+		m.ACPCommand = v
+	}
+	if v, ok := patch["acpArgs"].([]interface{}); ok {
+		args := make([]string, 0, len(v))
+		for _, a := range v {
+			if s, ok := a.(string); ok {
+				args = append(args, s)
+			}
+		}
+		m.ACPArgs = args
+	}
+	// A2A fields
+	if v, ok := patch["a2aEnabled"].(bool); ok {
+		m.A2AEnabled = v
+	}
+	if v, ok := patch["a2aAgentURL"].(string); ok {
+		if v != "" {
+			ptr := v
+			m.A2AAgentURL = &ptr
+		} else {
+			m.A2AAgentURL = nil
+		}
+	}
+	if v, ok := patch["a2aAuthType"].(string); ok {
+		if v != "" {
+			ptr := v
+			m.A2AAuthType = &ptr
+		} else {
+			m.A2AAuthType = nil
+		}
+	}
+	if v, ok := patch["a2aAuthToken"].(string); ok {
+		if v != "" {
+			ptr := v
+			m.A2AAuthToken = &ptr
+		} else {
+			m.A2AAuthToken = nil
+		}
+	}
 
 	if err := h.repo.Update(c.Request.Context(), m); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

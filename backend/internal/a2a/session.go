@@ -5,6 +5,7 @@ package a2a
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -13,7 +14,7 @@ import (
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
 )
 
-// Session represents an A2A agent session.
+// Session represents an agent session (A2A HTTP or Local CLI).
 // It implements the same interface as the old ACP session for ACPBridge compatibility.
 type Session struct {
 	ID           string
@@ -22,8 +23,12 @@ type Session struct {
 	MemberName   string
 	TerminalType string
 
+	// A2A (HTTP-based) fields
 	Client   *a2aclient.Client
 	AgentURL string
+
+	// Local CLI runner (PTY alternative)
+	localRunner *LocalRunner
 
 	mu               sync.Mutex
 	lastActive       time.Time
@@ -56,6 +61,14 @@ type ACPMessage struct {
 	Content json.RawMessage
 }
 
+// marshalACPContent creates ACP content JSON for the given type and text.
+func marshalACPContent(typ, text string) (json.RawMessage, error) {
+	return json.Marshal(map[string]string{
+		"type":    typ,
+		"content": text,
+	})
+}
+
 type MessageType string
 
 const (
@@ -68,7 +81,7 @@ const (
 	TypeSystem           MessageType = "system"
 )
 
-// NewSession creates a new A2A session for a workspace member.
+// NewSession creates a new session for a workspace member.
 func NewSession(id, workspaceID, memberID, memberName, terminalType string, client *a2aclient.Client, agentURL string) *Session {
 	return &Session{
 		ID:            id,
@@ -88,12 +101,22 @@ func NewSession(id, workspaceID, memberID, memberName, terminalType string, clie
 	}
 }
 
-// SendUserMessage sends a user message to the A2A agent.
-// It creates a SendMessage request and starts SSE subscription for the response.
+// SendUserMessage sends a user message to the agent.
+// Supports both A2A HTTP-based and Local CLI agents.
 func (s *Session) SendUserMessage(content string) error {
 	s.mu.Lock()
 	s.lastActive = time.Now()
 	s.mu.Unlock()
+
+	// Local CLI runner path
+	if s.localRunner != nil {
+		return s.localRunner.SendUserMessage(content)
+	}
+
+	// A2A HTTP path
+	if s.Client == nil {
+		return fmt.Errorf("no agent configured for session %s", s.ID)
+	}
 
 	msg := a2a.NewMessage(a2a.MessageRoleUser, a2a.NewTextPart(content))
 
@@ -254,12 +277,16 @@ func (s *Session) SendToolResult(toolUseID, content string, isError bool) error 
 // Release closes the session and all active subscriptions.
 func (s *Session) Release() {
 	s.subMu.Lock()
-	defer s.subMu.Unlock()
-
 	for _, cancel := range s.subscriptions {
 		cancel()
 	}
 	s.subscriptions = make(map[string]context.CancelFunc)
+	s.subMu.Unlock()
+
+	// Stop local runner if present
+	if s.localRunner != nil {
+		s.localRunner.Stop()
+	}
 
 	s.mu.Lock()
 	if !s.done {

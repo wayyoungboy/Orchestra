@@ -79,9 +79,11 @@ func main() {
 
 	// Initialize A2A pool for agent communication
 	a2aRegistry := a2a.NewAgentRegistry()
+	workspacePath := cfg.Storage.Workspaces
 	a2aPool := a2a.NewPool(
 		cfg.Terminal.IdleTimeout,
 		a2aRegistry,
+		workspacePath,
 	)
 
 	// Initialize WebSocket gateway with A2A terminal handler

@@ -2,6 +2,7 @@ package a2a
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"sync"
 	"time"
@@ -13,30 +14,32 @@ import (
 	"github.com/orchestra/backend/pkg/utils"
 )
 
-// Pool manages A2A agent sessions.
+// Pool manages agent sessions (both A2A HTTP-based and Local CLI).
 type Pool struct {
-	mu          sync.RWMutex
-	sessions    map[string]*Session // sessionID -> Session
-	agentURLs   map[string]string   // "workspaceID:memberID" -> agentURL
-	registry    *AgentRegistry
-	toolHandler *ToolHandler
-	outputHook  func(*Session, *ACPMessage)
-	idleTimeout time.Duration
+	mu            sync.RWMutex
+	sessions      map[string]*Session // sessionID -> Session
+	agentURLs     map[string]string   // "workspaceID:memberID" -> agentURL
+	registry      *AgentRegistry
+	toolHandler   *ToolHandler
+	outputHook    func(*Session, *ACPMessage)
+	idleTimeout   time.Duration
+	workspacePath string // server-side workspace root path for local agents
 }
 
-// NewPool creates a new A2A session pool.
-func NewPool(idleTimeout time.Duration, registry *AgentRegistry) *Pool {
+// NewPool creates a new session pool.
+func NewPool(idleTimeout time.Duration, registry *AgentRegistry, workspacePath string) *Pool {
 	p := &Pool{
-		sessions:    make(map[string]*Session),
-		agentURLs:   make(map[string]string),
-		registry:    registry,
-		idleTimeout: idleTimeout,
+		sessions:      make(map[string]*Session),
+		agentURLs:     make(map[string]string),
+		registry:      registry,
+		idleTimeout:   idleTimeout,
+		workspacePath: workspacePath,
 	}
 	go p.cleanupIdleSessions()
 	return p
 }
 
-// SessionConfig contains parameters for creating an A2A session.
+// SessionConfig contains parameters for creating a session.
 type SessionConfig struct {
 	ID           string
 	WorkspaceID  string
@@ -46,7 +49,8 @@ type SessionConfig struct {
 	Member       *models.Member
 }
 
-// Acquire creates or retrieves an A2A session for a member.
+// Acquire creates or retrieves a session for a member.
+// Supports both A2A (HTTP-based) and Local CLI agents.
 func (p *Pool) Acquire(ctx context.Context, config SessionConfig) (*Session, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -61,25 +65,152 @@ func (p *Pool) Acquire(ctx context.Context, config SessionConfig) (*Session, err
 		}
 	}
 
-	// Resolve agent URL from member config or registry
-	agentURL := p.resolveAgentURL(config)
-	if agentURL == "" {
-		return nil, nil
+	// Priority 1: Check for local CLI agent (ACP mode)
+	if config.Member != nil && config.Member.ACPEnabled && config.Member.ACPCommand != "" {
+		sess, err := p.createLocalSession(ctx, config)
+		if err != nil {
+			return nil, err
+		}
+		if sess != nil {
+			return sess, nil
+		}
 	}
 
-	// Create A2A client
+	// Priority 2: Check for A2A (HTTP-based) agent
+	agentURL := p.resolveAgentURL(config)
+	if agentURL != "" {
+		sess, err := p.createA2ASession(ctx, config, agentURL)
+		if err != nil {
+			return nil, err
+		}
+		if sess != nil {
+			return sess, nil
+		}
+	}
+
+	// No agent configured for this member
+	return nil, nil
+}
+
+// createLocalSession creates a session using a local CLI subprocess.
+func (p *Pool) createLocalSession(ctx context.Context, config SessionConfig) (*Session, error) {
+	command := config.Member.ACPCommand
+	args := config.Member.ACPArgs
+	if args == nil {
+		args = []string{}
+	}
+
+	runner := NewLocalRunner(command, args, p.workspacePath)
+
+	// Generate session ID if not provided
+	sessionID := config.ID
+	if sessionID == "" {
+		sessionID = "local_" + utils.GenerateID()
+	}
+
+	// Create session without A2A client
+	sess := NewSession(
+		sessionID,
+		config.WorkspaceID,
+		config.MemberID,
+		config.MemberName,
+		config.TerminalType,
+		nil, // no A2A client for local runner
+		"",  // no agent URL
+	)
+	sess.localRunner = runner
+
+	// Wire up runner callbacks
+	runner.onOutput = func(text string) {
+		if text == "" {
+			return
+		}
+		// Convert raw text to ACP message
+		acpMsg := &ACPMessage{
+			Type: TypeAssistantMessage,
+		}
+		// Try to parse as JSON first
+		content, _ := marshalACPContent("assistant_message", text)
+		acpMsg.Content = content
+		sess.OutputChan <- acpMsg
+	}
+	runner.onEvent = func(typ string, data any) {
+		switch typ {
+		case "assistant":
+			// Extract text from assistant message and emit as ACP
+			if text := extractAssistantTextFromRaw(data); text != "" {
+				acpMsg := &ACPMessage{
+					Type: TypeAssistantMessage,
+				}
+				acpMsg.Content, _ = marshalACPContent("assistant_message", text)
+				sess.OutputChan <- acpMsg
+			}
+		case "result":
+			// Final result from Claude
+			costUSD := 0.0
+			msg := ""
+			if raw, ok := data.(map[string]any); ok {
+				if usage, ok := raw["usage"].(map[string]any); ok {
+					if inputTokens, ok := usage["input_tokens"].(float64); ok {
+						costUSD = inputTokens * 0.00001 // rough estimate
+					}
+				}
+				if result, ok := raw["result"].(string); ok {
+					msg = result
+				}
+			}
+			acpMsg := &ACPMessage{
+				Type: TypeResult,
+			}
+			acpMsg.Content, _ = json.Marshal(map[string]any{
+				"type":        "result",
+				"message":     msg,
+				"cost_usd":    costUSD,
+				"duration_ms": 0,
+			})
+			sess.OutputChan <- acpMsg
+		case "control_request":
+			// Auto-approved internally, no output needed
+		case "system":
+			// System initialized, log it
+			if raw, ok := data.(map[string]any); ok {
+				if sid, _ := raw["session_id"].(string); sid != "" {
+					log.Printf("[local-runner] Claude session ID: %s", sid)
+				}
+			}
+		}
+	}
+	runner.onError = func(err error) {
+		log.Printf("[local-runner] Error from %s: %v", config.MemberName, err)
+		sess.ErrorChan <- err
+	}
+
+	// Start the runner
+	if err := runner.Start(ctx); err != nil {
+		return nil, err
+	}
+
+	// Start output processing goroutine
+	go p.processOutput(sess)
+
+	// Register in pool
+	p.sessions[sessionID] = sess
+
+	return sess, nil
+}
+
+// createA2ASession creates a session using A2A HTTP protocol.
+func (p *Pool) createA2ASession(ctx context.Context, config SessionConfig, agentURL string) (*Session, error) {
 	client, err := p.createClient(agentURL)
 	if err != nil {
 		return nil, err
 	}
 
-	// Generate session ID if not provided
 	sessionID := config.ID
 	if sessionID == "" {
 		sessionID = utils.GenerateID()
 	}
 
-	// Create session
 	sess := NewSession(
 		sessionID,
 		config.WorkspaceID,
@@ -90,10 +221,8 @@ func (p *Pool) Acquire(ctx context.Context, config SessionConfig) (*Session, err
 		agentURL,
 	)
 
-	// Start output processing goroutine
 	go p.processOutput(sess)
 
-	// Register in pool
 	p.sessions[sessionID] = sess
 	p.agentURLs[config.WorkspaceID+":"+config.MemberID] = agentURL
 
@@ -114,9 +243,11 @@ func (p *Pool) Release(id string) {
 	if sess != nil {
 		delete(p.sessions, id)
 		// Clean up agent URL mapping
-		for key, url := range p.agentURLs {
-			if url == sess.AgentURL {
-				delete(p.agentURLs, key)
+		if sess.AgentURL != "" {
+			for key, url := range p.agentURLs {
+				if url == sess.AgentURL {
+					delete(p.agentURLs, key)
+				}
 			}
 		}
 	}
@@ -124,7 +255,12 @@ func (p *Pool) Release(id string) {
 
 	if sess != nil {
 		sess.Release()
-		_ = sess.Client.Destroy()
+		// Stop local runner if present
+		if sess.localRunner != nil {
+			sess.localRunner.Stop()
+		} else if sess.Client != nil {
+			_ = sess.Client.Destroy()
+		}
 	}
 }
 
@@ -152,7 +288,7 @@ func (p *Pool) ListSessionsForWorkspace(workspaceID string) []WorkspaceSessionIn
 			infos = append(infos, WorkspaceSessionInfo{
 				MemberID:  sess.MemberID,
 				SessionID: sess.ID,
-				PID:       0, // No PID for HTTP-based sessions
+				PID:       0,
 			})
 		}
 	}
@@ -179,8 +315,8 @@ type WorkspaceSessionInfo struct {
 // resolveAgentURL determines the A2A agent URL for a session.
 func (p *Pool) resolveAgentURL(config SessionConfig) string {
 	// Check member's A2A config first
-	if config.Member != nil && config.Member.A2AEnabled && config.Member.A2AAgentURL != "" {
-		return config.Member.A2AAgentURL
+	if config.Member != nil && config.Member.A2AEnabled && config.Member.A2AAgentURL != nil && *config.Member.A2AAgentURL != "" {
+		return *config.Member.A2AAgentURL
 	}
 
 	// Check registry

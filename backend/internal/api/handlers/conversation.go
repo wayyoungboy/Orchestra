@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -763,7 +764,34 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 	for _, memberID := range targets {
 		sess := h.a2aPool.SessionForWorkspaceMember(workspaceID, memberID)
 		if sess == nil {
-			continue
+			// Create session on first message (ACP/Local CLI or A2A)
+			var targetMember *models.Member
+			for _, m := range members {
+				if m.ID == memberID {
+					targetMember = m
+					break
+				}
+			}
+			if targetMember == nil {
+				continue
+			}
+			var err error
+			sess, err = h.a2aPool.Acquire(c.Request.Context(), a2a.SessionConfig{
+				WorkspaceID:  workspaceID,
+				MemberID:     memberID,
+				MemberName:   targetMember.Name,
+				TerminalType: targetMember.TerminalType,
+				Member:       targetMember,
+			})
+			if err != nil {
+				log.Printf("[chat-forward] Failed to acquire session for member %s: %v", memberID, err)
+				continue
+			}
+			if sess == nil {
+				continue
+			}
+			// Wire output to broadcast back to chat
+			log.Printf("[chat-forward] Created new session %s for member %s (acp=%v)", sess.ID, memberID, targetMember.ACPEnabled)
 		}
 		sess.SetLastChatTargetConversation(convID)
 
