@@ -3,15 +3,177 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: 79 70 229; /* Indigo-600 - slightly darker */
-  --color-primary-hover: 67 56 202; /* Indigo-700 */
+  --color-primary: 79 70 229;
+  --color-primary-hover: 67 56 202;
   --color-on-primary: 255 255 255;
   --color-panel: 255 255 255;
-  --color-surface: 226 232 240; /* Slate 200 */
-  --color-background: 241 245 249; /* Slate 100 - Stronger Light */
-  --color-overlay: 15 23 42; /* Slate 900 */
-  --scrollbar-thumb: 148 163 184; /* Slate 400 */
-  --scrollbar-thumb-hover: 100 116 139; /* Slate 500 */
+  --color-surface: 226 232 240;
+  --color-background: 241 245 249;
+  --color-overlay: 15 23 42;
+  --scrollbar-thumb: 148 163 184;
+  --scrollbar-thumb-hover: 100 116 139;
+}
+
+/* Dark theme overrides */
+.dark-theme {
+  --color-primary: 99 102 241;
+  --color-primary-hover: 79 70 229;
+  --color-on-primary: 255 255 255;
+  --color-panel: 15 23 42;
+  --color-surface: 30 41 59;
+  --color-background: 9 14 30;
+  --color-overlay: 241 245 249;
+  --scrollbar-thumb: 71 85 105;
+  --scrollbar-thumb-hover: 100 116 139;
+}
+
+/* Dark theme — override hardcoded colors globally */
+.dark-theme body {
+  background-color: #090e1e !important;
+  color: #f1f5f9 !important;
+}
+
+.dark-theme ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+.dark-theme ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark-theme .glass-panel,
+.dark-theme .glass-panel *,
+.dark-theme .glass-modal {
+  background: rgba(30, 41, 59, 0.7) !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+  color: #f1f5f9 !important;
+}
+
+/* Dark theme — settings page */
+.dark-theme .settings-page-root .nav-title { color: #f1f5f9 !important; }
+.dark-theme .settings-page-root .nav-item { color: #94a3b8 !important; }
+.dark-theme .settings-page-root .nav-item:hover { background: rgba(51, 65, 85, 0.3) !important; color: #f1f5f9 !important; }
+.dark-theme .settings-page-root .nav-item.is-active { background: #6366f1 !important; }
+.dark-theme .settings-content {
+  background: rgba(30, 41, 59, 0.5) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+}
+.dark-theme .section-title { color: #f1f5f9 !important; }
+.dark-theme .setting-card label { color: #64748b !important; }
+.dark-theme .setting-input,
+.dark-theme .setting-select {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+.dark-theme .setting-value { color: #f1f5f9 !important; }
+.dark-theme .theme-toggle { background: #1e293b !important; }
+.dark-theme .theme-btn { color: #94a3b8 !important; }
+.dark-theme .theme-btn.is-active { background: #334155 !important; color: #a5b4fc !important; }
+.dark-theme .save-btn { background: #6366f1 !important; }
+.dark-theme .logout-btn { background: #450a0a !important; border-color: #7f1d1d !important; }
+
+/* Dark theme — chat */
+.dark-theme .messages-list { background: transparent !important; }
+.dark-theme .message-bubble {
+  background: rgba(30, 41, 59, 0.6) !important;
+  border-color: rgba(51, 65, 85, 0.3) !important;
+  color: #f1f5f9 !important;
+}
+.dark-theme .chat-input {
+  background: rgba(30, 41, 59, 0.5) !important;
+  border-color: rgba(51, 65, 85, 0.3) !important;
+  color: #f1f5f9 !important;
+}
+.dark-theme .chat-sidebar {
+  background: rgba(30, 41, 59, 0.5) !important;
+  border-color: rgba(51, 65, 85, 0.3) !important;
+}
+.dark-theme .conv-item {
+  background: transparent !important;
+  color: #cbd5e1 !important;
+}
+.dark-theme .conv-item.is-active { background: rgba(79, 70, 229, 0.3) !important; }
+.dark-theme .conv-item:hover { background: rgba(51, 65, 85, 0.3) !important; }
+.dark-theme .conv-title { color: #f1f5f9 !important; }
+.dark-theme .conv-preview { color: #94a3b8 !important; }
+
+/* Dark theme — workspace selection */
+.dark-theme .workspace-selection {
+  background: #090e1e !important;
+}
+.dark-theme .workspace-card {
+  background: rgba(30, 41, 59, 0.6) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+  color: #f1f5f9 !important;
+}
+.dark-theme .workspace-card:hover {
+  background: rgba(51, 65, 85, 0.4) !important;
+}
+
+/* Dark theme — login */
+.dark-theme .login-page {
+  background: #090e1e !important;
+}
+.dark-theme .login-card {
+  background: rgba(30, 41, 59, 0.8) !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+.dark-theme .login-title { color: #f1f5f9 !important; }
+.dark-theme .login-subtitle { color: #94a3b8 !important; }
+.dark-theme .login-input {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Dark theme — sidebar navigation */
+.dark-theme .sidebar-nav {
+  background: rgba(30, 41, 59, 0.7) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+  color: #cbd5e1 !important;
+}
+.dark-theme .sidebar-nav button {
+  color: #94a3b8 !important;
+}
+.dark-theme .sidebar-nav button.is-active {
+  background: rgba(79, 70, 229, 0.3) !important;
+  color: #a5b4fc !important;
+}
+.dark-theme .sidebar-nav button:hover {
+  background: rgba(51, 65, 85, 0.3) !important;
+  color: #f1f5f9 !important;
+}
+
+/* Dark theme — tasks */
+.dark-theme .task-card {
+  background: rgba(30, 41, 59, 0.6) !important;
+  border-color: rgba(51, 65, 85, 0.3) !important;
+  color: #cbd5e1 !important;
+}
+.dark-theme .task-title { color: #f1f5f9 !important; }
+
+/* Dark theme — members */
+.dark-theme .member-row {
+  background: rgba(30, 41, 59, 0.6) !important;
+  border-color: rgba(51, 65, 85, 0.3) !important;
+}
+.dark-theme .member-name { color: #f1f5f9 !important; }
+
+/* Dark theme — modals */
+.dark-theme .modal-overlay {
+  background: rgba(0, 0, 0, 0.6) !important;
+}
+.dark-theme .modal-content {
+  background: rgba(30, 41, 59, 0.9) !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+.dark-theme .modal-title { color: #f1f5f9 !important; }
+
+/* Dark theme — notifications */
+.dark-theme .notification-toast {
+  background: rgba(30, 41, 59, 0.9) !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+  color: #f1f5f9 !important;
 }
 
 body {

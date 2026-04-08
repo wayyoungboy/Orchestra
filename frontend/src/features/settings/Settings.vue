@@ -30,15 +30,22 @@
         <div class="settings-grid">
           <div class="setting-card">
             <label>语言 (Language)</label>
-            <select class="setting-select">
-              <option>简体中文</option>
-              <option>English</option>
+            <select class="setting-select" :value="currentLocale" @change="handleLocaleChange">
+              <option value="zh">简体中文</option>
+              <option value="en">English</option>
             </select>
           </div>
           <div class="setting-card">
             <label>主题模式</label>
             <div class="theme-toggle">
-              <div class="toggle-active">清新磨砂 (Light)</div>
+              <button
+                :class="['theme-btn', theme === 'light' ? 'is-active' : '']"
+                @click="handleThemeChange('light')"
+              >Light</button>
+              <button
+                :class="['theme-btn', theme === 'dark' ? 'is-active' : '']"
+                @click="handleThemeChange('dark')"
+              >Dark</button>
             </div>
           </div>
         </div>
@@ -90,17 +97,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/features/auth/authStore'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
 import ApiKeysSection from './ApiKeysSection.vue'
 
+const { locale } = useI18n()
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
 const router = useRouter()
 const activeTab = ref('general')
 const isSaving = ref(false)
+const theme = ref<'light' | 'dark'>((localStorage.getItem('orchestra.theme') as 'light' | 'dark') || 'light')
+
+const currentLocale = computed(() => locale.value)
 
 const editWorkspace = reactive({
   name: '',
@@ -114,7 +126,36 @@ const tabs = [
   { id: 'account', label: '账号' }
 ]
 
+function handleLocaleChange(event: Event) {
+  const newLocale = (event.target as HTMLSelectElement).value
+  locale.value = newLocale as 'en' | 'zh'
+  localStorage.setItem('orchestra.locale', newLocale)
+}
+
+function handleThemeChange(newTheme: 'light' | 'dark') {
+  theme.value = newTheme
+  localStorage.setItem('orchestra.theme', newTheme)
+  applyTheme(newTheme)
+}
+
+function applyTheme(t: 'light' | 'dark') {
+  const root = document.documentElement
+  if (t === 'dark') {
+    root.classList.add('dark-theme')
+  } else {
+    root.classList.remove('dark-theme')
+  }
+}
+
 onMounted(() => {
+  // Restore saved locale
+  const savedLocale = localStorage.getItem('orchestra.locale')
+  if (savedLocale && (savedLocale === 'en' || savedLocale === 'zh')) {
+    locale.value = savedLocale
+  }
+  // Apply saved theme
+  applyTheme(theme.value)
+
   if (workspaceStore.currentWorkspace) {
     editWorkspace.name = workspaceStore.currentWorkspace.name
     editWorkspace.path = workspaceStore.currentWorkspace.path
@@ -190,8 +231,12 @@ function handleLogout() {
 .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .setting-value { font-size: 16px; font-weight: 700; color: #0f172a; }
-.theme-toggle { padding: 4px; background: #f1f5f9; border-radius: 12px; width: fit-content; }
-.toggle-active { padding: 8px 16px; background: white; border-radius: 10px; font-size: 13px; font-weight: 700; color: #4f46e5; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.theme-toggle { display: flex; gap: 4px; padding: 4px; background: #f1f5f9; border-radius: 12px; width: fit-content; }
+.theme-btn {
+  padding: 8px 16px; border-radius: 10px; border: none; background: transparent;
+  font-size: 13px; font-weight: 700; color: #64748b; cursor: pointer; transition: all 0.2s;
+}
+.theme-btn.is-active { background: white; color: #4f46e5; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
 
 .logout-btn {
   margin-top: 20px; padding: 14px; border-radius: 16px; border: 1px solid #fee2e2;
