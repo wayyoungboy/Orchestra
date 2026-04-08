@@ -12,19 +12,35 @@ export interface AgentStatus {
   message?: string
 }
 
+export interface ChatWsEvent {
+  type: 'new_message' | 'message_status' | 'unread_sync'
+  workspaceId: string
+  conversationId?: string
+  messageId?: string
+  senderId?: string
+  senderName?: string
+  content?: string
+  createdAt?: number
+  isAi?: boolean
+  status?: string
+  unreadCount?: number
+}
+
 export const useChatStore = defineStore('chat', () => {
   const conversations = ref<Conversation[]>([])
   const activeConversationId = ref<string | null>(null)
   const loading = ref(false)
   const workspaceId = ref<string | null>(null)
   const agentStatuses = ref<Record<string, AgentStatus>>({})
+  const wsConnected = ref(false)
   const authStore = useAuthStore()
 
-  let pollingTimer: any = null
+  let chatWs: WebSocket | null = null
+  let chatWsReconnectTimer: ReturnType<typeof setTimeout> | null = null
 
   const currentUserId = computed(() => authStore.currentUserId || 'default')
 
-  const activeConversation = computed(() => 
+  const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeConversationId.value) || null
   )
 
@@ -38,14 +54,19 @@ export const useChatStore = defineStore('chat', () => {
   })
 
   /**
-   * Load session and start polling
+   * Load conversations via HTTP (history) then connect WebSocket for real-time updates
    */
   async function loadConversations(wsId: string) {
     workspaceId.value = wsId
     loading.value = true
     try {
-      await refreshAllData()
-      startPolling()
+      // 1. Fetch conversation list + messages via HTTP (load history)
+      await loadConversationsList(wsId)
+      if (activeConversationId.value) {
+        await loadMessages(wsId, activeConversationId.value)
+      }
+      // 2. Connect WebSocket for real-time updates
+      connectChatWebSocket(wsId)
     } catch (e) {
       notifyUserError('Failed to load chat session', e)
     } finally {
@@ -53,50 +74,124 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function loadConversationsList(wsId: string) {
+    const convResponse = await client.get(`/workspaces/${wsId}/conversations`)
+    const remoteConvs = convResponse.data.timeline || []
+    conversations.value = remoteConvs.map((rc: any) => {
+      const local = conversations.value.find(lc => lc.id === rc.id)
+      return {
+        ...rc,
+        messages: local?.messages || []
+      }
+    })
+    if (!activeConversationId.value && convResponse.data.defaultChannelId) {
+      activeConversationId.value = convResponse.data.defaultChannelId
+    }
+  }
+
   /**
-   * High-frequency polling for messages and status
+   * Connect to chat WebSocket for real-time message broadcasting
    */
-  function startPolling() {
-    stopPolling()
-    pollingTimer = setInterval(async () => {
-      await refreshAllData()
-    }, 10000) // 10 seconds interval to reduce CPU load
-  }
+  function connectChatWebSocket(wsId: string) {
+    // Close existing connection
+    if (chatWs) {
+      chatWs.close()
+      chatWs = null
+    }
+    if (chatWsReconnectTimer) {
+      clearTimeout(chatWsReconnectTimer)
+      chatWsReconnectTimer = null
+    }
 
-  function stopPolling() {
-    if (pollingTimer) {
-      clearInterval(pollingTimer)
-      pollingTimer = null
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const host = window.location.host === 'localhost:5175' ? 'localhost:8080' : window.location.host
+    const token = localStorage.getItem('orchestra.auth.token') || ''
+    const wsUrl = `${protocol}//${host}/ws/chat/${wsId}?token=${encodeURIComponent(token)}`
+
+    wsConnected.value = false
+    chatWs = new WebSocket(wsUrl)
+
+    chatWs.onopen = () => {
+      wsConnected.value = true
+      console.log('[ChatWS] connected')
+    }
+
+    chatWs.onmessage = (event: MessageEvent) => {
+      try {
+        const data: ChatWsEvent = JSON.parse(event.data)
+        handleWsEvent(data)
+      } catch (e) {
+        console.warn('[ChatWS] parse error', e)
+      }
+    }
+
+    chatWs.onerror = () => {
+      wsConnected.value = false
+      console.warn('[ChatWS] error')
+    }
+
+    chatWs.onclose = () => {
+      wsConnected.value = false
+      console.log('[ChatWS] disconnected, reconnecting in 3s...')
+      chatWsReconnectTimer = setTimeout(() => connectChatWebSocket(wsId), 3000)
     }
   }
 
-  async function refreshAllData() {
-    if (!workspaceId.value) return
-    try {
-      // 1. Refresh conversation list (includes unread counts and agent statuses)
-      const convResponse = await client.get(`/workspaces/${workspaceId.value}/conversations`)
-      const remoteConvs = convResponse.data.timeline || []
-      
-      // Merge with local state to preserve message history while updating metadata
-      conversations.value = remoteConvs.map((rc: any) => {
-        const local = conversations.value.find(lc => lc.id === rc.id)
-        return {
-          ...rc,
-          messages: local?.messages || []
+  /**
+   * Handle incoming WebSocket chat events
+   */
+  function handleWsEvent(event: ChatWsEvent) {
+    if (!event.workspaceId || event.workspaceId !== workspaceId.value) return
+
+    switch (event.type) {
+      case 'new_message': {
+        // Find the conversation and append/refresh messages
+        const convIndex = conversations.value.findIndex(c => c.id === event.conversationId)
+        if (convIndex !== -1) {
+          // If it's the active conversation, load the full message list to get ordering
+          if (event.conversationId === activeConversationId.value) {
+            loadMessages(workspaceId.value!, event.conversationId!)
+          } else {
+            // For inactive conversations, just refresh the list to update lastMessage/unread
+            loadConversationsList(workspaceId.value!)
+          }
+        } else {
+          // New conversation appeared
+          loadConversationsList(workspaceId.value!)
         }
-      })
-
-      if (!activeConversationId.value && convResponse.data.defaultChannelId) {
-        activeConversationId.value = convResponse.data.defaultChannelId
+        break
       }
-
-      // 2. Refresh active conversation messages
-      if (activeConversationId.value) {
-        await loadMessages(workspaceId.value, activeConversationId.value)
+      case 'message_status': {
+        // Agent status update — handled via agentStatuses record
+        if (event.senderId) {
+          agentStatuses.value[event.senderId] = {
+            memberId: event.senderId,
+            status: (event.status as AgentStatus['status']) || 'idle',
+            message: event.content
+          }
+        }
+        break
       }
-    } catch (e) {
-      console.warn('Polling tick failed', e)
+      case 'unread_sync': {
+        if (event.conversationId) {
+          const conv = conversations.value.find(c => c.id === event.conversationId)
+          if (conv) conv.unreadCount = event.unreadCount ?? 0
+        }
+        break
+      }
     }
+  }
+
+  function disconnectChatWebSocket() {
+    if (chatWs) {
+      chatWs.close()
+      chatWs = null
+    }
+    if (chatWsReconnectTimer) {
+      clearTimeout(chatWsReconnectTimer)
+      chatWsReconnectTimer = null
+    }
+    wsConnected.value = false
   }
 
   async function loadMessages(wsId: string, convId: string) {
@@ -104,16 +199,12 @@ export const useChatStore = defineStore('chat', () => {
       const response = await client.get(`/workspaces/${wsId}/conversations/${convId}/messages`)
       const index = conversations.value.findIndex(c => c.id === convId)
       if (index !== -1) {
-        // Only update if message count changed or new content
-        const remoteMsgs = response.data || []
-        if (JSON.stringify(conversations.value[index].messages) !== JSON.stringify(remoteMsgs)) {
-          conversations.value[index] = {
-            ...conversations.value[index],
-            messages: remoteMsgs
-          }
+        conversations.value[index] = {
+          ...conversations.value[index],
+          messages: response.data || []
         }
       }
-    } catch (e) { /* silent during polling */ }
+    } catch (e) { /* silent during loading */ }
   }
 
   async function setActiveConversation(id: string) {
@@ -127,7 +218,6 @@ export const useChatStore = defineStore('chat', () => {
   async function sendMessage(payload: { text: string, conversationId: string }) {
     if (!workspaceId.value) return
     try {
-      // Get real senderId: if currentUserId is 'default', find Owner from member list
       let senderId = currentUserId.value
       const senderName = authStore.currentUser || 'User'
 
@@ -144,7 +234,7 @@ export const useChatStore = defineStore('chat', () => {
         senderId,
         senderName
       })
-      // Immediate pull after send
+      // Immediate pull after send for optimistic consistency
       await loadMessages(workspaceId.value, payload.conversationId)
     } catch (e) {
       notifyUserError('Failed to send message', e)
@@ -177,12 +267,13 @@ export const useChatStore = defineStore('chat', () => {
     sortedConversations,
     agentStatuses,
     loading,
+    wsConnected,
     currentUserId,
     loadConversations,
     setActiveConversation,
     sendMessage,
     updatePresence,
-    stopPolling,
+    disconnectChatWebSocket,
     getConversationTitle: (c: any) => c.customName || c.id
   }
 })

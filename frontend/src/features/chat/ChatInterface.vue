@@ -184,7 +184,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  chatStore.stopPolling()
+  chatStore.disconnectChatWebSocket()
 })
 </script>
 
