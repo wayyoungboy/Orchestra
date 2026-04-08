@@ -15,3 +15,8 @@ type WorkspaceCreate struct {
 	Path              string `json:"path" binding:"required"`
 	OwnerDisplayName  string `json:"ownerDisplayName,omitempty"`
 }
+
+type WorkspaceUpdate struct {
+	Name string `json:"name,omitempty"`
+	Path string `json:"path,omitempty"`
+}
