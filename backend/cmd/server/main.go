@@ -74,7 +74,7 @@ func main() {
 
 	// Create default user if auth is enabled and no users exist
 	if cfg.Auth.Enabled && cfg.Auth.JWTSecret != "" {
-		ensureDefaultUser(db)
+		ensureDefaultUserAndWorkspace(db)
 	}
 
 	// Initialize A2A pool for agent communication
@@ -110,11 +110,13 @@ func main() {
 	_ = encryptor // TODO: use encryptor for API key encryption
 }
 
-// ensureDefaultUser creates a default admin user if no users exist
-func ensureDefaultUser(db *storage.Database) {
+// ensureDefaultUserAndWorkspace creates a default admin user, workspace, and member if none exist
+func ensureDefaultUserAndWorkspace(db *storage.Database) {
 	userRepo := repository.NewUserRepository(db.DB())
+	wsRepo := repository.NewWorkspaceRepository(db.DB())
+	memberRepo := repository.NewMemberRepository(db.DB())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	users, err := userRepo.List(ctx)
@@ -124,10 +126,10 @@ func ensureDefaultUser(db *storage.Database) {
 	}
 
 	if len(users) > 0 {
-		return
+		return // Already has users, nothing to do
 	}
 
-	// Create default user: orchestra/orchestra
+	// Create default user
 	hash, err := security.HashPassword("orchestra")
 	if err != nil {
 		log.Printf("Failed to hash default password: %v", err)
@@ -143,7 +145,41 @@ func ensureDefaultUser(db *storage.Database) {
 
 	if err := userRepo.Create(ctx, user); err != nil {
 		log.Printf("Failed to create default user: %v", err)
-	} else {
-		log.Println("Created default user: orchestra (password: orchestra)")
+		return
 	}
+	log.Println("Created default user: orchestra (password: orchestra)")
+
+	// Create default workspace
+	ws := &models.Workspace{
+		ID:           utils.GenerateID(),
+		Name:         "My First Workspace",
+		Path:         ".",
+		LastOpenedAt: time.Now(),
+		CreatedAt:    time.Now(),
+	}
+
+	if err := wsRepo.Create(ctx, ws); err != nil {
+		log.Printf("Failed to create default workspace: %v", err)
+		return
+	}
+	log.Printf("Created default workspace: %s (path: .)", ws.Name)
+
+	// Create owner member for the default workspace
+	member := &models.Member{
+		ID:                utils.GenerateID(),
+		WorkspaceID:       ws.ID,
+		Name:              "orchestra",
+		RoleType:          models.RoleOwner,
+		TerminalType:      "native",
+		TerminalCommand:   "/bin/bash",
+		AutoStartTerminal: true,
+		Status:            "online",
+		CreatedAt:         time.Now(),
+	}
+
+	if err := memberRepo.Create(ctx, member); err != nil {
+		log.Printf("Failed to create default member: %v", err)
+		return
+	}
+	log.Printf("Created default member: %s (owner) in workspace %s", member.Name, ws.Name)
 }
