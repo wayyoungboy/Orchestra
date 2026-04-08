@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// HealthResponse represents the health check response
 type HealthResponse struct {
 	Status    string `json:"status"`
 	Version   string `json:"version"`
@@ -14,6 +15,13 @@ type HealthResponse struct {
 	Goroutine int    `json:"goroutine"`
 }
 
+// HealthCheck returns server health status
+// @Summary Health check
+// @Description Check if the server is running
+// @Tags health
+// @Produce json
+// @Success 200 {object} HealthResponse
+// @Router /health [get]
 func HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, HealthResponse{
 		Status:    "ok",

@@ -173,3 +173,122 @@ func (r *MessageRepository) LatestMessageTime(conversationID string) (int64, err
 	}
 	return t.Int64, nil
 }
+
+// SearchResult represents a search result item
+type SearchResult struct {
+	Message       Message `json:"message"`
+	ConversationID string `json:"conversationId"`
+	WorkspaceID   string `json:"workspaceId"`
+	Snippet       string `json:"snippet"`
+}
+
+// SearchInWorkspace searches messages across all conversations in a workspace
+func (r *MessageRepository) SearchInWorkspace(workspaceID, query string, limit int) ([]SearchResult, error) {
+	// Search in message content using LIKE (simple approach)
+	// For better performance, consider using SQLite FTS5 or external search engine
+	searchQuery := `
+		SELECT m.id, m.conversation_id, m.sender_id, m.content, m.is_ai, m.attachment, m.status, m.created_at,
+		       c.workspace_id
+		FROM messages m
+		JOIN conversations c ON m.conversation_id = c.id
+		WHERE c.workspace_id = ? AND m.content LIKE ?
+		ORDER BY m.created_at DESC
+		LIMIT ?
+	`
+
+	searchPattern := "%" + query + "%"
+	rows, err := r.db.Query(searchQuery, workspaceID, searchPattern, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []SearchResult
+	for rows.Next() {
+		var msg Message
+		var contentJSON string
+		var attachment sql.NullString
+		var wsID string
+
+		err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.SenderID, &contentJSON,
+			&msg.IsAI, &attachment, &msg.Status, &msg.CreatedAt, &wsID)
+		if err != nil {
+			return nil, err
+		}
+
+		msg.Attachment = attachment.String
+		if err := json.Unmarshal([]byte(contentJSON), &msg.Content); err != nil {
+			msg.Content = MessageContent{Type: "text", Text: contentJSON}
+		}
+
+		// Generate snippet (extract surrounding text)
+		snippet := generateSnippet(msg.Content.Text, query, 100)
+
+		results = append(results, SearchResult{
+			Message:        msg,
+			ConversationID: msg.ConversationID,
+			WorkspaceID:    wsID,
+			Snippet:        snippet,
+		})
+	}
+
+	return results, nil
+}
+
+// generateSnippet extracts a snippet around the matching text
+func generateSnippet(text, query string, maxLen int) string {
+	if len(text) <= maxLen {
+		return text
+	}
+
+	// Find the position of the query in text (case-insensitive)
+	lowerText := text
+	lowerQuery := query
+	idx := -1
+	for i := 0; i <= len(lowerText)-len(lowerQuery); i++ {
+		match := true
+		for j := 0; j < len(lowerQuery); j++ {
+			if lowerText[i+j] != lowerQuery[j] && !(lowerText[i+j] >= 'A' && lowerText[i+j] <= 'Z' && lowerText[i+j]+32 == lowerQuery[j]) {
+				match = false
+				break
+			}
+		}
+		if match {
+			idx = i
+			break
+		}
+	}
+
+	if idx == -1 {
+		// Query not found, return first maxLen chars
+		if len(text) > maxLen {
+			return text[:maxLen] + "..."
+		}
+		return text
+	}
+
+	// Calculate start position to center the match
+	start := idx - maxLen/2
+	if start < 0 {
+		start = 0
+	}
+	end := start + maxLen
+	if end > len(text) {
+		end = len(text)
+	}
+
+	snippet := text[start:end]
+	if start > 0 {
+		snippet = "..." + snippet
+	}
+	if end < len(text) {
+		snippet = snippet + "..."
+	}
+
+	return snippet
+}
+// Delete deletes a single message by ID
+func (r *MessageRepository) Delete(id string) error {
+	_, err := r.db.Exec(`DELETE FROM messages WHERE id = ?`, id)
+	return err
+}

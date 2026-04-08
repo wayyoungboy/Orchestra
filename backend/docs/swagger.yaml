@@ -1,0 +1,2026 @@
+basePath: /
+definitions:
+  filesystem.PathValidationResult:
+    properties:
+      error:
+        type: string
+      exists:
+        type: boolean
+      isDir:
+        type: boolean
+      readable:
+        type: boolean
+      validated:
+        type: boolean
+      writable:
+        type: boolean
+    type: object
+  handlers.ConversationDTO:
+    properties:
+      customName:
+        type: string
+      id:
+        type: string
+      isDefault:
+        type: boolean
+      memberIds:
+        items:
+          type: string
+        type: array
+      muted:
+        type: boolean
+      pinned:
+        type: boolean
+      targetId:
+        type: string
+      type:
+        type: string
+      unreadCount:
+        type: integer
+    type: object
+  handlers.ConversationListResponse:
+    properties:
+      defaultChannelId:
+        type: string
+      pinned:
+        items:
+          $ref: '#/definitions/handlers.ConversationDTO'
+        type: array
+      timeline:
+        items:
+          $ref: '#/definitions/handlers.ConversationDTO'
+        type: array
+      totalUnreadCount:
+        type: integer
+    type: object
+  handlers.CreateConversationRequest:
+    properties:
+      memberIds:
+        items:
+          type: string
+        type: array
+      name:
+        type: string
+      targetId:
+        type: string
+      type:
+        type: string
+    type: object
+  handlers.CreateSessionRequest:
+    properties:
+      args:
+        items:
+          type: string
+        type: array
+      command:
+        type: string
+      memberId:
+        type: string
+      memberName:
+        type: string
+      terminalType:
+        type: string
+      workspaceId:
+        type: string
+    type: object
+  handlers.CreateSessionResponse:
+    properties:
+      pid:
+        type: integer
+      sessionId:
+        type: string
+    type: object
+  handlers.HealthResponse:
+    properties:
+      go_version:
+        type: string
+      goroutine:
+        type: integer
+      status:
+        type: string
+      version:
+        type: string
+    type: object
+  handlers.InternalChatSendRequest:
+    properties:
+      conversationId:
+        type: string
+      senderId:
+        type: string
+      senderName:
+        type: string
+      text:
+        type: string
+      workspaceId:
+        type: string
+    type: object
+  handlers.MessageDTO:
+    properties:
+      content:
+        additionalProperties: true
+        type: object
+      createdAt:
+        type: integer
+      id:
+        type: string
+      isAi:
+        type: boolean
+      senderId:
+        type: string
+      status:
+        type: string
+    type: object
+  handlers.SendMessageRequest:
+    properties:
+      clientTraceId:
+        type: string
+      senderId:
+        type: string
+      senderName:
+        type: string
+      text:
+        type: string
+    type: object
+  models.AgentStatus:
+    properties:
+      conversationId:
+        type: string
+      memberId:
+        type: string
+      message:
+        description: Human-readable status message
+        type: string
+      progress:
+        description: 0-100 progress percentage
+        type: integer
+      status:
+        description: '"thinking", "reading_file", "writing_code", "idle", "error"'
+        type: string
+      timestamp:
+        type: string
+      workspaceId:
+        type: string
+    type: object
+  models.AgentStatusUpdate:
+    properties:
+      conversationId:
+        type: string
+      memberId:
+        type: string
+      message:
+        type: string
+      progress:
+        type: integer
+      status:
+        type: string
+      workspaceId:
+        type: string
+    required:
+    - memberId
+    - status
+    - workspaceId
+    type: object
+  models.Attachment:
+    properties:
+      createdAt:
+        type: string
+      fileName:
+        type: string
+      filePath:
+        type: string
+      fileSize:
+        type: integer
+      id:
+        type: string
+      messageId:
+        type: string
+      mimeType:
+        type: string
+      uploadedBy:
+        type: string
+      workspaceId:
+        type: string
+    type: object
+  models.AttachmentUpload:
+    properties:
+      fileName:
+        type: string
+      fileSize:
+        type: integer
+      id:
+        type: string
+      isImage:
+        type: boolean
+      mimeType:
+        type: string
+      preview:
+        description: Base64 preview for images
+        type: string
+      url:
+        type: string
+    type: object
+  models.AuthToken:
+    properties:
+      expiresAt:
+        type: integer
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/models.User'
+    type: object
+  models.Member:
+    properties:
+      autoStartTerminal:
+        type: boolean
+      avatar:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      roleKey:
+        type: string
+      roleType:
+        $ref: '#/definitions/models.MemberRole'
+      status:
+        type: string
+      terminalCommand:
+        type: string
+      terminalPath:
+        type: string
+      terminalType:
+        type: string
+      workspaceId:
+        type: string
+    type: object
+  models.MemberCreate:
+    properties:
+      name:
+        type: string
+      roleType:
+        $ref: '#/definitions/models.MemberRole'
+      terminalCommand:
+        type: string
+      terminalType:
+        type: string
+    required:
+    - name
+    - roleType
+    type: object
+  models.MemberRole:
+    enum:
+    - owner
+    - admin
+    - secretary
+    - assistant
+    - member
+    type: string
+    x-enum-comments:
+      RoleSecretary: 秘书（监工/协调式监督角色）
+    x-enum-descriptions:
+    - ""
+    - ""
+    - 秘书（监工/协调式监督角色）
+    - ""
+    - ""
+    x-enum-varnames:
+    - RoleOwner
+    - RoleAdmin
+    - RoleSecretary
+    - RoleAssistant
+    - RoleMember
+  models.Presence:
+    properties:
+      activity:
+        description: '"typing", "viewing", "idle"'
+        type: string
+      memberId:
+        type: string
+      targetId:
+        description: conversationId or terminalId
+        type: string
+      targetType:
+        description: '"conversation" or "terminal"'
+        type: string
+      timestamp:
+        type: integer
+      workspaceId:
+        type: string
+    type: object
+  models.PresenceUpdate:
+    properties:
+      activity:
+        type: string
+      targetId:
+        type: string
+      targetType:
+        type: string
+    type: object
+  models.User:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: string
+      lastLoginAt:
+        type: string
+      username:
+        type: string
+    type: object
+  models.UserCreate:
+    properties:
+      password:
+        minLength: 6
+        type: string
+      username:
+        maxLength: 50
+        minLength: 3
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.UserLogin:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.Workspace:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: string
+      lastOpenedAt:
+        type: string
+      name:
+        type: string
+      path:
+        type: string
+    type: object
+  models.WorkspaceCreate:
+    properties:
+      name:
+        type: string
+      ownerDisplayName:
+        type: string
+      path:
+        type: string
+    required:
+    - name
+    - path
+    type: object
+  models.WorkspaceUpdate:
+    properties:
+      name:
+        type: string
+      path:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: Multi-Agent Collaboration Platform API
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Orchestra API
+  version: "1.0"
+paths:
+  /api/auth/config:
+    get:
+      description: Returns whether authentication is enabled
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+      summary: Get auth configuration
+      tags:
+      - auth
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UserLogin'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AuthToken'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: User login
+      tags:
+      - auth
+  /api/auth/me:
+    get:
+      description: Get the currently authenticated user's information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - auth
+  /api/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account
+      parameters:
+      - description: Registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UserCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.AuthToken'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: User registration
+      tags:
+      - auth
+  /api/auth/validate:
+    post:
+      consumes:
+      - application/json
+      description: Check if the provided JWT token is valid
+      parameters:
+      - description: Bearer token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Validate JWT token
+      tags:
+      - auth
+  /api/browse:
+    get:
+      description: Browse files from home directory or specified path
+      parameters:
+      - description: Path to browse
+        in: query
+        name: path
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Browse root files
+      tags:
+      - workspaces
+  /api/internal/agent-status:
+    post:
+      consumes:
+      - application/json
+      description: Update an AI agent's current activity status (thinking, reading
+        file, etc.)
+      parameters:
+      - description: Agent status data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.AgentStatusUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.AgentStatus'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Update agent status
+      tags:
+      - internal
+  /api/internal/chat/send:
+    post:
+      consumes:
+      - application/json
+      description: Receive AI responses from terminal PTY (internal API)
+      parameters:
+      - description: AI response data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.InternalChatSendRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Internal chat send
+      tags:
+      - internal
+  /api/terminals:
+    post:
+      consumes:
+      - application/json
+      description: Create a new PTY terminal session for an AI assistant or shell
+      parameters:
+      - description: Session configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateSessionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create terminal session
+      tags:
+      - terminals
+  /api/terminals/{sessionId}:
+    delete:
+      description: Terminate and remove a terminal session
+      parameters:
+      - description: Session ID
+        in: path
+        name: sessionId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete terminal session
+      tags:
+      - terminals
+  /api/workspaces:
+    get:
+      description: Get all workspaces
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Workspace'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List workspaces
+      tags:
+      - workspaces
+    post:
+      consumes:
+      - application/json
+      description: Create a new workspace
+      parameters:
+      - description: Workspace data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.WorkspaceCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Workspace'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create workspace
+      tags:
+      - workspaces
+  /api/workspaces/{id}:
+    delete:
+      description: Delete a workspace by ID
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete workspace
+      tags:
+      - workspaces
+    get:
+      description: Get a workspace by ID
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Workspace'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get workspace
+      tags:
+      - workspaces
+    put:
+      consumes:
+      - application/json
+      description: Update workspace name or other properties
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Workspace update data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.WorkspaceUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Workspace'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update workspace
+      tags:
+      - workspaces
+  /api/workspaces/{id}/attachments:
+    get:
+      description: List all attachments in a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Filter by conversation ID
+        in: query
+        name: conversationId
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Attachment'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List attachments
+      tags:
+      - attachments
+  /api/workspaces/{id}/attachments/{attachmentId}:
+    delete:
+      description: Delete a file attachment
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Attachment ID
+        in: path
+        name: attachmentId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete attachment
+      tags:
+      - attachments
+    get:
+      description: Download a file attachment
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Attachment ID
+        in: path
+        name: attachmentId
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Download attachment
+      tags:
+      - attachments
+  /api/workspaces/{id}/attachments/{attachmentId}/info:
+    get:
+      description: Get attachment metadata
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Attachment ID
+        in: path
+        name: attachmentId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Attachment'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get attachment info
+      tags:
+      - attachments
+  /api/workspaces/{id}/browse:
+    get:
+      description: Browse files in a workspace directory
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Sub path to browse
+        in: query
+        name: path
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Browse workspace files
+      tags:
+      - workspaces
+  /api/workspaces/{id}/conversations:
+    get:
+      description: Get all conversations (channels and DMs) in a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID for unread counts
+        in: query
+        name: userId
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ConversationListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List workspace conversations
+      tags:
+      - conversations
+    post:
+      consumes:
+      - application/json
+      description: Create a new channel or DM conversation
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateConversationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.ConversationDTO'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create conversation
+      tags:
+      - conversations
+  /api/workspaces/{id}/conversations/{convId}:
+    delete:
+      description: Delete a conversation by ID
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete conversation
+      tags:
+      - conversations
+    get:
+      description: Get a single conversation by ID
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ConversationDTO'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get conversation
+      tags:
+      - conversations
+    put:
+      consumes:
+      - application/json
+      description: Update pinned, muted, or other conversation settings
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      - description: Settings to update
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update conversation settings
+      tags:
+      - conversations
+  /api/workspaces/{id}/conversations/{convId}/attachments:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a file attachment to a conversation
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Sender member ID
+        in: formData
+        name: senderId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.AttachmentUpload'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload attachment
+      tags:
+      - attachments
+  /api/workspaces/{id}/conversations/{convId}/members:
+    put:
+      consumes:
+      - application/json
+      description: Update the members of a conversation (full replace)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      - description: Member IDs
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Set conversation members
+      tags:
+      - conversations
+  /api/workspaces/{id}/conversations/{convId}/messages:
+    delete:
+      description: Delete all messages in a conversation
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Clear conversation messages
+      tags:
+      - conversations
+    get:
+      description: Get messages from a conversation with pagination
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      - default: 200
+        description: Number of messages to return
+        in: query
+        name: limit
+        type: integer
+      - description: Get messages before this message ID
+        in: query
+        name: before
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.MessageDTO'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get conversation messages
+      tags:
+      - conversations
+    post:
+      consumes:
+      - application/json
+      description: Send a message to a conversation (broadcasts to WebSocket)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      - description: Message data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SendMessageRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.MessageDTO'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Send message
+      tags:
+      - conversations
+  /api/workspaces/{id}/conversations/{convId}/messages/{messageId}:
+    delete:
+      description: Delete a single message from a conversation
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      - description: Message ID
+        in: path
+        name: messageId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete message
+      tags:
+      - conversations
+  /api/workspaces/{id}/conversations/{convId}/read:
+    post:
+      consumes:
+      - application/json
+      description: Mark a conversation as read for a user
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Conversation ID
+        in: path
+        name: convId
+        required: true
+        type: string
+      - description: User ID
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: boolean
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark conversation as read
+      tags:
+      - conversations
+  /api/workspaces/{id}/conversations/read-all:
+    post:
+      consumes:
+      - application/json
+      description: Mark all conversations in a workspace as read for a user
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: User ID
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark all conversations as read
+      tags:
+      - conversations
+  /api/workspaces/{id}/members:
+    get:
+      description: Get all members in a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Member'
+            type: array
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List workspace members
+      tags:
+      - members
+    post:
+      consumes:
+      - application/json
+      description: Create a new member (AI assistant or team member) in a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.MemberCreate'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Member'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Create workspace member
+      tags:
+      - members
+  /api/workspaces/{id}/members/{memberId}:
+    delete:
+      description: Delete a member from a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: memberId
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete workspace member
+      tags:
+      - members
+    get:
+      description: Get a single member by ID
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: memberId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Member'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get workspace member
+      tags:
+      - members
+    put:
+      consumes:
+      - application/json
+      description: Update a member's properties (partial update supported)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: memberId
+        required: true
+        type: string
+      - description: Member patch data
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties: true
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Member'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update workspace member
+      tags:
+      - members
+  /api/workspaces/{id}/members/{memberId}/conversations:
+    delete:
+      description: Remove DM threads and channel membership for a member
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: memberId
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete member conversations
+      tags:
+      - conversations
+  /api/workspaces/{id}/members/{memberId}/presence:
+    post:
+      consumes:
+      - application/json
+      description: Update a member's real-time activity status (typing, viewing, etc.)
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: memberId
+        required: true
+        type: string
+      - description: Presence data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.PresenceUpdate'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Presence'
+      security:
+      - BearerAuth: []
+      summary: Update member presence
+      tags:
+      - members
+  /api/workspaces/{id}/members/{memberId}/terminal-session:
+    get:
+      description: Get the active terminal session for a workspace member
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: memberId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CreateSessionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get member's terminal session
+      tags:
+      - terminals
+    post:
+      consumes:
+      - application/json
+      description: Get existing terminal session or create a new one for the member
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Member ID
+        in: path
+        name: memberId
+        required: true
+        type: string
+      - description: Optional session configuration
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/handlers.CreateSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CreateSessionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get or create member's terminal session
+      tags:
+      - terminals
+  /api/workspaces/{id}/search:
+    get:
+      description: Full-text search across all conversations in a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - default: 50
+        description: Maximum results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Search workspace messages
+      tags:
+      - workspaces
+  /api/workspaces/{id}/terminal-sessions:
+    get:
+      description: Get all active PTY sessions for a workspace
+      parameters:
+      - description: Workspace ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List workspace terminal sessions
+      tags:
+      - terminals
+  /api/workspaces/validate-path:
+    post:
+      consumes:
+      - application/json
+      description: Validate if a path is suitable for a workspace (exists, readable,
+        writable)
+      parameters:
+      - description: Path to validate
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/filesystem.PathValidationResult'
+      security:
+      - BearerAuth: []
+      summary: Validate workspace path
+      tags:
+      - workspaces
+  /health:
+    get:
+      description: Check if the server is running
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.HealthResponse'
+      summary: Health check
+      tags:
+      - health
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

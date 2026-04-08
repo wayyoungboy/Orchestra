@@ -11,7 +11,8 @@ type Config struct {
 }
 
 type ServerConfig struct {
-	HTTPAddr string `yaml:"http_addr"`
+	HTTPAddr  string `yaml:"http_addr"`
+	UploadDir string `yaml:"upload_dir"`
 }
 
 type TerminalConfig struct {
@@ -41,7 +42,8 @@ type AuthConfig struct {
 func Default() *Config {
 	return &Config{
 		Server: ServerConfig{
-			HTTPAddr: ":8080",
+			HTTPAddr:  ":8080",
+			UploadDir: "./uploads",
 		},
 		Terminal: TerminalConfig{
 			MaxSessions: 10,

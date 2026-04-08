@@ -10,14 +10,13 @@ import (
 	"time"
 
 	_ "github.com/orchestra/backend/docs" // swagger docs
+	"github.com/orchestra/backend/internal/a2a"
 	"github.com/orchestra/backend/internal/api"
-	"github.com/orchestra/backend/internal/chatbridge"
 	"github.com/orchestra/backend/internal/config"
 	"github.com/orchestra/backend/internal/models"
 	"github.com/orchestra/backend/internal/security"
 	"github.com/orchestra/backend/internal/storage"
 	"github.com/orchestra/backend/internal/storage/repository"
-	"github.com/orchestra/backend/internal/terminal"
 	"github.com/orchestra/backend/internal/ws"
 	"github.com/orchestra/backend/pkg/utils"
 )
@@ -60,7 +59,7 @@ func main() {
 	}
 
 	// Initialize security whitelist
-	whitelist := security.NewWhitelist(
+	security.NewWhitelist(
 		cfg.Security.AllowedCommands,
 		cfg.Security.AllowedPaths,
 	)
@@ -78,27 +77,21 @@ func main() {
 		ensureDefaultUser(db)
 	}
 
-	// Initialize process pool
-	pool := terminal.NewProcessPool(
-		cfg.Terminal.MaxSessions,
+	// Initialize A2A pool for agent communication
+	a2aRegistry := a2a.NewAgentRegistry()
+	a2aPool := a2a.NewPool(
 		cfg.Terminal.IdleTimeout,
+		a2aRegistry,
 	)
-	pool.SetValidator(whitelist)
 
-	msgRepo := repository.NewMessageRepository(db.DB())
-	chatBridge := chatbridge.New(msgRepo)
-	pool.SetOutputHook(chatBridge.OnTerminalOutput)
-
-	// Initialize WebSocket gateway
-	terminalHandler := ws.NewTerminalHandler(pool)
-	gateway := ws.NewGateway(terminalHandler, cfg.Security.AllowedOrigins)
+	// Initialize WebSocket gateway with A2A terminal handler
+	a2aTerminalHandler := ws.NewA2ATerminalHandler(a2aPool)
+	gateway := ws.NewGateway(a2aTerminalHandler, cfg.Security.AllowedOrigins)
 
 	// Setup router
-	router := api.SetupRouter(pool, gateway, db, cfg)
+	router := api.SetupRouter(a2aPool, gateway, db, cfg)
 
 	log.Printf("Orchestra starting on %s", cfg.Server.HTTPAddr)
-	log.Printf("Allowed commands: %v", whitelist.AllowedCommands())
-	log.Printf("Allowed paths: %v", whitelist.AllowedPaths())
 	log.Printf("Authentication: enabled=%v", cfg.Auth.Enabled)
 
 	// Start HTTP server

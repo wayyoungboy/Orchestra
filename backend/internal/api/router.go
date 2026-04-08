@@ -2,6 +2,10 @@ package api
 
 import (
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	"github.com/orchestra/backend/internal/a2a"
 	"github.com/orchestra/backend/internal/api/handlers"
 	"github.com/orchestra/backend/internal/api/middleware"
 	"github.com/orchestra/backend/internal/config"
@@ -9,18 +13,21 @@ import (
 	"github.com/orchestra/backend/internal/security"
 	"github.com/orchestra/backend/internal/storage"
 	"github.com/orchestra/backend/internal/storage/repository"
-	"github.com/orchestra/backend/internal/terminal"
 	"github.com/orchestra/backend/internal/ws"
 )
 
-func SetupRouter(pool *terminal.ProcessPool, gateway *ws.Gateway, db *storage.Database, cfg *config.Config) *gin.Engine {
+func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, cfg *config.Config) *gin.Engine {
 	r := gin.New()
 
 	// Set trusted proxies (local only)
 	r.SetTrustedProxies([]string{"127.0.0.1", "::1"})
 
 	// Initialize filesystem validator and browser
-	validator := filesystem.NewValidator([]string{"~"})
+	allowedPaths := cfg.Security.AllowedPaths
+	if len(allowedPaths) == 0 {
+		allowedPaths = []string{"~"}
+	}
+	validator := filesystem.NewValidator(allowedPaths)
 	browser := filesystem.NewBrowser(validator)
 
 	// Initialize repositories
@@ -30,12 +37,21 @@ func SetupRouter(pool *terminal.ProcessPool, gateway *ws.Gateway, db *storage.Da
 	msgRepo := repository.NewMessageRepository(db.DB())
 	readRepo := repository.NewConversationReadRepository(db.DB())
 	userRepo := repository.NewUserRepository(db.DB())
+	attachRepo := repository.NewAttachmentRepository(db.DB())
+	taskRepo := repository.NewTaskRepository(db.DB())
+	apiKeyRepo := repository.NewAPIKeyRepository(db.DB())
 
 	// Initialize handlers
-	wsHandler := handlers.NewWorkspaceHandler(wsRepo, memberRepo, browser)
+	wsHandler := handlers.NewWorkspaceHandler(wsRepo, memberRepo, msgRepo, browser)
 	memberHandler := handlers.NewMemberHandler(memberRepo, wsRepo)
-	terminalHandler := handlers.NewTerminalHandler(pool, wsRepo)
-	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, pool)
+	terminalHandler := handlers.NewTerminalHandler(a2aPool, wsRepo)
+	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, a2aPool, ws.GlobalChatHub)
+	attachmentHandler := handlers.NewAttachmentHandler(msgRepo, convRepo, attachRepo, cfg.Server.UploadDir)
+	taskHandler := handlers.NewTaskHandler(taskRepo, memberRepo)
+	apiKeyHandler, err := handlers.NewAPIKeyHandler(apiKeyRepo, cfg)
+	if err != nil {
+		panic("failed to create API key handler: " + err.Error())
+	}
 
 	// Initialize JWT config
 	var jwtConfig *security.JWTConfig
@@ -56,6 +72,9 @@ func SetupRouter(pool *terminal.ProcessPool, gateway *ws.Gateway, db *storage.Da
 
 	// Health check (no auth required)
 	r.GET("/health", handlers.HealthCheck)
+
+	// Swagger API documentation
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Auth routes (no auth middleware)
 	authGroup := r.Group("/api/auth")
@@ -78,19 +97,27 @@ func SetupRouter(pool *terminal.ProcessPool, gateway *ws.Gateway, db *storage.Da
 		// Workspaces
 		api.GET("/workspaces", wsHandler.List)
 		api.POST("/workspaces", wsHandler.Create)
+		api.POST("/workspaces/validate-path", wsHandler.ValidatePath)
 		api.GET("/workspaces/:id", wsHandler.Get)
+		api.PUT("/workspaces/:id", wsHandler.Update)
 		api.DELETE("/workspaces/:id", wsHandler.Delete)
 		api.GET("/workspaces/:id/browse", wsHandler.Browse)
+		api.GET("/workspaces/:id/search", wsHandler.Search)
 		api.GET("/browse", wsHandler.BrowseRoot)
 
 		// Members
 		api.GET("/workspaces/:id/members", memberHandler.List)
+		api.GET("/workspaces/:id/members/:memberId", memberHandler.Get)
 		api.POST("/workspaces/:id/members", memberHandler.Create)
 		api.PUT("/workspaces/:id/members/:memberId", memberHandler.Update)
 		api.DELETE("/workspaces/:id/members/:memberId", memberHandler.Delete)
 		api.DELETE("/workspaces/:id/members/:memberId/conversations", convHandler.DeleteConversationsForMember)
 		api.GET("/workspaces/:id/members/:memberId/terminal-session", terminalHandler.GetSessionForMember)
+		api.POST("/workspaces/:id/members/:memberId/terminal-session", terminalHandler.GetOrCreateSessionForMember)
 		api.GET("/workspaces/:id/terminal-sessions", terminalHandler.ListWorkspaceTerminalSessions)
+
+		// Member presence
+		api.POST("/workspaces/:id/members/:memberId/presence", memberHandler.UpdatePresence)
 
 		// Terminal sessions
 		api.POST("/terminals", terminalHandler.CreateSession)
@@ -98,11 +125,12 @@ func SetupRouter(pool *terminal.ProcessPool, gateway *ws.Gateway, db *storage.Da
 
 		// Conversations
 		api.GET("/workspaces/:id/conversations", convHandler.List)
+		api.GET("/workspaces/:id/conversations/:convId", convHandler.GetConversation)
 		api.POST("/workspaces/:id/conversations", convHandler.Create)
 		api.PUT("/workspaces/:id/conversations/:convId", convHandler.UpdateSettings)
 		api.DELETE("/workspaces/:id/conversations/:convId", convHandler.Delete)
 		api.DELETE("/workspaces/:id/conversations/:convId/messages", convHandler.ClearMessages)
-		api.PUT("/workspaces/:id/conversations/:convId/settings", convHandler.UpdateSettings)
+		api.DELETE("/workspaces/:id/conversations/:convId/messages/:messageId", convHandler.DeleteMessage)
 		api.GET("/workspaces/:id/conversations/:convId/messages", convHandler.GetMessages)
 		api.POST("/workspaces/:id/conversations/:convId/messages", convHandler.SendMessage)
 		api.POST("/workspaces/:id/conversations/:convId/read", convHandler.MarkConversationRead)
@@ -111,6 +139,33 @@ func SetupRouter(pool *terminal.ProcessPool, gateway *ws.Gateway, db *storage.Da
 
 		// Internal API for AI assistants
 		api.POST("/internal/chat/send", convHandler.InternalChatSend)
+		api.POST("/internal/agent-status", convHandler.UpdateAgentStatus)
+
+		// Task API for secretary coordination
+		api.POST("/internal/tasks/create", taskHandler.CreateTask)
+		api.POST("/internal/tasks/start", taskHandler.StartTask)
+		api.POST("/internal/tasks/complete", taskHandler.CompleteTask)
+		api.POST("/internal/tasks/fail", taskHandler.FailTask)
+		api.GET("/internal/workloads/list", taskHandler.ListWorkloads)
+
+		// Task management (for frontend)
+		api.GET("/workspaces/:id/tasks", taskHandler.ListTasks)
+		api.GET("/workspaces/:id/tasks/:taskId", taskHandler.GetTask)
+		api.GET("/workspaces/:id/tasks/my-tasks", taskHandler.GetMyTasks)
+
+		// Attachments
+		api.GET("/workspaces/:id/attachments", attachmentHandler.ListAttachments)
+		api.POST("/workspaces/:id/conversations/:convId/attachments", attachmentHandler.UploadAttachment)
+		api.GET("/workspaces/:id/attachments/:attachmentId", attachmentHandler.DownloadAttachment)
+		api.GET("/workspaces/:id/attachments/:attachmentId/info", attachmentHandler.GetAttachmentInfo)
+		api.DELETE("/workspaces/:id/attachments/:attachmentId", attachmentHandler.DeleteAttachment)
+
+		// API Keys
+		api.GET("/api-keys", apiKeyHandler.List)
+		api.GET("/api-keys/provider/:provider", apiKeyHandler.GetByProvider)
+		api.POST("/api-keys", apiKeyHandler.Create)
+		api.DELETE("/api-keys/:id", apiKeyHandler.Delete)
+		api.POST("/api-keys/test", apiKeyHandler.Test)
 	}
 
 	// WebSocket routes with WebSocket-specific auth

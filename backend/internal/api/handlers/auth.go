@@ -224,7 +224,7 @@ func (h *AuthHandler) ValidateToken(c *gin.Context) {
 // @Tags auth
 // @Produce json
 // @Security BearerAuth
-// @Success 200 {object} map[string]*models.User
+// @Success 200 {object} models.User
 // @Failure 401 {object} map[string]string
 // @Router /api/auth/me [get]
 func (h *AuthHandler) GetCurrentUser(c *gin.Context) {

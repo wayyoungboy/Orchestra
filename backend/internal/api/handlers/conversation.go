@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/oklog/ulid/v2"
+	"github.com/orchestra/backend/internal/a2a"
 	"github.com/orchestra/backend/internal/models"
 	"github.com/orchestra/backend/internal/storage/repository"
-	"github.com/orchestra/backend/internal/terminal"
 	"github.com/orchestra/backend/internal/ws"
 )
 
@@ -21,7 +20,8 @@ type ConversationHandler struct {
 	msgRepo    *repository.MessageRepository
 	readRepo   *repository.ConversationReadRepository
 	memberRepo repository.MemberRepository
-	pool       *terminal.ProcessPool
+	a2aPool    *a2a.Pool
+	chatHub    *ws.ChatHub
 }
 
 func NewConversationHandler(
@@ -29,14 +29,16 @@ func NewConversationHandler(
 	msgRepo *repository.MessageRepository,
 	readRepo *repository.ConversationReadRepository,
 	memberRepo repository.MemberRepository,
-	pool *terminal.ProcessPool,
+	a2aPool *a2a.Pool,
+	chatHub *ws.ChatHub,
 ) *ConversationHandler {
 	return &ConversationHandler{
 		convRepo:   convRepo,
 		msgRepo:    msgRepo,
 		readRepo:   readRepo,
 		memberRepo: memberRepo,
-		pool:       pool,
+		a2aPool:    a2aPool,
+		chatHub:    chatHub,
 	}
 }
 
@@ -85,6 +87,18 @@ type SendMessageRequest struct {
 	ClientTraceID  string `json:"clientTraceId,omitempty"`
 }
 
+// List lists all conversations in a workspace
+// @Summary List workspace conversations
+// @Description Get all conversations (channels and DMs) in a workspace
+// @Tags conversations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param userId query string false "User ID for unread counts"
+// @Success 200 {object} ConversationListResponse
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations [get]
 func (h *ConversationHandler) List(c *gin.Context) {
 	workspaceID := c.Param("id")
 	if workspaceID == "" {
@@ -169,6 +183,19 @@ func (h *ConversationHandler) List(c *gin.Context) {
 	})
 }
 
+// Create creates a new conversation
+// @Summary Create conversation
+// @Description Create a new channel or DM conversation
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param request body CreateConversationRequest true "Conversation data"
+// @Success 201 {object} ConversationDTO
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations [post]
 func (h *ConversationHandler) Create(c *gin.Context) {
 	workspaceID := c.Param("id")
 	if workspaceID == "" {
@@ -204,6 +231,20 @@ func (h *ConversationHandler) Create(c *gin.Context) {
 	})
 }
 
+// GetMessages gets messages from a conversation
+// @Summary Get conversation messages
+// @Description Get messages from a conversation with pagination
+// @Tags conversations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param convId path string true "Conversation ID"
+// @Param limit query int false "Number of messages to return" default(200)
+// @Param before query string false "Get messages before this message ID"
+// @Success 200 {array} MessageDTO
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/{convId}/messages [get]
 func (h *ConversationHandler) GetMessages(c *gin.Context) {
 	convID := c.Param("convId")
 	if convID == "" {
@@ -244,6 +285,20 @@ func (h *ConversationHandler) GetMessages(c *gin.Context) {
 	c.JSON(http.StatusOK, dtos)
 }
 
+// SendMessage sends a message to a conversation
+// @Summary Send message
+// @Description Send a message to a conversation (broadcasts to WebSocket)
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param convId path string true "Conversation ID"
+// @Param request body SendMessageRequest true "Message data"
+// @Success 201 {object} MessageDTO
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/{convId}/messages [post]
 func (h *ConversationHandler) SendMessage(c *gin.Context) {
 	convID := c.Param("convId")
 	if convID == "" {
@@ -286,8 +341,8 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 		IsAI:           msg.IsAI,
 	})
 
-	if workspaceID != "" && h.pool != nil && h.memberRepo != nil {
-		h.forwardUserTextToAssistantPTY(c, workspaceID, convID, req.Text)
+	if workspaceID != "" && h.a2aPool != nil && h.memberRepo != nil {
+		h.forwardUserTextToAgent(c, workspaceID, convID, req.Text)
 	}
 
 	c.JSON(http.StatusCreated, MessageDTO{
@@ -303,6 +358,20 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 	})
 }
 
+// UpdateSettings updates conversation settings
+// @Summary Update conversation settings
+// @Description Update pinned, muted, or other conversation settings
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param convId path string true "Conversation ID"
+// @Param request body map[string]interface{} true "Settings to update"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/{convId} [put]
 func (h *ConversationHandler) UpdateSettings(c *gin.Context) {
 	convID := c.Param("convId")
 	if convID == "" {
@@ -324,6 +393,17 @@ func (h *ConversationHandler) UpdateSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+// Delete deletes a conversation
+// @Summary Delete conversation
+// @Description Delete a conversation by ID
+// @Tags conversations
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param convId path string true "Conversation ID"
+// @Success 204 "No Content"
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/{convId} [delete]
 func (h *ConversationHandler) Delete(c *gin.Context) {
 	convID := c.Param("convId")
 	if convID == "" {
@@ -342,6 +422,17 @@ func (h *ConversationHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
+// ClearMessages clears all messages in a conversation
+// @Summary Clear conversation messages
+// @Description Delete all messages in a conversation
+// @Tags conversations
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param convId path string true "Conversation ID"
+// @Success 204 "No Content"
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/{convId}/messages [delete]
 func (h *ConversationHandler) ClearMessages(c *gin.Context) {
 	convID := c.Param("convId")
 	if convID == "" {
@@ -366,7 +457,20 @@ type markReadBody struct {
 	UserID string `json:"userId"`
 }
 
-// MarkConversationRead persists last_read_at to the latest message time in the conversation.
+// MarkConversationRead marks a conversation as read
+// @Summary Mark conversation as read
+// @Description Mark a conversation as read for a user
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param convId path string true "Conversation ID"
+// @Param request body map[string]string true "User ID"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/{convId}/read [post]
 func (h *ConversationHandler) MarkConversationRead(c *gin.Context) {
 	convID := c.Param("convId")
 	if convID == "" {
@@ -400,7 +504,19 @@ func (h *ConversationHandler) MarkConversationRead(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// MarkAllConversationsRead marks every conversation in the workspace read for the given member.
+// MarkAllConversationsRead marks all conversations in a workspace as read
+// @Summary Mark all conversations as read
+// @Description Mark all conversations in a workspace as read for a user
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param request body map[string]string true "User ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/read-all [post]
 func (h *ConversationHandler) MarkAllConversationsRead(c *gin.Context) {
 	workspaceID := c.Param("id")
 	if workspaceID == "" {
@@ -438,7 +554,20 @@ type setConversationMembersBody struct {
 	MemberIDs []string `json:"memberIds"`
 }
 
-// SetConversationMembers updates channel membership (full replace).
+// SetConversationMembers updates channel membership
+// @Summary Set conversation members
+// @Description Update the members of a conversation (full replace)
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param convId path string true "Conversation ID"
+// @Param request body map[string][]string true "Member IDs"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/{convId}/members [put]
 func (h *ConversationHandler) SetConversationMembers(c *gin.Context) {
 	workspaceID := c.Param("id")
 	convID := c.Param("convId")
@@ -518,7 +647,17 @@ func memberSliceWithout(ids []string, id string) []string {
 	return out
 }
 
-// DeleteConversationsForMember removes DM threads involving the member and drops them from channel member lists.
+// DeleteConversationsForMember deletes conversations for a member
+// @Summary Delete member conversations
+// @Description Remove DM threads and channel membership for a member
+// @Tags conversations
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param memberId path string true "Member ID"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/members/{memberId}/conversations [delete]
 func (h *ConversationHandler) DeleteConversationsForMember(c *gin.Context) {
 	workspaceID := c.Param("id")
 	memberID := c.Param("memberId")
@@ -555,7 +694,7 @@ func (h *ConversationHandler) DeleteConversationsForMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-func (h *ConversationHandler) forwardUserTextToAssistantPTY(c *gin.Context, workspaceID, convID, text string) {
+func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID, convID, text string) {
 	if text == "" {
 		return
 	}
@@ -567,23 +706,26 @@ func (h *ConversationHandler) forwardUserTextToAssistantPTY(c *gin.Context, work
 	if err != nil {
 		return
 	}
-	// 用户消息转发到带 PTY 的助手与秘书（秘书 = Web 侧监工/协调角色）
-	ptyRecipientIDs := make(map[string]struct{})
+	// Forward user messages to assistants and secretaries (ACP-enabled members)
+	acpRecipientIDs := make(map[string]struct{})
 	for _, m := range members {
 		if m.RoleType == models.RoleAssistant || m.RoleType == models.RoleSecretary {
-			ptyRecipientIDs[m.ID] = struct{}{}
+			acpRecipientIDs[m.ID] = struct{}{}
 		}
 	}
-	if len(ptyRecipientIDs) == 0 {
+	if len(acpRecipientIDs) == 0 {
 		return
 	}
+
+	// Parse @mentions from text
+	mentionedIDs := parseMentions(text, members)
 
 	targets := make([]string, 0)
 	add := func(id string) {
 		if id == "" {
 			return
 		}
-		if _, ok := ptyRecipientIDs[id]; !ok {
+		if _, ok := acpRecipientIDs[id]; !ok {
 			return
 		}
 		for _, existing := range targets {
@@ -594,68 +736,109 @@ func (h *ConversationHandler) forwardUserTextToAssistantPTY(c *gin.Context, work
 		targets = append(targets, id)
 	}
 
-	switch conv.Type {
-	case repository.ConversationTypeDM:
-		add(conv.TargetID)
-		for _, mid := range conv.MemberIDs {
-			add(mid)
+	// If there are @mentions, only send to mentioned members
+	if len(mentionedIDs) > 0 {
+		for _, id := range mentionedIDs {
+			add(id)
 		}
-	case repository.ConversationTypeChannel:
-		for _, mid := range conv.MemberIDs {
-			add(mid)
-		}
-		if len(targets) == 0 && len(conv.MemberIDs) == 0 {
-			for id := range ptyRecipientIDs {
-				targets = append(targets, id)
+	} else {
+		// No @mentions - use original logic based on conversation type
+		switch conv.Type {
+		case repository.ConversationTypeDM:
+			add(conv.TargetID)
+			for _, mid := range conv.MemberIDs {
+				add(mid)
 			}
+		case repository.ConversationTypeChannel:
+			for _, mid := range conv.MemberIDs {
+				add(mid)
+			}
+			// Channel without @mention: don't forward (align with reference behavior)
 		}
 	}
 
-	// Strip @mentions from text before sending to terminal (matches golutra behavior)
+	// Strip @mentions from text before sending
 	cleanText := stripMentions(text, members)
 
-	spanID := ulid.Make().String()
 	for _, memberID := range targets {
-		sess := h.pool.SessionForWorkspaceMember(workspaceID, memberID)
+		sess := h.a2aPool.SessionForWorkspaceMember(workspaceID, memberID)
 		if sess == nil {
 			continue
 		}
 		sess.SetLastChatTargetConversation(convID)
-		sess.SetStreamSpanID(spanID)
-		sess.NoteChatInjectedLine(cleanText)
 
-		// Build prompt with reply instructions
+		// Find member for role check
+		var member *models.Member
+		for _, m := range members {
+			if m.ID == memberID {
+				member = m
+				break
+			}
+		}
+
 		memberName := sess.MemberName
 		if memberName == "" {
 			memberName = memberID
 		}
 
-		// Format the message with instructions for AI
-		// AI should use curl to send reply via internal API
-		fullPrompt := fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
+		// Build prompt based on role
+		var fullPrompt string
+		if member != nil && member.RoleType == models.RoleSecretary {
+			// Secretary prompt - coordinator role with task management
+			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
 
-规则：完成用户的要求。回复时使用 curl 调用内部 API：
-curl -X POST http://127.0.0.1:8080/api/internal/chat/send \
-  -H "Content-Type: application/json" \
-  -d '{"workspaceId":"%s","conversationId":"%s","senderId":"%s","senderName":"%s","text":"你的回复内容"}'`,
-			convID,
-			memberID,
-			cleanText,
-			workspaceID,
-			convID,
-			memberID,
-			memberName,
-		)
+你是团队的协调者（秘书）。你的职责：
+1. 分析用户需求，拆解为可执行的任务
+2. 查询助手负载，智能分配任务
+3. 追踪任务进度，协调多个助手协作
 
-		// Send the message text directly (no ESC - it interferes with TUI input mode)
-		_, _ = sess.Write([]byte(fullPrompt))
+【可用工具】
 
-		// Wait 100ms before sending Enter (matches golutra's COMMAND_CONFIRM_DELAY_MS)
-		time.Sleep(100 * time.Millisecond)
+使用 orchestra_workload_list 查询助手负载。
+使用 orchestra_task_create 创建任务分配给助手。
+使用 orchestra_chat_send 回复用户。
 
-		// Send Enter separately to submit the query
-		_, _ = sess.Write([]byte{'\r'})
+规则：先查询负载，再分配任务。任务完成后助手会汇报，你审核后回复用户。`,
+				convID,
+				memberID,
+				cleanText,
+			)
+		} else {
+			// Regular assistant prompt with task status reporting
+			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
+
+【可用工具】
+
+使用 orchestra_task_start 开始执行任务。
+使用 orchestra_task_complete 完成任务汇报。
+使用 orchestra_task_fail 报告任务失败。
+使用 orchestra_chat_send 回复用户。
+
+规则：完成任务要求。若收到秘书分配的任务(taskId)，开始执行时调用start，完成后调用complete，失败时调用fail。`,
+				convID,
+				memberID,
+				cleanText,
+			)
+		}
+
+		// Send via ACP protocol
+		_ = sess.SendUserMessage(fullPrompt)
 	}
+}
+
+// parseMentions extracts member IDs from @mentions in text
+func parseMentions(text string, members []*models.Member) []string {
+	var mentionIDs []string
+	for _, m := range members {
+		if m == nil {
+			continue
+		}
+		mention := "@" + m.Name
+		if idx := findMentionIndex(text, mention); idx != -1 {
+			mentionIDs = append(mentionIDs, m.ID)
+		}
+	}
+	return mentionIDs
 }
 
 // stripMentions removes @memberName mentions from text before sending to terminal.
@@ -706,7 +889,18 @@ type InternalChatSendRequest struct {
 }
 
 // InternalChatSend provides a simplified API for AI assistants to send messages.
-// This is used by AI running in PTY to respond to user messages.
+// InternalChatSend handles AI responses from terminal
+// @Summary Internal chat send
+// @Description Receive AI responses from terminal PTY (internal API)
+// @Tags internal
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body InternalChatSendRequest true "AI response data"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/internal/chat/send [post]
 func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 	var req InternalChatSendRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -735,21 +929,21 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 	}
 
 	// Broadcast to all WebSocket clients via ChatHub
-		ws.GlobalChatHub.BroadcastToWorkspace(req.WorkspaceID, ws.ChatEvent{
-			Type:           ws.EventNewMessage,
-			WorkspaceID:    req.WorkspaceID,
-			ConversationID: req.ConversationID,
-			MessageID:      msg.ID,
-			SenderID:       req.SenderID,
-			SenderName:     req.SenderName,
-			Content:        req.Text,
-			CreatedAt:      msg.CreatedAt,
-			IsAI:           true,
-		})
+	ws.GlobalChatHub.BroadcastToWorkspace(req.WorkspaceID, ws.ChatEvent{
+		Type:           ws.EventNewMessage,
+		WorkspaceID:    req.WorkspaceID,
+		ConversationID: req.ConversationID,
+		MessageID:      msg.ID,
+		SenderID:       req.SenderID,
+		SenderName:     req.SenderName,
+		Content:        req.Text,
+		CreatedAt:      msg.CreatedAt,
+		IsAI:           true,
+	})
 
-		// Broadcast to WebSocket clients via terminal session
-	if h.pool != nil {
-		sess := h.pool.SessionForWorkspaceMember(req.WorkspaceID, req.SenderID)
+	// Broadcast to WebSocket clients via terminal session
+	if h.a2aPool != nil {
+		sess := h.a2aPool.SessionForWorkspaceMember(req.WorkspaceID, req.SenderID)
 		if sess != nil {
 			// Build terminal_chat_stream payload for WebSocket broadcast
 			payload := map[string]interface{}{
@@ -772,8 +966,161 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 		}
 	}
 
+	// Check if sender is secretary - auto-forward @mentions to assistants
+	senderMember, err := h.memberRepo.GetByID(c.Request.Context(), req.SenderID)
+	if err == nil && senderMember != nil && senderMember.RoleType == models.RoleSecretary {
+		// Get all workspace members for mention parsing
+		allMembers, err := h.memberRepo.ListByWorkspace(c.Request.Context(), req.WorkspaceID)
+		if err == nil {
+			// Parse @mentions from secretary's response
+			mentionedIDs := parseMentions(req.Text, allMembers)
+			if len(mentionedIDs) > 0 {
+				// Strip @mentions from forwarded text
+				cleanText := stripMentions(req.Text, allMembers)
+
+				// Forward to mentioned assistants
+				for _, targetID := range mentionedIDs {
+					// Find target member
+					var targetMember *models.Member
+					for _, m := range allMembers {
+						if m.ID == targetID {
+							targetMember = m
+							break
+						}
+					}
+
+					// Only forward to assistants (not other secretaries or members)
+					if targetMember != nil && targetMember.RoleType == models.RoleAssistant {
+						targetSess := h.a2aPool.SessionForWorkspaceMember(req.WorkspaceID, targetID)
+						if targetSess != nil {
+							targetName := targetSess.MemberName
+							if targetName == "" {
+								targetName = targetID
+							}
+
+							// Build forwarded prompt
+							forwardPrompt := fmt.Sprintf(`#conversationId{%s}#senderId{%s}[秘书分配任务]: %s
+
+规则：完成秘书分配的任务。完成后可 @秘书 汇报结果。
+回复时使用 curl 调用内部 API：
+curl -X POST http://127.0.0.1:8080/api/internal/chat/send \
+  -H "Content-Type: application/json" \
+  -d '{"workspaceId":"%s","conversationId":"%s","senderId":"%s","senderName":"%s","text":"你的回复内容"}'`,
+								req.ConversationID,
+								targetID,
+								cleanText,
+								req.WorkspaceID,
+								req.ConversationID,
+								targetID,
+								targetName,
+							)
+
+							_ = targetSess.SendUserMessage(forwardPrompt)
+						}
+					}
+				}
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"ok":        true,
 		"messageId": msg.ID,
 	})
+}
+
+// GetConversation gets a single conversation by ID
+// @Summary Get conversation
+// @Description Get a single conversation by ID
+// @Tags conversations
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param convId path string true "Conversation ID"
+// @Success 200 {object} ConversationDTO
+// @Failure 404 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/{convId} [get]
+func (h *ConversationHandler) GetConversation(c *gin.Context) {
+	convID := c.Param("convId")
+
+	conv, err := h.convRepo.GetByID(convID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
+
+	dto := ConversationDTO{
+		ID:         conv.ID,
+		Type:       string(conv.Type),
+		TargetID:   conv.TargetID,
+		MemberIDs:  conv.MemberIDs,
+		CustomName: conv.Name,
+		Pinned:     conv.Pinned,
+		Muted:      conv.Muted,
+	}
+
+	c.JSON(http.StatusOK, dto)
+}
+
+// DeleteMessage deletes a single message
+// @Summary Delete message
+// @Description Delete a single message from a conversation
+// @Tags conversations
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Param convId path string true "Conversation ID"
+// @Param messageId path string true "Message ID"
+// @Success 204 "No Content"
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/workspaces/{id}/conversations/{convId}/messages/{messageId} [delete]
+func (h *ConversationHandler) DeleteMessage(c *gin.Context) {
+	convID := c.Param("convId")
+	msgID := c.Param("messageId")
+
+	// Verify message belongs to this conversation
+	msg, err := h.msgRepo.GetByID(msgID)
+	if err != nil || msg.ConversationID != convID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "message not found"})
+		return
+	}
+
+	if err := h.msgRepo.Delete(msgID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusNoContent, nil)
+}
+// UpdateAgentStatus updates an AI agent's activity status
+// @Summary Update agent status
+// @Description Update an AI agent's current activity status (thinking, reading file, etc.)
+// @Tags internal
+// @Accept json
+// @Produce json
+// @Param request body models.AgentStatusUpdate true "Agent status data"
+// @Success 200 {object} models.AgentStatus
+// @Failure 400 {object} map[string]string
+// @Router /api/internal/agent-status [post]
+func (h *ConversationHandler) UpdateAgentStatus(c *gin.Context) {
+	var req models.AgentStatusUpdate
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	status := models.AgentStatus{
+		MemberID:       req.MemberID,
+		WorkspaceID:    req.WorkspaceID,
+		ConversationID: req.ConversationID,
+		Status:         req.Status,
+		Message:        req.Message,
+		Progress:       req.Progress,
+		Timestamp:      time.Now(),
+	}
+
+	// TODO: Broadcast to WebSocket clients via chat gateway
+	// This would require passing the gateway to the handler
+
+	c.JSON(http.StatusOK, status)
 }

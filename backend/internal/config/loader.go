@@ -50,6 +50,16 @@ func Load(path string) (*Config, error) {
 	cfg.Storage.Database = expandPath(cfg.Storage.Database)
 	cfg.Storage.Workspaces = expandPath(cfg.Storage.Workspaces)
 
+	// Expand allowed paths and filter out empty/null values
+	expandedPaths := make([]string, 0, len(cfg.Security.AllowedPaths))
+	for _, p := range cfg.Security.AllowedPaths {
+		if p == "" {
+			continue
+		}
+		expandedPaths = append(expandedPaths, expandPath(p))
+	}
+	cfg.Security.AllowedPaths = expandedPaths
+
 	return cfg, nil
 }
 

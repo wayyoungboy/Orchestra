@@ -91,3 +91,66 @@ func sortFiles(files []*FileInfo) {
 		return files[i].Name < files[j].Name
 	})
 }
+
+// PathValidationResult contains detailed path validation results
+type PathValidationResult struct {
+	Exists    bool   `json:"exists"`
+	Readable  bool   `json:"readable"`
+	Writable  bool   `json:"writable"`
+	IsDir     bool   `json:"isDir"`
+	Error     string `json:"error,omitempty"`
+	Validated bool   `json:"validated"`
+}
+
+// ValidatePath performs comprehensive path validation
+func (b *Browser) ValidatePath(path string) *PathValidationResult {
+	result := &PathValidationResult{Validated: true}
+
+	// Check if path is allowed by validator
+	if err := b.validator.ValidatePath(path); err != nil {
+		result.Error = err.Error()
+		return result
+	}
+
+	// Check if path exists
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		result.Error = "path does not exist"
+		return result
+	}
+	if err != nil {
+		result.Error = err.Error()
+		return result
+	}
+
+	result.Exists = true
+	result.IsDir = info.IsDir()
+
+	// Check readability
+	file, err := os.Open(path)
+	if err == nil {
+		result.Readable = true
+		file.Close()
+	}
+
+	// Check writability
+	if result.IsDir {
+		// For directories, try to create a temp file
+		testFile := filepath.Join(path, ".orchestra_write_test")
+		f, err := os.Create(testFile)
+		if err == nil {
+			result.Writable = true
+			f.Close()
+			os.Remove(testFile)
+		}
+	} else {
+		// For files, check if we can open for appending
+		f, err := os.OpenFile(path, os.O_WRONLY|os.O_APPEND, 0)
+		if err == nil {
+			result.Writable = true
+			f.Close()
+		}
+	}
+
+	return result
+}

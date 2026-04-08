@@ -5,12 +5,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/orchestra/backend/internal/terminal"
+	"github.com/orchestra/backend/internal/a2a"
 )
 
-func TestTerminalHandler_Handle(t *testing.T) {
-	pool := terminal.NewProcessPool(10, 30*time.Minute)
-	handler := NewTerminalHandler(pool)
+func TestA2ATerminalHandler_Handle(t *testing.T) {
+	registry := a2a.NewAgentRegistry()
+	pool := a2a.NewPool(30*time.Minute, registry)
+	handler := NewA2ATerminalHandler(pool)
 
 	if handler == nil {
 		t.Error("handler should not be nil")
@@ -18,8 +19,9 @@ func TestTerminalHandler_Handle(t *testing.T) {
 }
 
 func TestGateway_NewGateway(t *testing.T) {
-	pool := terminal.NewProcessPool(10, 30*time.Minute)
-	handler := NewTerminalHandler(pool)
+	registry := a2a.NewAgentRegistry()
+	pool := a2a.NewPool(30*time.Minute, registry)
+	handler := NewA2ATerminalHandler(pool)
 	allowedOrigins := []string{"http://localhost:3000", "http://example.com"}
 
 	gateway := NewGateway(handler, allowedOrigins)
@@ -33,8 +35,9 @@ func TestGateway_NewGateway(t *testing.T) {
 }
 
 func TestGateway_checkOrigin(t *testing.T) {
-	pool := terminal.NewProcessPool(10, 30*time.Minute)
-	handler := NewTerminalHandler(pool)
+	registry := a2a.NewAgentRegistry()
+	pool := a2a.NewPool(30*time.Minute, registry)
+	handler := NewA2ATerminalHandler(pool)
 
 	tests := []struct {
 		name           string

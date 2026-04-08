@@ -13,15 +13,15 @@ import (
 
 type Gateway struct {
 	mu             sync.RWMutex
-	terminal       *TerminalHandler
+	a2aTerminal    *A2ATerminalHandler
 	chat           *ChatHandler
 	allowedOrigins []string
 	upgrader       websocket.Upgrader
 }
 
-func NewGateway(terminal *TerminalHandler, allowedOrigins []string) *Gateway {
+func NewGateway(a2aTerminal *A2ATerminalHandler, allowedOrigins []string) *Gateway {
 	g := &Gateway{
-		terminal:       terminal,
+		a2aTerminal:    a2aTerminal,
 		chat:           NewChatHandler(GlobalChatHub),
 		allowedOrigins: allowedOrigins,
 	}
@@ -45,7 +45,6 @@ func (g *Gateway) checkOrigin(r *http.Request) bool {
 	}
 
 	for _, allowed := range g.allowedOrigins {
-		// Support wildcard subdomain matching (e.g., "*.example.com")
 		if strings.HasPrefix(allowed, "*.") {
 			domain := allowed[2:]
 			if strings.HasSuffix(originURL.Host, domain) || originURL.Host == domain[1:] {
@@ -54,7 +53,6 @@ func (g *Gateway) checkOrigin(r *http.Request) bool {
 			continue
 		}
 
-		// Exact match
 		if origin == allowed {
 			return true
 		}
@@ -73,8 +71,10 @@ func (g *Gateway) HandleTerminal(c *gin.Context) {
 	}
 	defer conn.Close()
 
-	if err := g.terminal.Handle(sessionID, conn); err != nil {
-		log.Printf("Terminal handler error: %v", err)
+	if g.a2aTerminal != nil {
+		if err := g.a2aTerminal.Handle(sessionID, conn); err != nil {
+			log.Printf("A2A terminal handler error: %v", err)
+		}
 	}
 }
 
