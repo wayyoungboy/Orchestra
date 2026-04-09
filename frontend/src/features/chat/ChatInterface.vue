@@ -27,6 +27,7 @@
             :current-user-id="chatStore.currentUserId"
             :members="chatMembers"
             :loading="chatStore.loading"
+            :loading-messages="chatStore.loadingMessages"
           />
           
           <!-- AI Status Floating Indicator -->

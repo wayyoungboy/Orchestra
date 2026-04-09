@@ -78,13 +78,11 @@ const openMenuId = ref<string | null>(null)
 
 const roleSections = computed(() => [
   { label: 'Owners', members: props.members.filter(m => m.roleType === 'owner') },
-  { label: 'Admins', members: props.members.filter(m => m.roleType === 'admin') },
   { label: 'Secretaries', members: props.members.filter(m => m.roleType === 'secretary') },
   { label: 'Assistants', members: props.members.filter(m => m.roleType === 'assistant') },
-  { label: 'Members', members: props.members.filter(m => m.roleType === 'member') },
-  { 
-    label: 'Others', 
-    members: props.members.filter(m => !['owner', 'admin', 'secretary', 'assistant', 'member'].includes(m.roleType)) 
+  {
+    label: 'Others',
+    members: props.members.filter(m => !['owner', 'secretary', 'assistant'].includes(m.roleType))
   }
 ])
 

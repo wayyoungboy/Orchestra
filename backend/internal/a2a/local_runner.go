@@ -37,7 +37,9 @@ type LocalRunner struct {
 
 // NewLocalRunner creates a new local CLI agent runner.
 func NewLocalRunner(command string, args []string, workspacePath string) *LocalRunner {
-	cmd := exec.Command(command, args...)
+	// Augment command with headless ACP flags for known agents
+	command, allArgs := buildAgentCommand(command, args)
+	cmd := exec.Command(command, allArgs...)
 	if workspacePath != "" {
 		cmd.Dir = workspacePath
 	}
@@ -104,6 +106,43 @@ func (r *LocalRunner) SendUserMessage(text string) error {
 	}
 
 	// No synchronous response expected - Claude streams responses
+	return nil
+}
+
+// SendToolResult sends a tool execution result back to Claude's stdin.
+func (r *LocalRunner) SendToolResult(toolUseID, content string, isError bool) error {
+	r.mu.Lock()
+	if r.done {
+		r.mu.Unlock()
+		return fmt.Errorf("runner is closed")
+	}
+	r.mu.Unlock()
+
+	msg := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"role": "user",
+			"content": []map[string]any{
+				{
+					"type":      "tool_result",
+					"tool_use_id": toolUseID,
+					"content":   content,
+					"is_error":  isError,
+				},
+			},
+		},
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+
+	if _, err := r.stdin.Write(data); err != nil {
+		return fmt.Errorf("failed to write tool result to agent stdin: %w", err)
+	}
+
 	return nil
 }
 
@@ -382,6 +421,47 @@ func getHomeDir() string {
 		return string(home[:len(home)-1])
 	}
 	return "/root"
+}
+
+// buildAgentCommand augments the base command with headless ACP flags.
+// Claude needs --output-format=stream-json --input-format=stream-json
+// to run in non-interactive stdio mode (without TTY).
+// NOT --print, because --print exits after one turn; we need persistent session.
+func buildAgentCommand(command string, args []string) (string, []string) {
+	base := args
+	switch command {
+	case "claude":
+		// Ensure headless ACP flags are present
+		hasOutputFormat := false
+		hasInputFormat := false
+		hasSkipPerms := false
+		hasVerbose := false
+		for _, a := range base {
+			switch a {
+			case "--output-format":
+				hasOutputFormat = true
+			case "--input-format":
+				hasInputFormat = true
+			case "--dangerously-skip-permissions":
+				hasSkipPerms = true
+			case "--verbose":
+				hasVerbose = true
+			}
+		}
+		if !hasOutputFormat {
+			base = append([]string{"--output-format", "stream-json"}, base...)
+		}
+		if !hasInputFormat {
+			base = append([]string{"--input-format", "stream-json"}, base...)
+		}
+		if !hasSkipPerms {
+			base = append([]string{"--dangerously-skip-permissions"}, base...)
+		}
+		if !hasVerbose {
+			base = append([]string{"--verbose"}, base...)
+		}
+	}
+	return command, base
 }
 
 // extractAssistantTextFromRaw extracts text content from a Claude assistant message.

@@ -6,7 +6,7 @@ export interface AppShortcut {
   key: string
   displayKey: string
   description: string
-  scope: 'global' | 'input' | 'terminal'
+  scope: 'global' | 'input'
   callback?: () => void
 }
 
@@ -15,7 +15,6 @@ export interface AppShortcutsOptions {
   onToggleHelp?: () => void
   onCloseModal?: () => void
   onNavigateChat?: () => void
-  onNavigateTerminal?: () => void
   onNavigateMembers?: () => void
   onNavigateSettings?: () => void
   onNavigateSkills?: () => void
@@ -48,20 +47,14 @@ const APP_SHORTCUTS: Omit<AppShortcut, 'displayKey'>[] = [
     scope: 'global'
   },
   {
-    id: 'navigate-terminal',
-    key: 'Ctrl+2',
-    description: 'Navigate to Terminal',
-    scope: 'global'
-  },
-  {
     id: 'navigate-members',
-    key: 'Ctrl+3',
+    key: 'Ctrl+2',
     description: 'Navigate to Members',
     scope: 'global'
   },
   {
     id: 'navigate-settings',
-    key: 'Ctrl+4',
+    key: 'Ctrl+3',
     description: 'Navigate to Settings',
     scope: 'global'
   },
@@ -134,14 +127,6 @@ export function useAppShortcuts(options: AppShortcutsOptions = {}) {
     registeredIds.push(id)
   }
 
-  if (options.onNavigateTerminal) {
-    const id = registerShortcut('Ctrl+2', () => options.onNavigateTerminal?.(), {
-      scope: 'global',
-      description: 'Navigate to Terminal'
-    })
-    registeredIds.push(id)
-  }
-
   if (options.onNavigateMembers) {
     const id = registerShortcut('Ctrl+3', () => options.onNavigateMembers?.(), {
       scope: 'global',
@@ -170,7 +155,6 @@ export function useAppShortcuts(options: AppShortcutsOptions = {}) {
     unregisterAll()
   }
 
-  const enterTerminalScope = () => setScope('terminal')
   const enterInputScope = () => setScope('input')
   const enterGlobalScope = () => setScope('global')
 
@@ -178,7 +162,6 @@ export function useAppShortcuts(options: AppShortcutsOptions = {}) {
     shortcuts,
     registeredIds,
     cleanup,
-    enterTerminalScope,
     enterInputScope,
     enterGlobalScope,
     formatShortcutForDisplay

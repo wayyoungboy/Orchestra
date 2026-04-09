@@ -48,7 +48,7 @@ func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, c
 	wsHandler := handlers.NewWorkspaceHandler(wsRepo, memberRepo, msgRepo, browser)
 	memberHandler := handlers.NewMemberHandler(memberRepo, wsRepo, ws.GlobalChatHub)
 	terminalHandler := handlers.NewTerminalHandler(a2aPool, wsRepo)
-	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, a2aPool, ws.GlobalChatHub)
+	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, wsRepo, a2aPool, ws.GlobalChatHub)
 	attachmentHandler := handlers.NewAttachmentHandler(msgRepo, convRepo, attachRepo, cfg.Server.UploadDir)
 	taskHandler := handlers.NewTaskHandler(taskRepo, memberRepo)
 	apiKeyHandler, err := handlers.NewAPIKeyHandler(apiKeyRepo, cfg)

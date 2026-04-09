@@ -204,7 +204,8 @@ func (h *ChatHandler) Handle(workspaceID string, conn *websocket.Conn) error {
 		for {
 			_, _, err := conn.ReadMessage()
 			if err != nil {
-				close(client.Quit)
+				// Signal quit via channel close; only the defer should close it,
+				// so just return here to avoid double-close.
 				return
 			}
 		}

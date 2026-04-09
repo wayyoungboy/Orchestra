@@ -1,4 +1,4 @@
-export type MemberRole = 'owner' | 'admin' | 'secretary' | 'assistant' | 'member'
+export type MemberRole = 'owner' | 'secretary' | 'assistant'
 export type MemberStatus = 'online' | 'working' | 'dnd' | 'offline'
 
 export interface Member {
@@ -16,6 +16,9 @@ export interface Member {
   status: MemberStatus
   manualStatus?: MemberStatus
   createdAt: string
+  acpEnabled?: boolean
+  acpCommand?: string
+  acpArgs?: string[]
 }
 
 export interface MemberCreate {

@@ -21,14 +21,11 @@
         
         <!-- Role Badges -->
         <span v-if="member.roleType === 'owner'" class="role-badge owner">{{ t('members.roleOwner') }}</span>
-        <span v-if="member.roleType === 'admin'" class="role-badge admin">{{ t('members.roleAdmin') }}</span>
         <span v-if="member.roleType === 'assistant'" class="role-badge assistant">{{ t('members.roleAssistant') }}</span>
         <span v-if="member.roleType === 'secretary'" class="role-badge secretary">{{ t('members.roleSecretary') }}</span>
         
         <!-- Terminal Status Badge -->
-        <span v-if="terminalBadge" :class="['terminal-status-badge', terminalBadge.cls]" :title="terminalBadge.title">
-          {{ terminalBadge.text }}
-        </span>
+        <span v-if="false" :class="['terminal-status-badge']"></span>
       </div>
       <span v-if="subtitleSecondary" class="member-status-line truncate">
         {{ subtitleSecondary }}
@@ -49,15 +46,11 @@
       <!-- Dropdown Menu (Light Glass) -->
       <div v-if="menuOpen" class="member-dropdown-menu animate-in fade-in zoom-in-95 duration-200" @click.stop>
         <div class="menu-group">
-          <button v-if="canOpenTerminal" @click="$emit('action', { action: 'open-terminal', member })" class="menu-item">
-            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-            {{ t('memberRow.openTerminal') }}
-          </button>
           <button v-if="canSendMessage" @click="$emit('action', { action: 'send-message', member })" class="menu-item">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
             {{ t('memberRow.sendMessage') }}
           </button>
-          <button v-if="canMention" @click="$emit('action', { action: 'mention', member })" class="menu-item">
+          <button @click="$emit('action', { action: 'mention', member })" class="menu-item">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" /></svg>
             {{ t('memberRow.mention') }}
           </button>
@@ -87,9 +80,6 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Member, MemberStatus } from '@/shared/types/member'
-import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
-import { useTerminalStore } from '@/features/terminal/terminalStore'
-import { hasTerminalConfig, useTerminalMemberStore } from '@/features/terminal/terminalMemberStore'
 
 const props = defineProps<{
   member: Member
@@ -103,34 +93,11 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const workspaceStore = useWorkspaceStore()
-const terminalStore = useTerminalStore()
-const terminalMemberStore = useTerminalMemberStore()
 
 const displayName = computed(() => props.member.name?.trim() || t('members.unnamedMember'))
 const menuOpen = computed(() => props.menuOpen ?? false)
 const canRemove = computed(() => props.currentUserId ? props.member.id !== props.currentUserId : true)
 const canSendMessage = computed(() => props.currentUserId ? props.member.id !== props.currentUserId : true)
-const canOpenTerminal = computed(() => hasTerminalConfig(props.member.terminalType, props.member.terminalCommand))
-// 只有有 PTY 配置的成员才能被 @ 提及（assistant/secretary）
-const canMention = computed(() => hasTerminalConfig(props.member.terminalType, props.member.terminalCommand))
-
-const terminalBadge = computed(() => {
-  if (!canOpenTerminal.value) return null
-  const wid = workspaceStore.currentWorkspace?.id
-  const sess = terminalMemberStore.getSession(props.member.id, wid)
-  if (sess) {
-    const session = terminalStore.sessions.find(s => s.id === sess.terminalId)
-    const st = session?.status ?? 'disconnected'
-    const styles: any = {
-      connected: { text: 'tty', cls: 'bg-green-50 text-green-600 border-green-100' },
-      error: { text: 'err', cls: 'bg-red-50 text-red-600 border-red-100' },
-      disconnected: { text: 'off', cls: 'bg-slate-100 text-slate-400 border-slate-200' }
-    }
-    return styles[st] || { text: '...', cls: 'bg-indigo-50 text-primary border-indigo-100' }
-  }
-  return { text: 'pty', cls: 'bg-slate-50 text-slate-400 border-slate-100' }
-})
 
 const initials = computed(() => {
   const n = displayName.value.trim()
@@ -167,12 +134,16 @@ const avatarTextClass = computed(() => {
 })
 
 const subtitleSecondary = computed(() => {
+  // AI members show agent config instead of presence status
+  if (props.member.roleType === 'assistant' || props.member.roleType === 'secretary') {
+    const agentLabel = props.member.acpEnabled ? (props.member.acpCommand || 'AI Agent') : '未配置'
+    return agentLabel
+  }
   const presence = statusOptions.value.find(o => o.id === coercedStatus.value)?.label ?? ''
   const roleLabel = () => {
     switch (props.member.roleType) {
       case 'assistant': return t('members.roleAssistant')
       case 'secretary': return t('members.roleSecretary')
-      case 'admin': return t('members.roleAdmin')
       default: return ''
     }
   }
@@ -218,8 +189,6 @@ function handleContextMenu(_event: MouseEvent) {
 .role-badge.admin { background: #e0e7ff; color: #4338ca; }
 .role-badge.assistant { background: #dcfce7; color: #10b981; }
 .role-badge.secretary { background: #fef9c3; color: #ca8a04; }
-
-.terminal-status-badge { font-size: 9px; font-weight: 900; padding: 1px 6px; border-radius: 6px; border: 1px solid transparent; }
 
 .member-status-line { font-size: 11px; font-weight: 600; color: #94a3b8; }
 

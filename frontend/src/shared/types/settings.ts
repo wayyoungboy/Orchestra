@@ -36,15 +36,6 @@ export interface AppearanceSettings {
   theme: AppTheme
 }
 
-export interface TerminalSettings {
-  fontSize: number
-  fontFamily: string
-  cursorStyle: 'block' | 'underline' | 'bar'
-  cursorBlink: boolean
-  scrollback: number
-  bellSound: boolean
-}
-
 export interface Settings {
   appearance: AppearanceSettings
   locale: AppLocale
@@ -52,7 +43,6 @@ export interface Settings {
   notifications: NotificationSettings
   keybinds: KeybindSettings
   chat: ChatSettings
-  terminal: TerminalSettings
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -85,13 +75,5 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   chat: {
     streamOutput: true
-  },
-  terminal: {
-    fontSize: 14,
-    fontFamily: 'monospace',
-    cursorStyle: 'block',
-    cursorBlink: true,
-    scrollback: 10000,
-    bellSound: false
   }
 }

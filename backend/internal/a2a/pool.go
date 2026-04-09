@@ -2,6 +2,7 @@ package a2a
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -40,12 +41,13 @@ func NewPool(idleTimeout time.Duration, registry *AgentRegistry, workspacePath s
 
 // SessionConfig contains parameters for creating a session.
 type SessionConfig struct {
-	ID           string
-	WorkspaceID  string
-	MemberID     string
-	MemberName   string
-	TerminalType string
-	Member       *models.Member
+	ID            string
+	WorkspaceID   string
+	WorkspaceDir  string // per-workspace directory path
+	MemberID      string
+	MemberName    string
+	TerminalType  string
+	Member        *models.Member
 }
 
 // Acquire creates or retrieves a session for a member.
@@ -99,7 +101,7 @@ func (p *Pool) createLocalSession(ctx context.Context, config SessionConfig) (*S
 		args = []string{}
 	}
 
-	runner := NewLocalRunner(command, args, p.workspacePath)
+	runner := NewLocalRunner(command, args, config.WorkspaceDir)
 
 	// Generate session ID if not provided
 	sessionID := config.ID
@@ -347,7 +349,25 @@ func (p *Pool) processOutput(sess *Session) {
 				return // Session was released, stop processing
 			}
 			if msg.Type == TypeToolUse && p.toolHandler != nil {
-				go p.toolHandler.ExecuteTool(msg, sess)
+				go func() {
+					// Capture tool use ID and name for result correlation
+					toolUseParsed, _ := msg.ParseToolUseMessage()
+					toolUseID := ""
+					toolName := ""
+					if toolUseParsed != nil {
+						toolUseID = toolUseParsed.ToolUseID
+						toolName = toolUseParsed.Name
+					}
+
+					// Execute the tool (broadcasts to frontend)
+					p.toolHandler.ExecuteTool(msg, sess)
+
+					// Send tool result back to agent's stdin so it can continue
+					content := fmt.Sprintf("Tool '%s' executed successfully", toolName)
+					if err := sess.SendToolResultToAgent(toolUseID, content, false); err != nil {
+						log.Printf("[a2a-pool] Failed to send tool result to agent: %v", err)
+					}
+				}()
 			}
 			if p.outputHook != nil {
 				p.outputHook(sess, msg)

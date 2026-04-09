@@ -32,8 +32,29 @@
             <input
               v-model="name"
               class="modal-input"
-              placeholder="Enter display name"
+              :placeholder="t('members.editMemberModal.displayNamePlaceholder')"
             />
+          </div>
+
+          <!-- ACP Configuration (for non-owner/admin) -->
+          <div v-if="member.roleType !== 'owner'" class="input-group">
+            <label>{{ t('members.editMemberModal.acpHeading') }}</label>
+            <div class="acp-desc">{{ t('members.editMemberModal.acpDesc') }}</div>
+            <label class="acp-toggle">
+              <input type="checkbox" v-model="acpEnabled" class="modal-checkbox" />
+              <span>{{ t('members.editMemberModal.acpEnabled') }}</span>
+            </label>
+            <template v-if="acpEnabled">
+              <div class="input-group">
+                <label>{{ t('members.editMemberModal.acpCommand') }}</label>
+                <input v-model="acpCommand" class="modal-input" :placeholder="t('members.editMemberModal.acpCommandPlaceholder')" />
+              </div>
+              <div class="input-group">
+                <label>{{ t('members.editMemberModal.acpArgs') }}</label>
+                <input v-model="acpArgsDisplay" class="modal-input" :placeholder="t('members.editMemberModal.acpArgsPlaceholder')" />
+                <div class="input-hint">{{ t('members.editMemberModal.acpArgsHint') }}</div>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -74,29 +95,34 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'save', id: string, name: string): void
+  (e: 'save', id: string, name: string, acpEnabled: boolean, acpCommand: string, acpArgs: string[]): void
   (e: 'remove', id: string): void
 }>()
 
 const name = ref(props.member.name)
+const acpEnabled = ref(props.member.acpEnabled ?? false)
+const acpCommand = ref(props.member.acpCommand || '')
+const acpArgsDisplay = ref((props.member.acpArgs || []).join(' '))
 
 const roleLabel = computed(() => {
   switch (props.member.roleType) {
     case 'owner': return t('members.roleOwner')
-    case 'admin': return t('members.roleAdmin')
     case 'assistant': return t('members.roleAssistant')
     case 'secretary': return t('members.roleSecretary')
-    case 'member': return t('members.roleMember')
     default: return t('members.roleMember')
   }
 })
 
 watch(() => props.member, (newMember) => {
   name.value = newMember.name
+  acpEnabled.value = newMember.acpEnabled ?? false
+  acpCommand.value = newMember.acpCommand || ''
+  acpArgsDisplay.value = (newMember.acpArgs || []).join(' ')
 })
 
 function handleSave() {
-  emit('save', props.member.id, name.value)
+  const args = acpArgsDisplay.value.split(' ').filter(Boolean)
+  emit('save', props.member.id, name.value, acpEnabled.value, acpCommand.value, args)
 }
 
 function handleRemove() {
@@ -150,6 +176,12 @@ function handleRemove() {
 .form-sections { display: flex; flex-direction: column; gap: 24px; }
 .input-group { display: flex; flex-direction: column; gap: 10px; }
 .input-group label { font-size: 11px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; margin-left: 4px; }
+
+.acp-desc { font-size: 12px; font-weight: 600; color: #94a3b8; margin-left: 4px; }
+.acp-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; margin-left: 4px; }
+.acp-toggle span { font-size: 14px; font-weight: 700; color: #475569; }
+.acp-field-label { font-size: 11px; font-weight: 900; color: #64748b; text-transform: uppercase; letter-spacing: 0.1em; margin-left: 4px; display: block; }
+.input-hint { font-size: 11px; color: #94a3b8; margin-left: 4px; margin-top: 4px; }
 
 .modal-input {
   width: 100%; padding: 14px 18px; border-radius: 16px; border: 1px solid #e2e8f0;

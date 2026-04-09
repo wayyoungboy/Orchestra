@@ -30,9 +30,17 @@ export const useChatStore = defineStore('chat', () => {
   const conversations = ref<Conversation[]>([])
   const activeConversationId = ref<string | null>(null)
   const loading = ref(false)
+  const loadingMessages = ref(false)
   const workspaceId = ref<string | null>(null)
   const agentStatuses = ref<Record<string, AgentStatus>>({})
   const wsConnected = ref(false)
+
+  // Pagination state for active conversation
+  const oldestMessageId = ref<string | null>(null)
+  const hasMoreMessages = ref(true)
+  const MESSAGE_PAGE_SIZE = 50
+  const MESSAGE_INITIAL_SIZE = 30
+
   const authStore = useAuthStore()
 
   let chatWs: WebSocket | null = null
@@ -148,9 +156,22 @@ export const useChatStore = defineStore('chat', () => {
         // Find the conversation and append/refresh messages
         const convIndex = conversations.value.findIndex(c => c.id === event.conversationId)
         if (convIndex !== -1) {
-          // If it's the active conversation, load the full message list to get ordering
-          if (event.conversationId === activeConversationId.value) {
-            loadMessages(workspaceId.value!, event.conversationId!)
+          // If it's the active conversation, append the new message directly (don't reload all)
+          if (event.conversationId === activeConversationId.value && event.messageId) {
+            const conv = conversations.value[convIndex]
+            // Check if message already exists (avoid duplicates from rapid sends)
+            const exists = conv.messages?.some(m => m.id === event.messageId)
+            if (!exists) {
+              const newMsg = {
+                id: event.messageId,
+                senderId: event.senderId,
+                senderName: event.senderName ?? '',
+                content: { type: 'text' as const, text: event.content || '' },
+                isAi: event.isAi || false,
+                createdAt: event.createdAt || Date.now()
+              }
+              conv.messages = [...(conv.messages || []), newMsg]
+            }
           } else {
             // For inactive conversations, just refresh the list to update lastMessage/unread
             loadConversationsList(workspaceId.value!)
@@ -194,21 +215,55 @@ export const useChatStore = defineStore('chat', () => {
     wsConnected.value = false
   }
 
-  async function loadMessages(wsId: string, convId: string) {
+  async function loadMessages(wsId: string, convId: string, beforeId?: string) {
+    loadingMessages.value = true
     try {
-      const response = await client.get(`/workspaces/${wsId}/conversations/${convId}/messages`)
+      const params = new URLSearchParams()
+      params.set('limit', String(beforeId ? MESSAGE_PAGE_SIZE : MESSAGE_INITIAL_SIZE))
+      if (beforeId) params.set('beforeId', beforeId)
+
+      const response = await client.get(`/workspaces/${wsId}/conversations/${convId}/messages?${params}`)
       const index = conversations.value.findIndex(c => c.id === convId)
       if (index !== -1) {
-        conversations.value[index] = {
-          ...conversations.value[index],
-          messages: response.data || []
+        const newMessages = response.data || []
+        if (beforeId) {
+          // Prepend older messages
+          const existing = conversations.value[index].messages || []
+          conversations.value[index] = {
+            ...conversations.value[index],
+            messages: [...newMessages, ...existing]
+          }
+        } else {
+          conversations.value[index] = {
+            ...conversations.value[index],
+            messages: newMessages
+          }
+        }
+
+        // Track oldest message for pagination
+        if (newMessages.length > 0) {
+          oldestMessageId.value = newMessages[0].id
+          hasMoreMessages.value = newMessages.length >= MESSAGE_PAGE_SIZE
+        } else {
+          hasMoreMessages.value = false
         }
       }
     } catch (e) { /* silent during loading */ }
+    finally {
+      loadingMessages.value = false
+    }
+  }
+
+  async function loadOlderMessages(wsId: string, convId: string) {
+    if (!hasMoreMessages.value || !oldestMessageId.value) return
+    await loadMessages(wsId, convId, oldestMessageId.value)
   }
 
   async function setActiveConversation(id: string) {
     activeConversationId.value = id
+    // Reset pagination state for new conversation
+    oldestMessageId.value = null
+    hasMoreMessages.value = true
     if (workspaceId.value) {
       await loadMessages(workspaceId.value, id)
       await markAsRead(workspaceId.value, id)
@@ -267,13 +322,18 @@ export const useChatStore = defineStore('chat', () => {
     sortedConversations,
     agentStatuses,
     loading,
+    loadingMessages,
+    hasMoreMessages,
+    oldestMessageId,
     wsConnected,
     currentUserId,
+    workspaceId,
     loadConversations,
     setActiveConversation,
     sendMessage,
     updatePresence,
     disconnectChatWebSocket,
+    loadOlderMessages,
     getConversationTitle: (c: any) => c.customName || c.id
   }
 })

@@ -41,7 +41,6 @@
         <WorkspaceSelection v-if="showWorkspaceSelection" />
         
         <ChatInterface v-else-if="activeTab === 'chat' && workspaceStore.currentWorkspace" />
-        <TerminalWorkspace v-else-if="activeTab === 'terminal' && workspaceStore.currentWorkspace" />
         <MembersPage v-else-if="activeTab === 'members' && workspaceStore.currentWorkspace" />
         <TasksPage v-else-if="activeTab === 'tasks' && workspaceStore.currentWorkspace" />
         <Settings v-else-if="activeTab === 'settings'" />
@@ -67,7 +66,6 @@ import SidebarNav, { type TabId } from '@/shared/components/SidebarNav.vue'
 import WorkspaceSwitcher from '@/shared/components/WorkspaceSwitcher.vue'
 import WorkspaceSelection from '@/features/workspace/WorkspaceSelection.vue'
 import ChatInterface from '@/features/chat/ChatInterface.vue'
-import TerminalWorkspace from '@/features/terminal/TerminalWorkspace.vue'
 import Settings from '@/features/settings/Settings.vue'
 import MembersPage from '@/features/members/MembersPage.vue'
 import TasksPage from '@/features/tasks/TasksPage.vue'
@@ -127,8 +125,7 @@ function handleCreateWorkspace() {
 }
 
 watch(() => route.path, (path) => {
-  if (path.includes('/terminal')) activeTab.value = 'terminal'
-  else if (path.includes('/members')) activeTab.value = 'members'
+  if (path.includes('/members')) activeTab.value = 'members'
   else if (path.includes('/tasks')) activeTab.value = 'tasks'
   else if (path.includes('/settings')) activeTab.value = 'settings'
   else if (path.includes('/chat')) activeTab.value = 'chat'

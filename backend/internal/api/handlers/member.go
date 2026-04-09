@@ -116,10 +116,18 @@ func (h *MemberHandler) Create(c *gin.Context) {
 		return
 	}
 	switch req.RoleType {
-	case models.RoleOwner, models.RoleAdmin, models.RoleSecretary, models.RoleAssistant, models.RoleMember:
+	case models.RoleOwner, models.RoleSecretary, models.RoleAssistant:
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid roleType"})
 		return
+	}
+
+	// Derive ACP fields from terminal fields if not explicitly set
+	acpEnabled := req.ACPEnabled
+	acpCommand := req.ACPCommand
+	if !acpEnabled && req.TerminalCommand != "" {
+		acpEnabled = true
+		acpCommand = req.TerminalCommand
 	}
 
 	m := &models.Member{
@@ -132,8 +140,8 @@ func (h *MemberHandler) Create(c *gin.Context) {
 		AutoStartTerminal: true,
 		Status:            "online",
 		CreatedAt:         time.Now(),
-		ACPEnabled:        req.ACPEnabled,
-		ACPCommand:        req.ACPCommand,
+		ACPEnabled:        acpEnabled,
+		ACPCommand:        acpCommand,
 		ACPArgs:           req.ACPArgs,
 	}
 

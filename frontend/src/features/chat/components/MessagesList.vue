@@ -2,15 +2,25 @@
   <div
     ref="listRef"
     class="messages-list-container custom-scrollbar"
+    @scroll="handleScroll"
   >
+    <!-- Loading Older Indicator -->
+    <div v-if="loadingOlder" class="loading-older">
+      <div class="loading-spinner"></div>
+      <span>加载历史消息...</span>
+    </div>
+
+    <!-- Load More Trigger (at top of list) -->
+    <div ref="loadMoreTrigger" class="load-more-trigger"></div>
+
     <!-- Empty State -->
-    <div v-if="messages.length === 0" class="empty-messages">
+    <div v-if="messages.length === 0 && !loading" class="empty-messages">
       <div class="empty-bubble">还没有消息。开始对话吧！</div>
     </div>
 
     <!-- Messages Groups -->
     <template v-else>
-      <div v-for="(item, index) in groupedMessages" :key="index" class="message-group">
+      <div v-for="item in groupedMessages" :key="item.message.id" class="message-group">
         <!-- Message Item -->
         <div
           :class="['message-item', isMe(item.message) ? 'is-me' : 'is-other']"
@@ -31,7 +41,7 @@
               <span class="sender-name">{{ resolveSenderName(item.message) }}</span>
               <span class="message-time">{{ formatTime(item.message.createdAt) }}</span>
             </div>
-            
+
             <div :class="['message-bubble', isMe(item.message) ? 'my-bubble' : 'other-bubble']">
               <div
                 class="message-text"
@@ -46,7 +56,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { useChatStore } from '../chatStore'
 import { stripAnsiForChat } from '@/shared/utils/stripAnsiForChat'
 import { renderMarkdownSafe } from '@/shared/utils/markdown'
 
@@ -54,33 +65,33 @@ const props = defineProps<{
   messages: any[]
   currentUserId: string
   loading?: boolean
+  loadingMessages?: boolean
   members?: any[]
 }>()
 
+const chatStore = useChatStore()
 const listRef = ref<HTMLElement | null>(null)
+const loadMoreTrigger = ref<HTMLElement | null>(null)
+
+// State
+const loadingOlder = ref(false)
+const wasNearTop = ref(false)
+let observer: IntersectionObserver | null = null
 
 function isMe(msg: any) {
-  // If senderId is empty and not AI, might be me in some backend implementations
   return msg.senderId === props.currentUserId || (!msg.senderId && !msg.isAi)
 }
 
 function resolveSenderName(msg: any) {
-  // 优先使用消息自带的 senderName
   if (msg.senderName) return msg.senderName
-
-  // 从成员列表查找
   if (msg.senderId && props.members) {
     const member = props.members.find((m: any) => m.id === msg.senderId)
     if (member?.name) return member.name
   }
-
-  // 旧消息 senderId 为空且不是 AI -> 可能是 Owner
   if (!msg.senderId && !msg.isAi && props.members) {
     const owner = props.members.find((m: any) => m.roleType === 'owner')
     if (owner?.name) return owner.name
   }
-
-  // 回退
   return msg.isAi ? 'AI Assistant' : 'Member'
 }
 
@@ -109,17 +120,77 @@ const groupedMessages = computed(() => {
   return props.messages.map(m => ({ type: 'message', message: m }))
 })
 
-function scrollToBottom() {
+function scrollToBottom(behavior: ScrollBehavior = 'auto') {
   nextTick(() => {
     if (listRef.value) {
-      listRef.value.scrollTop = listRef.value.scrollHeight
+      listRef.value.scrollTo({ top: listRef.value.scrollHeight, behavior })
     }
   })
 }
 
-onMounted(scrollToBottom)
+function handleScroll() {
+  if (!listRef.value) return
+  const { scrollTop } = listRef.value
+  // If user is near top (within 100px), flag that we should restore scroll position after loading
+  wasNearTop.value = scrollTop < 100
+}
 
-defineExpose({ jumpToLatest: scrollToBottom })
+async function loadOlder() {
+  if (loadingOlder.value || !chatStore.hasMoreMessages) return
+  loadingOlder.value = true
+
+  // Record current scroll height and position for restoration
+  const el = listRef.value
+  const prevScrollHeight = el?.scrollHeight || 0
+  const prevScrollTop = el?.scrollTop || 0
+
+  await chatStore.loadOlderMessages(chatStore.workspaceId!, chatStore.activeConversationId!)
+
+  // After new messages are prepended, restore scroll position
+  await nextTick()
+  if (el) {
+    const newScrollHeight = el.scrollHeight
+    el.scrollTop = prevScrollTop + (newScrollHeight - prevScrollHeight)
+  }
+
+  loadingOlder.value = false
+}
+
+// Watch for new messages from WebSocket — auto-scroll only if user was already at bottom
+let prevMessageCount = props.messages.length
+watch(
+  () => props.messages.length,
+  (newCount) => {
+    if (newCount > prevMessageCount) {
+      // New message arrived — scroll to bottom
+      scrollToBottom('smooth')
+    }
+    prevMessageCount = newCount
+  }
+)
+
+onMounted(() => {
+  scrollToBottom()
+
+  // Set up IntersectionObserver for infinite scroll
+  if (loadMoreTrigger.value) {
+    observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && chatStore.hasMoreMessages && !loadingOlder.value) {
+          loadOlder()
+        }
+      },
+      { root: listRef.value, rootMargin: '200px 0px 0px 0px', threshold: 0 }
+    )
+    observer.observe(loadMoreTrigger.value)
+  }
+})
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+})
+
+defineExpose({ jumpToLatest: () => scrollToBottom('smooth') })
 </script>
 
 <style scoped>
@@ -130,6 +201,36 @@ defineExpose({ jumpToLatest: scrollToBottom })
   display: flex;
   flex-direction: column;
   gap: 32px;
+}
+
+.loading-older {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e2e8f0;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.load-more-trigger {
+  height: 1px;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .empty-messages {

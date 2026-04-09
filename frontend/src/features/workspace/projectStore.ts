@@ -71,15 +71,6 @@ export const useProjectStore = defineStore('project', () => {
         optimisticMemberIds.value = opt
       }
       members.value = nextList
-      queueMicrotask(() => {
-        void import('@/features/terminal/terminalMemberStore').then(({ useTerminalMemberStore }) => {
-          const terminalMemberStore = useTerminalMemberStore()
-          // 先恢复已有终端（页面刷新后重连），再 autostart 新终端
-          void terminalMemberStore.refreshServerTerminalStatus().then(() => {
-            void terminalMemberStore.autoStartMemberTerminals()
-          })
-        })
-      })
     } catch (e) {
       if (gen !== membersListGeneration) return
       if (!silent) {

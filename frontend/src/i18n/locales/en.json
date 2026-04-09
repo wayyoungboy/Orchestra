@@ -57,7 +57,7 @@
   "memberRow": {
     "openTerminal": "Open Terminal",
     "sendMessage": "Send Message",
-    "mention": "Mention",
+    "mention": "Mention @",
     "rename": "Rename",
     "remove": "Remove",
     "statusHeading": "Status",
@@ -138,6 +138,15 @@
     "editMemberModal": {
       "title": "Edit member",
       "displayName": "Display name",
+      "displayNamePlaceholder": "Enter display name",
+      "acpHeading": "ACP Agent Configuration",
+      "acpDesc": "Configure the AI agent command for this member",
+      "acpEnabled": "Enable ACP Agent",
+      "acpCommand": "Agent Command",
+      "acpCommandPlaceholder": "e.g., claude, gemini",
+      "acpArgs": "Command Args",
+      "acpArgsPlaceholder": "Space-separated arguments",
+      "acpArgsHint": "Separate multiple arguments with spaces",
       "save": "Save changes",
       "remove": "Remove member"
     },

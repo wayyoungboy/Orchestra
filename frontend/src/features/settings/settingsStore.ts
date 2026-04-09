@@ -71,14 +71,6 @@ const normalizeSettings = (candidate: Partial<Settings>): Settings => {
     },
     chat: {
       streamOutput: Boolean(candidate.chat?.streamOutput ?? DEFAULT_SETTINGS.chat.streamOutput)
-    },
-    terminal: {
-      fontSize: candidate.terminal?.fontSize ?? DEFAULT_SETTINGS.terminal.fontSize,
-      fontFamily: candidate.terminal?.fontFamily ?? DEFAULT_SETTINGS.terminal.fontFamily,
-      cursorStyle: candidate.terminal?.cursorStyle ?? DEFAULT_SETTINGS.terminal.cursorStyle,
-      cursorBlink: Boolean(candidate.terminal?.cursorBlink ?? DEFAULT_SETTINGS.terminal.cursorBlink),
-      scrollback: candidate.terminal?.scrollback ?? DEFAULT_SETTINGS.terminal.scrollback,
-      bellSound: Boolean(candidate.terminal?.bellSound ?? DEFAULT_SETTINGS.terminal.bellSound)
     }
   }
 }
@@ -288,20 +280,6 @@ export const useSettingsStore = defineStore('settings', () => {
   }
 
   /**
-   * 设置终端配置
-   */
-  const setTerminalConfig = (config: Partial<typeof DEFAULT_SETTINGS.terminal>) => {
-    const next: Settings = {
-      ...settingsRef.value,
-      terminal: {
-        ...settingsRef.value.terminal,
-        ...config
-      }
-    }
-    return saveSettings(next)
-  }
-
-  /**
    * 设置聊天配置
    */
   const setChatConfig = (config: Partial<typeof DEFAULT_SETTINGS.chat>) => {
@@ -344,7 +322,6 @@ export const useSettingsStore = defineStore('settings', () => {
     setAccountDisplayName,
     setAccountStatus,
     setNotifications,
-    setTerminalConfig,
     setChatConfig
   }
 })

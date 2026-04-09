@@ -30,20 +30,6 @@
               <span class="item-desc">协调任务分配给多个助手</span>
             </div>
           </button>
-          <button @click="openAddModal('admin')" class="dropdown-item">
-            <span class="item-icon admin">🛡️</span>
-            <div class="item-info">
-              <span class="item-title">管理员</span>
-              <span class="item-desc">管理项目和成员权限</span>
-            </div>
-          </button>
-          <button @click="openAddModal('member')" class="dropdown-item">
-            <span class="item-icon member">👤</span>
-            <div class="item-info">
-              <span class="item-title">成员</span>
-              <span class="item-desc">添加普通团队成员</span>
-            </div>
-          </button>
         </div>
       </div>
     </div>
@@ -70,8 +56,11 @@
           
           <div class="member-info">
             <h3 class="member-name">{{ member.name }}</h3>
-            <p v-if="member.terminalCommand" class="member-terminal-hint">
-              CMD: <code>{{ member.terminalCommand }}</code>
+            <p v-if="member.acpEnabled" class="member-agent-hint">
+              Agent: <code>{{ member.acpCommand || '未配置命令' }}</code>
+            </p>
+            <p v-else-if="member.roleType === 'assistant' || member.roleType === 'secretary'" class="member-agent-hint is-disabled">
+              未启用 ACP 智能体
             </p>
             <p class="member-id">ID: {{ member.id.slice(0, 8) }}...</p>
           </div>
@@ -86,7 +75,7 @@
 
     <!-- Modals -->
     <AddMemberModal v-if="showAddModal" :mode="addModalMode" @close="showAddModal = false" @invite="handleInviteMember" />
-    <EditMemberModal v-if="editingMember" :member="editingMember" @close="editingMember = null" @save="handleSaveMember" @remove="handleDelete" />
+    <EditMemberModal v-if="editingMember" :member="editingMember" :show-remove="editingMember.roleType !== 'owner'" @close="editingMember = null" @save="handleSaveMember" @remove="handleDelete" />
   </div>
 </template>
 
@@ -103,10 +92,10 @@ const members = ref<any[]>([])
 const loading = ref(false)
 const showAddModal = ref(false)
 const showAddDropdown = ref(false)
-const addModalMode = ref<'assistant' | 'admin' | 'member' | 'secretary'>('assistant')
+const addModalMode = ref<'assistant' | 'secretary'>('assistant')
 const editingMember = ref<any>(null)
 
-function openAddModal(mode: 'assistant' | 'admin' | 'member' | 'secretary') {
+function openAddModal(mode: 'assistant' | 'secretary') {
   addModalMode.value = mode
   showAddModal.value = true
   showAddDropdown.value = false
@@ -152,12 +141,12 @@ function roleLabel(role: string) {
 
 function handleEdit(member: any) { editingMember.value = member }
 
-async function handleSaveMember(id: string, name: string) {
+async function handleSaveMember(id: string, name: string, acpEnabled: boolean, acpCommand: string, acpArgs: string[]) {
   const wsId = workspaceStore.currentWorkspace?.id
   if (!wsId) return
 
   try {
-    await client.put(`/workspaces/${wsId}/members/${id}`, { name })
+    await client.put(`/workspaces/${wsId}/members/${id}`, { name, acpEnabled, acpCommand, acpArgs })
     editingMember.value = null
     await loadMembers()
   } catch (e) {

@@ -5,11 +5,9 @@ import "time"
 type MemberRole string
 
 const (
-	RoleOwner      MemberRole = "owner"
-	RoleAdmin      MemberRole = "admin"
-	RoleSecretary  MemberRole = "secretary" // 秘书（监工/协调式监督角色）
-	RoleAssistant  MemberRole = "assistant"
-	RoleMember     MemberRole = "member"
+	RoleOwner     MemberRole = "owner"
+	RoleSecretary MemberRole = "secretary" // 秘书（协调者）
+	RoleAssistant MemberRole = "assistant" // AI 助手
 )
 
 type Member struct {

@@ -274,6 +274,19 @@ func (s *Session) SendToolResult(toolUseID, content string, isError bool) error 
 	return nil
 }
 
+// SendToolResultToAgent sends a tool result back to the agent via the correct transport.
+// For local CLI agents, it sends in Claude's stream-json format.
+// For A2A agents, it uses the A2A protocol.
+func (s *Session) SendToolResultToAgent(toolUseID, content string, isError bool) error {
+	// Local CLI runner path - use Claude's native format
+	if s.localRunner != nil {
+		return s.localRunner.SendToolResult(toolUseID, content, isError)
+	}
+
+	// A2A HTTP path - use existing method
+	return s.SendToolResult(toolUseID, content, isError)
+}
+
 // Release closes the session and all active subscriptions.
 func (s *Session) Release() {
 	s.subMu.Lock()
@@ -491,6 +504,69 @@ func (s *Session) convertA2AEventToACP(event a2a.Event) *ACPMessage {
 
 	default:
 		// Unknown event type, skip
+		return nil
+	}
+}
+
+// convertRawEventToACP converts a raw map[string]any event (e.g., from LocalRunner's
+// Claude stream-json output) into an ACPMessage. Returns nil for events that should
+// be silently ignored (system hooks, control responses, etc.).
+func convertRawEventToACP(raw map[string]any) *ACPMessage {
+	typ, _ := raw["type"].(string)
+	switch typ {
+	case "assistant":
+		// Extract text content from assistant message
+		text := extractAssistantTextFromRaw(raw)
+		if text == "" {
+			return nil
+		}
+		data, _ := json.Marshal(map[string]string{
+			"type":    "assistant_message",
+			"content": text,
+		})
+		return &ACPMessage{
+			Type:    TypeAssistantMessage,
+			Content: data,
+		}
+
+	case "result":
+		// Final result
+		resultText, _ := raw["result"].(string)
+		costUSD, _ := raw["total_cost_usd"].(float64)
+		durationMs, _ := raw["duration_ms"].(float64)
+		data, _ := json.Marshal(map[string]any{
+			"type":        "result",
+			"message":     resultText,
+			"cost_usd":    costUSD,
+			"duration_ms": durationMs,
+		})
+		return &ACPMessage{
+			Type:    TypeResult,
+			Content: data,
+		}
+
+	case "system":
+		// Only log init, skip hook events
+		subtype, _ := raw["subtype"].(string)
+		if subtype == "init" {
+			sessionID, _ := raw["session_id"].(string)
+			data, _ := json.Marshal(map[string]string{
+				"type":       "system",
+				"session_id": sessionID,
+				"level":      "info",
+			})
+			return &ACPMessage{
+				Type:    TypeSystem,
+				Content: data,
+			}
+		}
+		return nil
+
+	case "control_request":
+		// Auto-approve already handled in LocalRunner, skip
+		return nil
+
+	default:
 		return nil
 	}
 }

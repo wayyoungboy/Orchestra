@@ -36,11 +36,6 @@ const routes = [
         component: () => import('@/features/chat/ChatInterface.vue'),
       },
       {
-        path: 'terminal',
-        name: 'terminal',
-        component: () => import('@/features/terminal/TerminalWorkspace.vue'),
-      },
-      {
         path: 'members',
         name: 'members',
         component: () => import('@/features/members/MembersPage.vue'),

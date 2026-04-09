@@ -83,10 +83,8 @@ const projectStore = useProjectStore()
 function roleTypeLabel(roleType: string) {
   switch (roleType) {
     case 'owner': return t('members.roleOwner')
-    case 'admin': return t('members.roleAdmin')
     case 'assistant': return t('members.roleAssistant')
     case 'secretary': return t('members.roleSecretary')
-    case 'member': return t('members.roleMember')
     default: return roleType
   }
 }

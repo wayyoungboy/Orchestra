@@ -21,6 +21,7 @@ type ConversationHandler struct {
 	msgRepo    *repository.MessageRepository
 	readRepo   *repository.ConversationReadRepository
 	memberRepo repository.MemberRepository
+	wsRepo     repository.WorkspaceRepository
 	a2aPool    *a2a.Pool
 	chatHub    *ws.ChatHub
 }
@@ -30,6 +31,7 @@ func NewConversationHandler(
 	msgRepo *repository.MessageRepository,
 	readRepo *repository.ConversationReadRepository,
 	memberRepo repository.MemberRepository,
+	wsRepo repository.WorkspaceRepository,
 	a2aPool *a2a.Pool,
 	chatHub *ws.ChatHub,
 ) *ConversationHandler {
@@ -38,6 +40,7 @@ func NewConversationHandler(
 		msgRepo:    msgRepo,
 		readRepo:   readRepo,
 		memberRepo: memberRepo,
+		wsRepo:     wsRepo,
 		a2aPool:    a2aPool,
 		chatHub:    chatHub,
 	}
@@ -703,6 +706,10 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 	if err != nil || conv == nil {
 		return
 	}
+	ws, err := h.wsRepo.GetByID(c.Request.Context(), workspaceID)
+	if err != nil || ws == nil {
+		return
+	}
 	members, err := h.memberRepo.ListByWorkspace(c.Request.Context(), workspaceID)
 	if err != nil {
 		return
@@ -778,6 +785,7 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 			var err error
 			sess, err = h.a2aPool.Acquire(c.Request.Context(), a2a.SessionConfig{
 				WorkspaceID:  workspaceID,
+				WorkspaceDir: ws.Path,
 				MemberID:     memberID,
 				MemberName:   targetMember.Name,
 				TerminalType: targetMember.TerminalType,
