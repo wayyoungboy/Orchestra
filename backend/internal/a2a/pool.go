@@ -2,7 +2,6 @@ package a2a
 
 import (
 	"context"
-	"encoding/json"
 	"log"
 	"sync"
 	"time"
@@ -146,29 +145,13 @@ func (p *Pool) createLocalSession(ctx context.Context, config SessionConfig) (*S
 				sess.OutputChan <- acpMsg
 			}
 		case "result":
-			// Final result from Claude
-			costUSD := 0.0
-			msg := ""
+			// Final result from Claude - skip, assistant message already emitted
+			// Only log for debugging
 			if raw, ok := data.(map[string]any); ok {
-				if usage, ok := raw["usage"].(map[string]any); ok {
-					if inputTokens, ok := usage["input_tokens"].(float64); ok {
-						costUSD = inputTokens * 0.00001 // rough estimate
-					}
-				}
-				if result, ok := raw["result"].(string); ok {
-					msg = result
+				if res, _ := raw["result"].(string); ok && res != "" {
+					log.Printf("[local-runner] Claude session completed: result=%s", res)
 				}
 			}
-			acpMsg := &ACPMessage{
-				Type: TypeResult,
-			}
-			acpMsg.Content, _ = json.Marshal(map[string]any{
-				"type":        "result",
-				"message":     msg,
-				"cost_usd":    costUSD,
-				"duration_ms": 0,
-			})
-			sess.OutputChan <- acpMsg
 		case "control_request":
 			// Auto-approved internally, no output needed
 		case "system":

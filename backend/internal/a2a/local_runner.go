@@ -186,13 +186,9 @@ func (r *LocalRunner) handleJSONLine(line []byte) {
 		}
 
 	case "result":
-		// Final result with usage info
+		// Final result with usage info - handled via onEvent, don't also emit raw output
 		if r.onEvent != nil {
 			r.onEvent("result", raw)
-		}
-		if r.onOutput != nil {
-			data, _ := json.Marshal(raw)
-			r.onOutput(string(data))
 		}
 
 	case "control_request":
@@ -271,10 +267,6 @@ func extractAssistantText(raw map[string]any) string {
 			case "text":
 				if text, ok := blockMap["text"].(string); ok {
 					parts = append(parts, text)
-				}
-			case "thinking":
-				if thinking, ok := blockMap["thinking"].(string); ok && thinking != "" {
-					parts = append(parts, "Thinking: "+thinking)
 				}
 			}
 		}
