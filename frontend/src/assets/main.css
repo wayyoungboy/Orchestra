@@ -49,6 +49,13 @@
 }
 
 /* Dark theme — settings page */
+.dark-theme .settings-page-root {
+  background: transparent !important;
+}
+.dark-theme .settings-nav {
+  background: rgba(15, 23, 42, 0.7) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+}
 .dark-theme .settings-page-root .nav-title { color: #f1f5f9 !important; }
 .dark-theme .settings-page-root .nav-item { color: #94a3b8 !important; }
 .dark-theme .settings-page-root .nav-item:hover { background: rgba(51, 65, 85, 0.3) !important; color: #f1f5f9 !important; }
