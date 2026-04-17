@@ -68,6 +68,7 @@
       :members="chatMembers"
       :current-user-id="chatStore.currentUserId"
       @mention="handleMentionMember"
+      @open-invite="showInviteMenu = !showInviteMenu"
       @close="showMembersSidebar = false"
     />
 
@@ -100,6 +101,12 @@
       @close="showCreateConvModal = false"
       @create="handleCreateConversation"
     />
+
+    <!-- Invite Menu -->
+    <InviteMenu
+      v-if="showInviteMenu"
+      @select="handleInviteMember"
+    />
   </div>
 </template>
 
@@ -115,6 +122,7 @@ import ChatHeader from './components/ChatHeader.vue'
 import MessagesList from './components/MessagesList.vue'
 import ChatInput from './components/ChatInput.vue'
 import MembersSidebar from './components/MembersSidebar.vue'
+import InviteMenu from './components/InviteMenu.vue'
 import CreateConversationModal from './components/CreateConversationModal.vue'
 
 const { t } = useI18n()
@@ -129,6 +137,7 @@ const newMessage = ref('')
 const showMembersSidebar = ref(true)
 const showSearchPanel = ref(false)
 const showCreateConvModal = ref(false)
+const showInviteMenu = ref(false)
 const searchQuery = ref('')
 const messagesListRef = ref<any>(null)
 
@@ -197,6 +206,16 @@ let searchTimer: any = null
 function handleSearch() {
   clearTimeout(searchTimer)
   searchTimer = setTimeout(() => workspaceStore.searchWorkspace(searchQuery.value), 300)
+}
+
+async function handleInviteMember(type: 'secretary' | 'assistant') {
+  showInviteMenu.value = false
+  if (!currentWorkspace.value) return
+  const name = type === 'secretary' ? 'Secretary' : 'Assistant'
+  const created = await projectStore.addMember({ name, roleType: type })
+  if (created) {
+    await projectStore.loadMembers(currentWorkspace.value.id, { silent: true })
+  }
 }
 
 onMounted(async () => {
