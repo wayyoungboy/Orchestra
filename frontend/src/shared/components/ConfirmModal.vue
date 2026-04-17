@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{
+defineProps<{
   open: boolean
   title: string
   message: string

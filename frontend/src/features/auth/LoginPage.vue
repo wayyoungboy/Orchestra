@@ -22,15 +22,15 @@
       <div class="info-panel">
         <div class="version-badge reveal-item" style="animation-delay: 0.1s">
           <span class="badge-dot"></span>
-          <span class="badge-text">VERSION 1.0 ALPHA</span>
+          <span class="badge-text">{{ t('loginPage.versionBadge') }}</span>
         </div>
         
         <div class="slogan-group">
           <h2 class="slogan-title reveal-item" style="animation-delay: 0.2s">
-            Orchestrate your <br /><span class="gradient-text">AI workforce.</span>
+            {{ t('loginPage.sloganPrefix') }} <br /><span class="gradient-text">{{ t('loginPage.sloganHighlight') }}</span>
           </h2>
           <p class="slogan-sub reveal-item" style="animation-delay: 0.3s">
-            Orchestra 是一个为开发者设计的全功能协作平台，集成多智能体管理、实时终端与项目工作区。
+            {{ t('loginPage.sloganDesc') }}
           </p>
         </div>
 
@@ -43,8 +43,8 @@
               </div>
             </div>
             <div class="feature-text">
-              <h3>多智能体协作</h3>
-              <p>在同一个界面管理并编排 Claude, Gemini, Aider 等多个智能体。</p>
+              <h3>{{ t('loginPage.featureCollabTitle') }}</h3>
+              <p>{{ t('loginPage.featureCollabDesc') }}</p>
             </div>
           </div>
 
@@ -56,8 +56,8 @@
               </div>
             </div>
             <div class="feature-text">
-              <h3>原生终端体验</h3>
-              <p>基于 PTY 的实时终端，支持 ANSI 全色彩输出与多标签并行操作。</p>
+              <h3>{{ t('loginPage.featureTerminalTitle') }}</h3>
+              <p>{{ t('loginPage.featureTerminalDesc') }}</p>
             </div>
           </div>
         </div>
@@ -73,27 +73,27 @@
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
             </div>
             <h1 class="app-name">Orchestra</h1>
-            <p class="app-subtitle">开始你的交响乐</p>
+            <p class="app-subtitle">{{ t('auth.accessRequired') }}</p>
           </div>
 
           <form @submit.prevent="handleLogin" class="login-form">
             <div class="input-group">
-              <label>用户名</label>
+              <label>{{ t('auth.username') }}</label>
               <div class="input-wrapper">
                 <div class="input-icon">
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                 </div>
-                <input v-model="username" type="text" placeholder="输入您的用户名" :disabled="isSubmitting" />
+                <input v-model="username" type="text" :placeholder="t('auth.usernamePlaceholder')" :disabled="isSubmitting" />
               </div>
             </div>
 
             <div class="input-group">
-              <label>密码</label>
+              <label>{{ t('auth.password') }}</label>
               <div class="input-wrapper">
                 <div class="input-icon">
                   <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                 </div>
-                <input v-model="password" type="password" placeholder="输入您的密码" :disabled="isSubmitting" />
+                <input v-model="password" type="password" :placeholder="t('auth.passwordPlaceholder')" :disabled="isSubmitting" />
               </div>
             </div>
 
@@ -103,8 +103,8 @@
 
             <button type="submit" class="login-btn" :disabled="isSubmitting || !username || !password">
               <div class="btn-content">
-                <span v-if="!isSubmitting">登录</span>
-                <span v-else>验证中...</span>
+                <span v-if="!isSubmitting">{{ t('auth.signIn') }}</span>
+                <span v-else>{{ t('auth.validating') }}</span>
                 <svg v-if="!isSubmitting" class="btn-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
                 <div v-else class="spinner"></div>
               </div>
@@ -112,14 +112,14 @@
           </form>
 
           <div class="card-footer-note">
-            <p>Private Deployment · Invitation Only</p>
+            <p>{{ t('loginPage.privateDeployment') }}</p>
           </div>
         </div>
       </div>
     </div>
 
     <div class="global-footer-simple">
-      <p>© 2026 Orchestra AI. 保留所有权利。</p>
+      <p>{{ t('loginPage.footerText') }}</p>
     </div>
   </div>
 </template>
@@ -127,10 +127,12 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from './authStore'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { t } = useI18n()
 
 const username = ref('')
 const password = ref('')
@@ -168,7 +170,7 @@ async function handleLogin() {
   if (success) {
     router.push('/workspaces')
   } else {
-    error.value = '用户名或密码错误'
+    error.value = t('auth.invalidCredentials')
   }
   isSubmitting.value = false
 }

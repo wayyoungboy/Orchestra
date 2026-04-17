@@ -56,8 +56,8 @@
           <div class="empty-icon">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
           </div>
-          <h3>开始对话</h3>
-          <p>从左侧选择频道开始。Orchestra 的 AI 助手随时准备协助您编排任务。</p>
+          <h3>{{ t('chat.emptyStateTitle') }}</h3>
+          <p>{{ t('chat.emptyStateDesc') }}</p>
         </div>
       </div>
     </div>
@@ -76,11 +76,11 @@
       <div class="search-modal" @click.stop>
         <div class="search-header">
           <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          <input v-model="searchQuery" placeholder="搜索消息..." autofocus @input="handleSearch" />
+          <input v-model="searchQuery" :placeholder="t('chat.searchPlaceholder')" autofocus @input="handleSearch" />
           <button class="close-search" @click="showSearchPanel = false">Esc</button>
         </div>
         <div class="search-results custom-scrollbar">
-          <div v-if="!searchQuery" class="search-hint">输入关键字搜索</div>
+          <div v-if="!searchQuery" class="search-hint">{{ t('chat.searchHint') }}</div>
           <div v-for="res in workspaceStore.searchResults" :key="res.id" class="search-item">
             <div class="res-meta">
               <span class="res-sender">{{ res.senderName }}</span>
@@ -135,8 +135,9 @@ const currentAgentStatus = computed(() => {
 })
 
 function statusLabel(status: string) {
-  const map: any = { thinking: '正在思考...', reading_file: '正在读取文件...', writing_code: '正在编写代码...', idle: '就绪', error: '错误' }
-  return map[status] || status
+  const key = `chat.status.${status}`
+  const translated = t(key)
+  return translated === key ? status : translated
 }
 
 function toggleMembersSidebar() {

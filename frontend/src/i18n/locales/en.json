@@ -4,11 +4,13 @@
   },
   "auth": {
     "subtitle": "Multi-Agent Collaboration Platform",
+    "accessRequired": "Begin your symphony",
     "username": "Username",
     "password": "Password",
     "usernamePlaceholder": "Enter username",
     "passwordPlaceholder": "Enter password",
     "signIn": "Sign In",
+    "validating": "Validating...",
     "invalidCredentials": "Invalid username or password",
     "defaultCredentialsHint": "Default: orchestra / orchestra"
   },
@@ -42,7 +44,18 @@
     "inputSend": "Send",
     "inputHint": "Press Enter to send, Shift+Enter for new line",
     "inputPlaceholder": "Message {name}",
-    "mentionSuggestions": "Select a member to mention"
+    "mentionSuggestions": "Select a member to mention",
+    "emptyStateTitle": "Start a Conversation",
+    "emptyStateDesc": "Select a channel from the left to begin. Orchestra's AI assistant is ready to help you orchestrate tasks.",
+    "searchPlaceholder": "Search messages...",
+    "searchHint": "Type a keyword to search",
+    "status": {
+      "thinking": "Thinking...",
+      "reading_file": "Reading file...",
+      "writing_code": "Writing code...",
+      "idle": "Ready",
+      "error": "Error"
+    }
   },
   "workspace": {
     "noSelectionTitle": "No workspace selected",
@@ -158,18 +171,55 @@
       "shell": "Custom shell"
     }
   },
+  "messagesList": {
+    "loadingOlder": "Loading older messages...",
+    "empty": "No messages yet. Start a conversation!"
+  },
   "settings": {
     "title": "Settings",
     "general": "General",
     "language": "Language",
     "terminal": "Terminal",
     "workspace": "Workspace",
+    "account": "Account",
+    "apiKeys": "API Keys",
     "keyboard": "Keyboard",
     "security": "Security",
     "about": "About",
     "diagnostics": "Diagnostics",
     "diagnosticsHint": "Recent API errors are logged here automatically.",
     "clearLog": "Clear log"
+  },
+  "settingsTabs": {
+    "general": "General",
+    "apiKeys": "API Keys",
+    "workspace": "Workspace",
+    "account": "Account"
+  },
+  "settingsSections": {
+    "general": "General Settings",
+    "workspace": "Workspace Configuration",
+    "account": "Account & Security",
+    "currentUser": "Current User",
+    "logout": "Sign Out",
+    "themeMode": "Theme Mode",
+    "language": "Language",
+    "saving": "Saving...",
+    "saveChanges": "Save Changes",
+    "workspaceName": "Workspace Name",
+    "serverPath": "Server Path"
+  },
+  "loginPage": {
+    "versionBadge": "VERSION 1.0 ALPHA",
+    "sloganPrefix": "Orchestrate your",
+    "sloganHighlight": "AI workforce.",
+    "sloganDesc": "Orchestra is a full-featured collaboration platform with multi-agent management, real-time terminals, and project workspaces.",
+    "featureCollabTitle": "Multi-Agent Collaboration",
+    "featureCollabDesc": "Manage and orchestrate Claude, Gemini, Aider and more from a single interface.",
+    "featureTerminalTitle": "Native Terminal",
+    "featureTerminalDesc": "PTY-based real-time terminal with full ANSI color support and multi-tab parallel operations.",
+    "footerText": "© 2026 Orchestra AI. All rights reserved.",
+    "privateDeployment": "Private Deployment · Invitation Only"
   },
   "skills": {
     "title": "Skills",

@@ -3,7 +3,7 @@
     <!-- Settings Sidebar -->
     <aside class="settings-nav">
       <div class="nav-header">
-        <h2 class="nav-title">设置中心</h2>
+        <h2 class="nav-title">{{ t('settings.title') }}</h2>
       </div>
       <div class="nav-items">
         <button
@@ -26,17 +26,17 @@
     <!-- Settings Content -->
     <main class="settings-content custom-scrollbar">
       <div v-if="activeTab === 'general'" class="settings-section">
-        <h3 class="section-title">通用设置</h3>
+        <h3 class="section-title">{{ t('settingsSections.general') }}</h3>
         <div class="settings-grid">
           <div class="setting-card">
-            <label>语言 (Language)</label>
+            <label>{{ t('settingsSections.language') }}</label>
             <select class="setting-select" :value="currentLocale" @change="handleLocaleChange">
               <option value="zh">简体中文</option>
               <option value="en">English</option>
             </select>
           </div>
           <div class="setting-card">
-            <label>主题模式</label>
+            <label>{{ t('settingsSections.themeMode') }}</label>
             <div class="theme-toggle">
               <button
                 :class="['theme-btn', theme === 'light' ? 'is-active' : '']"
@@ -56,10 +56,10 @@
       </div>
 
       <div v-if="activeTab === 'workspace'" class="settings-section">
-        <h3 class="section-title">工作区配置</h3>
+        <h3 class="section-title">{{ t('settingsSections.workspace') }}</h3>
         <form @submit.prevent="handleUpdateWorkspace" class="settings-grid">
           <div class="setting-card">
-            <label>工作区名称</label>
+            <label>{{ t('settingsSections.workspaceName') }}</label>
             <input
               v-model="editWorkspace.name"
               class="setting-input"
@@ -67,7 +67,7 @@
             />
           </div>
           <div class="setting-card">
-            <label>物理路径 (Server Path)</label>
+            <label>{{ t('settingsSections.serverPath') }}</label>
             <input
               v-model="editWorkspace.path"
               class="setting-input"
@@ -76,20 +76,20 @@
           </div>
           <div class="form-actions">
             <button type="submit" :disabled="isSaving" class="save-btn">
-              {{ isSaving ? '保存中...' : '保存更改' }}
+              {{ isSaving ? t('settingsSections.saving') : t('settingsSections.saveChanges') }}
             </button>
           </div>
         </form>
       </div>
 
       <div v-if="activeTab === 'account'" class="settings-section">
-        <h3 class="section-title">账号与安全</h3>
+        <h3 class="section-title">{{ t('settingsSections.account') }}</h3>
         <div class="settings-grid">
           <div class="setting-card">
-            <label>当前用户</label>
+            <label>{{ t('settingsSections.currentUser') }}</label>
             <p class="setting-value">{{ authStore.currentUser }}</p>
           </div>
-          <button @click="handleLogout" class="logout-btn">退出登录</button>
+          <button @click="handleLogout" class="logout-btn">{{ t('settingsSections.logout') }}</button>
         </div>
       </div>
     </main>
@@ -104,6 +104,7 @@ import { useAuthStore } from '@/features/auth/authStore'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
 import ApiKeysSection from './ApiKeysSection.vue'
 
+const { t } = useI18n()
 const { locale } = useI18n()
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
@@ -119,12 +120,12 @@ const editWorkspace = reactive({
   path: ''
 })
 
-const tabs = [
-  { id: 'general', label: '通用' },
-  { id: 'apiKeys', label: 'API 密钥' },
-  { id: 'workspace', label: '工作区' },
-  { id: 'account', label: '账号' }
-]
+const tabs = computed(() => [
+  { id: 'general', label: t('settingsTabs.general') },
+  { id: 'apiKeys', label: t('settingsTabs.apiKeys') },
+  { id: 'workspace', label: t('settingsTabs.workspace') },
+  { id: 'account', label: t('settingsTabs.account') }
+])
 
 function handleLocaleChange(event: Event) {
   const newLocale = (event.target as HTMLSelectElement).value

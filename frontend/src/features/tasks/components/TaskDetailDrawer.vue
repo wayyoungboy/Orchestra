@@ -83,7 +83,7 @@
 <script setup lang="ts">
 import type { Task } from '../taskStore'
 
-const props = defineProps<{
+defineProps<{
   open: boolean
   task?: Task | null
 }>()

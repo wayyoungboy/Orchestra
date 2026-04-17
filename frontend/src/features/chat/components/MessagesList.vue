@@ -7,7 +7,7 @@
     <!-- Loading Older Indicator -->
     <div v-if="loadingOlder" class="loading-older">
       <div class="loading-spinner"></div>
-      <span>加载历史消息...</span>
+      <span>{{ t('messagesList.loadingOlder') }}</span>
     </div>
 
     <!-- Load More Trigger (at top of list) -->
@@ -15,7 +15,7 @@
 
     <!-- Empty State -->
     <div v-if="messages.length === 0 && !loading" class="empty-messages">
-      <div class="empty-bubble">还没有消息。开始对话吧！</div>
+      <div class="empty-bubble">{{ t('messagesList.empty') }}</div>
     </div>
 
     <!-- Messages Groups -->
@@ -57,6 +57,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useChatStore } from '../chatStore'
 import { stripAnsiForChat } from '@/shared/utils/stripAnsiForChat'
 import { renderMarkdownSafe } from '@/shared/utils/markdown'
@@ -70,6 +71,7 @@ const props = defineProps<{
 }>()
 
 const chatStore = useChatStore()
+const { t } = useI18n()
 const listRef = ref<HTMLElement | null>(null)
 const loadMoreTrigger = ref<HTMLElement | null>(null)
 

@@ -71,13 +71,13 @@
 import { computed } from 'vue'
 import { useChatStore } from '@/features/chat/chatStore'
 
-const props = defineProps<{
+defineProps<{
   title: string
   description?: string
   memberCount?: number
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'open-members'): void
   (e: 'open-search'): void
 }>()
