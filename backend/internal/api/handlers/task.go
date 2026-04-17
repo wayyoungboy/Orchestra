@@ -184,6 +184,52 @@ func (h *TaskHandler) FailTask(c *gin.Context) {
 	})
 }
 
+// TaskAssignRequest is the request body for assigning a task
+type TaskAssignRequest struct {
+	TaskID     string `json:"taskId" binding:"required"`
+	AssigneeID string `json:"assigneeId,omitempty"`
+}
+
+// AssignTask marks a task as assigned
+func (h *TaskHandler) AssignTask(c *gin.Context) {
+	var req TaskAssignRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	task, err := h.taskRepo.GetByID(c.Request.Context(), req.TaskID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return
+	}
+
+	if !models.IsValidTaskTransition(task.Status, models.TaskStatusAssigned) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot assign task in current status"})
+		return
+	}
+
+	updates := map[string]interface{}{
+		"updated_at": time.Now().UnixMilli(),
+	}
+	if req.AssigneeID != "" {
+		updates["assignee_id"] = req.AssigneeID
+	}
+
+	if err := h.taskRepo.UpdateStatus(c.Request.Context(), req.TaskID, models.TaskStatusAssigned, updates); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"ok":           true,
+		"taskId":       req.TaskID,
+		"status":       models.TaskStatusAssigned,
+		"conversationId": task.ConversationID,
+		"secretaryId":  task.SecretaryID,
+	})
+}
+
 // CancelTaskRequest is the request body for cancelling a task
 type CancelTaskRequest struct {
 	TaskID  string `json:"taskId" binding:"required"`

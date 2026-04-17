@@ -82,7 +82,7 @@
         </div>
         <div class="search-results custom-scrollbar">
           <div v-if="!searchQuery" class="search-hint">{{ t('chat.searchHint') }}</div>
-          <div v-for="res in workspaceStore.searchResults" :key="res.id" class="search-item">
+          <div v-for="res in workspaceStore.searchResults" :key="res.id" class="search-item" @click="jumpToResult(res)">
             <div class="res-meta">
               <span class="res-sender">{{ res.senderName }}</span>
               <span class="res-time">{{ new Date(res.createdAt).toLocaleDateString() }}</span>
@@ -215,6 +215,14 @@ async function handleInviteMember(type: 'secretary' | 'assistant') {
   const created = await projectStore.addMember({ name, roleType: type })
   if (created) {
     await projectStore.loadMembers(currentWorkspace.value.id, { silent: true })
+  }
+}
+
+async function jumpToResult(res: any) {
+  showSearchPanel.value = false
+  const convId = res.message?.conversationId || res.conversationId
+  if (convId) {
+    await handleSelectConversation(convId)
   }
 }
 

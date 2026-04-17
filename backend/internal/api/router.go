@@ -150,6 +150,7 @@ func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, c
 
 		// Task API for secretary coordination
 		api.POST("/internal/tasks/create", taskHandler.CreateTask)
+		api.POST("/internal/tasks/assign", taskHandler.AssignTask)
 		api.POST("/internal/tasks/start", taskHandler.StartTask)
 		api.POST("/internal/tasks/complete", taskHandler.CompleteTask)
 		api.POST("/internal/tasks/fail", taskHandler.FailTask)

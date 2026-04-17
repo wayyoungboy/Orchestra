@@ -344,7 +344,7 @@ export const useChatStore = defineStore('chat', () => {
   async function updatePresence(activity: 'typing' | 'viewing' | 'idle', targetId: string) {
     if (!workspaceId.value) return
     try {
-      await client.post(`/workspaces/${workspaceId.value}/members/me/presence`, {
+      await client.post(`/workspaces/${workspaceId.value}/members/${currentUserId.value}/presence`, {
         activity,
         targetId,
         targetType: 'conversation'

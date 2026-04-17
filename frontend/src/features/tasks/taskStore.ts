@@ -207,9 +207,11 @@ export const useTaskStore = defineStore('task', () => {
 
   async function updateTaskStatus(taskId: string, newStatus: Task['status']) {
     try {
-      // Determine the appropriate endpoint based on status
       let endpoint = ''
       switch (newStatus) {
+        case 'assigned':
+          endpoint = '/internal/tasks/assign'
+          break
         case 'in_progress':
           endpoint = '/internal/tasks/start'
           break
@@ -218,6 +220,9 @@ export const useTaskStore = defineStore('task', () => {
           break
         case 'failed':
           endpoint = '/internal/tasks/fail'
+          break
+        case 'cancelled':
+          endpoint = '/internal/tasks/cancel'
           break
         default:
           return
