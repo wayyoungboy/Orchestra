@@ -74,10 +74,12 @@ interface KanbanColumn {
 }
 
 const columns: KanbanColumn[] = [
-  { status: 'pending', label: '待分配' },
+  { status: 'pending', label: '待处理' },
+  { status: 'assigned', label: '已分配' },
   { status: 'in_progress', label: '进行中' },
   { status: 'completed', label: '已完成' },
-  { status: 'failed', label: '失败' }
+  { status: 'failed', label: '失败' },
+  { status: 'cancelled', label: '已取消' }
 ]
 
 function getTasksInColumn(status: Task['status']): Task[] {
@@ -106,10 +108,12 @@ function handleDrop(event: DragEvent, targetStatus: Task['status']) {
 
   // Allow only valid status transitions
   const validTransitions: Record<Task['status'], Task['status'][]> = {
-    pending: ['in_progress', 'completed', 'failed'],
-    in_progress: ['completed', 'failed'],
+    pending: ['assigned', 'in_progress', 'completed', 'failed', 'cancelled'],
+    assigned: ['in_progress', 'cancelled'],
+    in_progress: ['completed', 'failed', 'cancelled'],
     completed: ['in_progress'],
-    failed: ['in_progress']
+    failed: ['in_progress'],
+    cancelled: []
   }
 
   const allowedTransitions = validTransitions[draggedTask.value.status] || []
@@ -258,6 +262,10 @@ function formatDate(dateStr: string): string {
 
 .status-failed {
   background: #ef4444;
+}
+
+.status-cancelled {
+  background: #9ca3af;
 }
 
 .card-title-text {

@@ -184,6 +184,58 @@ func (h *TaskHandler) FailTask(c *gin.Context) {
 	})
 }
 
+// CancelTaskRequest is the request body for cancelling a task
+type CancelTaskRequest struct {
+	TaskID  string `json:"taskId" binding:"required"`
+	Message string `json:"message,omitempty"`
+}
+
+// CancelTask marks a task as cancelled
+func (h *TaskHandler) CancelTask(c *gin.Context) {
+	taskID := c.Param("taskId")
+	if taskID == "" {
+		var req struct {
+			TaskID  string `json:"taskId" binding:"required"`
+			Message string `json:"message,omitempty"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "taskId required"})
+			return
+		}
+		taskID = req.TaskID
+	}
+
+	task, err := h.taskRepo.GetByID(c.Request.Context(), taskID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return
+	}
+
+	if !models.IsValidTaskTransition(task.Status, models.TaskStatusCancelled) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot cancel task in current status"})
+		return
+	}
+
+	updates := map[string]interface{}{
+		"updated_at":    time.Now().UnixMilli(),
+		"completed_at":  time.Now().UnixMilli(),
+		"error_message": "",
+	}
+
+	if err := h.taskRepo.UpdateStatus(c.Request.Context(), taskID, models.TaskStatusCancelled, updates); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"ok":           true,
+		"taskId":       taskID,
+		"status":       models.TaskStatusCancelled,
+		"conversationId": task.ConversationID,
+		"secretaryId":  task.SecretaryID,
+	})
+}
+
 // ListTasks returns tasks for a workspace
 func (h *TaskHandler) ListTasks(c *gin.Context) {
 	workspaceID := c.Param("id")

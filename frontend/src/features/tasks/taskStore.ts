@@ -10,7 +10,7 @@ export interface Task {
   assigneeId: string
   title: string
   description: string
-  status: 'pending' | 'in_progress' | 'completed' | 'failed'
+  status: 'pending' | 'assigned' | 'in_progress' | 'completed' | 'failed' | 'cancelled'
   resultSummary?: string
   errorMessage?: string
   createdAt: string
@@ -59,6 +59,10 @@ export const useTaskStore = defineStore('task', () => {
     tasks.value.filter(t => t.status === 'pending')
   )
 
+  const assignedTasks = computed(() =>
+    tasks.value.filter(t => t.status === 'assigned')
+  )
+
   const inProgressTasks = computed(() =>
     tasks.value.filter(t => t.status === 'in_progress')
   )
@@ -69,6 +73,10 @@ export const useTaskStore = defineStore('task', () => {
 
   const failedTasks = computed(() =>
     tasks.value.filter(t => t.status === 'failed')
+  )
+
+  const cancelledTasks = computed(() =>
+    tasks.value.filter(t => t.status === 'cancelled')
   )
 
   async function fetchTasks(workspaceId: string) {
@@ -169,6 +177,19 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
+  async function cancelTask(taskId: string) {
+    try {
+      await client.post(`/workspaces/${currentWorkspaceId.value}/tasks/${taskId}/cancel`, {})
+      const task = tasks.value.find(t => t.id === taskId)
+      if (task) {
+        task.status = 'cancelled'
+      }
+    } catch (e: any) {
+      console.error('Failed to cancel task:', e)
+      throw e
+    }
+  }
+
   function addTask(task: Task) {
     tasks.value.push(task)
   }
@@ -220,9 +241,11 @@ export const useTaskStore = defineStore('task', () => {
     error,
     currentWorkspaceId,
     pendingTasks,
+    assignedTasks,
     inProgressTasks,
     completedTasks,
     failedTasks,
+    cancelledTasks,
     fetchTasks,
     fetchMyTasks,
     fetchWorkloads,
@@ -230,6 +253,7 @@ export const useTaskStore = defineStore('task', () => {
     startTask,
     completeTask,
     failTask,
+    cancelTask,
     addTask,
     updateTask,
     removeTask,

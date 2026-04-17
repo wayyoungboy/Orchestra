@@ -75,6 +75,7 @@
         @start="handleStartTask"
         @complete="handleCompleteTask"
         @fail="handleFailTask"
+        @cancel="handleCancelTask"
       />
     </div>
 
@@ -135,9 +136,11 @@ const selectedTask = ref<Task | null>(null)
 const tabs = [
   { label: '全部', value: 'all' },
   { label: '待处理', value: 'pending' },
+  { label: '已分配', value: 'assigned' },
   { label: '进行中', value: 'in_progress' },
   { label: '已完成', value: 'completed' },
-  { label: '失败', value: 'failed' }
+  { label: '失败', value: 'failed' },
+  { label: '已取消', value: 'cancelled' }
 ]
 
 const tasks = computed(() => taskStore.tasks)
@@ -177,6 +180,10 @@ function handleFailTask(taskId: string) {
     taskActionType.value = 'fail'
     showTaskActionModal.value = true
   }
+}
+
+async function handleCancelTask(taskId: string) {
+  await taskStore.cancelTask(taskId)
 }
 
 async function handleTaskActionSubmit(value: string) {

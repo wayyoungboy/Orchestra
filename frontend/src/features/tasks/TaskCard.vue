@@ -5,7 +5,7 @@
         {{ statusLabel }}
       </div>
       <div class="task-actions">
-        <button v-if="task.status === 'pending'" @click="$emit('start', task.id)" class="action-btn start">
+        <button v-if="task.status === 'pending' || task.status === 'assigned'" @click="$emit('start', task.id)" class="action-btn start">
           开始
         </button>
         <button v-if="task.status === 'in_progress'" @click="$emit('complete', task.id)" class="action-btn complete">
@@ -13,6 +13,9 @@
         </button>
         <button v-if="task.status === 'in_progress'" @click="$emit('fail', task.id)" class="action-btn fail">
           失败
+        </button>
+        <button v-if="task.status === 'pending' || task.status === 'assigned' || task.status === 'in_progress'" @click="$emit('cancel', task.id)" class="action-btn cancel">
+          取消
         </button>
       </div>
     </div>
@@ -62,14 +65,17 @@ defineEmits<{
   (e: 'start', taskId: string): void
   (e: 'complete', taskId: string): void
   (e: 'fail', taskId: string): void
+  (e: 'cancel', taskId: string): void
 }>()
 
 const statusLabel = computed(() => {
   const labels: Record<string, string> = {
     pending: '待处理',
+    assigned: '已分配',
     in_progress: '进行中',
     completed: '已完成',
-    failed: '失败'
+    failed: '失败',
+    cancelled: '已取消'
   }
   return labels[props.task.status] || props.task.status
 })
@@ -97,6 +103,10 @@ function formatDate(dateStr: string): string {
   @apply border-l-4 border-l-slate-400;
 }
 
+.task-card.status-assigned {
+  @apply border-l-4 border-l-yellow-500;
+}
+
 .task-card.status-in_progress {
   @apply border-l-4 border-l-blue-500;
 }
@@ -109,6 +119,10 @@ function formatDate(dateStr: string): string {
   @apply border-l-4 border-l-red-500;
 }
 
+.task-card.status-cancelled {
+  @apply border-l-4 border-l-gray-400;
+}
+
 .task-header {
   @apply flex items-center justify-between mb-3;
 }
@@ -119,6 +133,10 @@ function formatDate(dateStr: string): string {
 
 .status-badge.pending {
   @apply bg-slate-100 text-slate-600;
+}
+
+.status-badge.assigned {
+  @apply bg-yellow-100 text-yellow-700;
 }
 
 .status-badge.in_progress {
@@ -151,6 +169,10 @@ function formatDate(dateStr: string): string {
 
 .action-btn.fail {
   @apply bg-red-50 text-red-600 hover:bg-red-100;
+}
+
+.action-btn.cancel {
+  @apply bg-gray-100 text-gray-500 hover:bg-gray-200;
 }
 
 .task-title {

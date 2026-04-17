@@ -308,9 +308,34 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  async function createConversation(data: { type: 'channel' | 'dm'; name?: string; memberId?: string }) {
+    if (!workspaceId.value) return null
+    try {
+      const memberIDs = data.memberId
+        ? [currentUserId.value, data.memberId]
+        : [currentUserId.value]
+
+      const response = await client.post(`/workspaces/${workspaceId.value}/conversations`, {
+        type: data.type,
+        name: data.name || '',
+        memberIDs
+      })
+
+      const newConv = response.data
+      // Add to local state with empty messages array
+      conversations.value = [...conversations.value, { ...newConv, messages: [] }]
+      return newConv.id
+    } catch (e) {
+      notifyUserError('Failed to create conversation', e)
+      return null
+    }
+  }
+
   async function markAsRead(wsId: string, convId: string) {
     try {
-      await client.post(`/workspaces/${wsId}/conversations/${convId}/read`, {})
+      await client.post(`/workspaces/${wsId}/conversations/${convId}/read`, {
+        userId: currentUserId.value
+      })
       const index = conversations.value.findIndex(c => c.id === convId)
       if (index !== -1) conversations.value[index].unreadCount = 0
     } catch (e) { /* silent */ }
@@ -344,6 +369,7 @@ export const useChatStore = defineStore('chat', () => {
     loadConversations,
     setActiveConversation,
     sendMessage,
+    createConversation,
     updatePresence,
     disconnectChatWebSocket,
     reconnectChatWebSocket,

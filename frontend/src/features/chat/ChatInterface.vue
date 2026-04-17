@@ -91,6 +91,15 @@
         </div>
       </div>
     </div>
+
+    <!-- Create Conversation Modal -->
+    <CreateConversationModal
+      v-if="showCreateConvModal"
+      :members="chatMembers"
+      :current-user-id="chatStore.currentUserId"
+      @close="showCreateConvModal = false"
+      @create="handleCreateConversation"
+    />
   </div>
 </template>
 
@@ -106,6 +115,7 @@ import ChatHeader from './components/ChatHeader.vue'
 import MessagesList from './components/MessagesList.vue'
 import ChatInput from './components/ChatInput.vue'
 import MembersSidebar from './components/MembersSidebar.vue'
+import CreateConversationModal from './components/CreateConversationModal.vue'
 
 const { t } = useI18n()
 const chatStore = useChatStore()
@@ -118,6 +128,7 @@ const { getConversationTitle } = chatStore
 const newMessage = ref('')
 const showMembersSidebar = ref(true)
 const showSearchPanel = ref(false)
+const showCreateConvModal = ref(false)
 const searchQuery = ref('')
 const messagesListRef = ref<any>(null)
 
@@ -150,7 +161,17 @@ async function handleSelectConversation(id: string) {
   messagesListRef.value?.jumpToLatest?.()
 }
 
-function handleNewConversation() {}
+function handleNewConversation() { showCreateConvModal.value = true }
+
+async function handleCreateConversation(data: { type: 'channel' | 'dm'; name?: string; memberId?: string }) {
+  showCreateConvModal.value = false
+  const newId = await chatStore.createConversation(data)
+  if (newId) {
+    await chatStore.setActiveConversation(newId)
+    await nextTick()
+    messagesListRef.value?.jumpToLatest?.()
+  }
+}
 
 async function handleSendMessage() {
   if (!newMessage.value.trim() || !activeConversation.value) return

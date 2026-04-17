@@ -153,12 +153,14 @@ func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, c
 		api.POST("/internal/tasks/start", taskHandler.StartTask)
 		api.POST("/internal/tasks/complete", taskHandler.CompleteTask)
 		api.POST("/internal/tasks/fail", taskHandler.FailTask)
+		api.POST("/internal/tasks/cancel", taskHandler.CancelTask)
 		api.GET("/internal/workloads/list", taskHandler.ListWorkloads)
 
 		// Task management (for frontend)
 		api.GET("/workspaces/:id/tasks", taskHandler.ListTasks)
 		api.GET("/workspaces/:id/tasks/:taskId", taskHandler.GetTask)
 		api.GET("/workspaces/:id/tasks/my-tasks", taskHandler.GetMyTasks)
+		api.POST("/workspaces/:id/tasks/:taskId/cancel", taskHandler.CancelTask)
 
 		// Attachments
 		api.GET("/workspaces/:id/attachments", attachmentHandler.ListAttachments)
