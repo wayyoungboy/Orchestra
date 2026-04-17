@@ -79,6 +79,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useChatStore } from '@/features/chat/chatStore'
 import type { Member, MemberStatus } from '@/shared/types/member'
 
 const props = defineProps<{
@@ -93,6 +94,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const chatStore = useChatStore()
 
 const displayName = computed(() => props.member.name?.trim() || t('members.unnamedMember'))
 const menuOpen = computed(() => props.menuOpen ?? false)
@@ -106,6 +108,13 @@ const initials = computed(() => {
 
 const coercedStatus = computed((): MemberStatus => ((props.member.manualStatus ?? props.member.status) || 'online') as MemberStatus)
 
+const agentStatus = computed(() => {
+  if (props.member.roleType === 'assistant' || props.member.roleType === 'secretary') {
+    return chatStore.agentStatuses[props.member.id]?.status
+  }
+  return undefined
+})
+
 const statusOptions = computed(() => [
   { id: 'online' as MemberStatus, label: t('memberRow.statusOnline'), dotClass: 'bg-green-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' },
   { id: 'working' as MemberStatus, label: t('memberRow.statusWorking'), dotClass: 'bg-amber-400' },
@@ -113,7 +122,25 @@ const statusOptions = computed(() => [
   { id: 'offline' as MemberStatus, label: t('memberRow.statusOffline'), dotClass: 'bg-slate-400' }
 ])
 
-const statusColor = computed(() => statusOptions.value.find(o => o.id === coercedStatus.value)?.dotClass || 'bg-slate-400')
+const statusColor = computed(() => {
+  // For AI members, show their agent status
+  if (agentStatus.value) {
+    switch (agentStatus.value) {
+      case 'idle':
+        return 'bg-green-500'
+      case 'thinking':
+      case 'reading_file':
+      case 'writing_code':
+        return 'bg-yellow-400 animate-pulse'
+      case 'error':
+        return 'bg-red-500'
+      default:
+        return 'bg-gray-300'
+    }
+  }
+  // For regular members, use manual/standard status
+  return statusOptions.value.find(o => o.id === coercedStatus.value)?.dotClass || 'bg-slate-400'
+})
 
 const avatarClass = computed(() => {
   switch (props.member.roleType) {

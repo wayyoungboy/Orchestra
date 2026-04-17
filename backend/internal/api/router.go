@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -19,7 +20,7 @@ import (
 	"github.com/orchestra/backend/internal/ws"
 )
 
-func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, cfg *config.Config) *gin.Engine {
+func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, cfg *config.Config) (*gin.Engine, *a2a.ToolHandler) {
 	r := gin.New()
 
 	// Set trusted proxies (local only)
@@ -44,11 +45,14 @@ func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, c
 	taskRepo := repository.NewTaskRepository(db.DB())
 	apiKeyRepo := repository.NewAPIKeyRepository(db.DB())
 
+	// Read configured base URL from environment
+	baseURL := os.Getenv("ORCHESTRA_BASE_URL")
+
 	// Initialize handlers
 	wsHandler := handlers.NewWorkspaceHandler(wsRepo, memberRepo, msgRepo, browser)
 	memberHandler := handlers.NewMemberHandler(memberRepo, wsRepo, ws.GlobalChatHub)
 	terminalHandler := handlers.NewTerminalHandler(a2aPool, wsRepo)
-	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, wsRepo, a2aPool, ws.GlobalChatHub)
+	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, wsRepo, a2aPool, ws.GlobalChatHub, cfg.Server.HTTPAddr, cfg.Auth.Enabled, baseURL)
 	attachmentHandler := handlers.NewAttachmentHandler(msgRepo, convRepo, attachRepo, cfg.Server.UploadDir)
 	taskHandler := handlers.NewTaskHandler(taskRepo, memberRepo)
 	apiKeyHandler, err := handlers.NewAPIKeyHandler(apiKeyRepo, cfg)
@@ -188,7 +192,11 @@ func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, c
 	toolHandler := a2a.NewToolHandler(msgRepo, taskRepo, memberRepo, convRepo, chatBroadcaster, browser, validator)
 	a2aPool.SetToolHandler(toolHandler)
 
-	return r
+	// Wire up Pool to ToolHandler for task dispatch
+	toolHandler.SetPool(a2aPool)
+	toolHandler.SetWorkspaceRepo(wsRepo)
+
+	return r, toolHandler
 }
 
 // chatEventAdapter wraps ws.ChatHub to satisfy a2a.ChatBroadcaster interface.

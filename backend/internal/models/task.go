@@ -31,6 +31,7 @@ type Task struct {
 	CompletedAt    int64      `json:"completedAt,omitempty"`
 	ResultSummary  string     `json:"resultSummary,omitempty"`
 	ErrorMessage   string     `json:"errorMessage,omitempty"`
+	Version        int        `json:"version"`
 	CreatedAt      int64      `json:"createdAt"`
 	UpdatedAt      int64      `json:"updatedAt"`
 }
@@ -85,6 +86,25 @@ type AgentWorkload struct {
 	Status             string `json:"status"` // idle, working, offline
 }
 
+// IsValidTaskTransition checks if a task status transition is allowed
+func IsValidTaskTransition(from, to TaskStatus) bool {
+	transitions := map[TaskStatus][]TaskStatus{
+		TaskStatusPending:    {TaskStatusAssigned, TaskStatusCancelled},
+		TaskStatusAssigned:   {TaskStatusInProgress, TaskStatusCancelled},
+		TaskStatusInProgress: {TaskStatusCompleted, TaskStatusFailed},
+	}
+	allowed, ok := transitions[from]
+	if !ok {
+		return false // terminal state
+	}
+	for _, s := range allowed {
+		if s == to {
+			return true
+		}
+	}
+	return false
+}
+
 // NewTask creates a new Task instance
 func NewTask(create TaskCreate) *Task {
 	now := time.Now().UnixMilli()
@@ -98,6 +118,7 @@ func NewTask(create TaskCreate) *Task {
 		Status:         TaskStatusPending,
 		Priority:       create.Priority,
 		DeadlineAt:     create.DeadlineAt,
+		Version:        1,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

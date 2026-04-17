@@ -17,13 +17,16 @@ import (
 )
 
 type ConversationHandler struct {
-	convRepo   *repository.ConversationRepository
-	msgRepo    *repository.MessageRepository
-	readRepo   *repository.ConversationReadRepository
-	memberRepo repository.MemberRepository
-	wsRepo     repository.WorkspaceRepository
-	a2aPool    *a2a.Pool
-	chatHub    *ws.ChatHub
+	convRepo         *repository.ConversationRepository
+	msgRepo          *repository.MessageRepository
+	readRepo         *repository.ConversationReadRepository
+	memberRepo       repository.MemberRepository
+	wsRepo           repository.WorkspaceRepository
+	a2aPool          *a2a.Pool
+	chatHub          *ws.ChatHub
+	serverAddr       string
+	authEnabled      bool
+	configuredBaseURL string
 }
 
 func NewConversationHandler(
@@ -34,16 +37,43 @@ func NewConversationHandler(
 	wsRepo repository.WorkspaceRepository,
 	a2aPool *a2a.Pool,
 	chatHub *ws.ChatHub,
+	serverAddr string,
+	authEnabled bool,
+	baseURL string,
 ) *ConversationHandler {
 	return &ConversationHandler{
-		convRepo:   convRepo,
-		msgRepo:    msgRepo,
-		readRepo:   readRepo,
-		memberRepo: memberRepo,
-		wsRepo:     wsRepo,
-		a2aPool:    a2aPool,
-		chatHub:    chatHub,
+		convRepo:          convRepo,
+		msgRepo:           msgRepo,
+		readRepo:          readRepo,
+		memberRepo:        memberRepo,
+		wsRepo:            wsRepo,
+		a2aPool:           a2aPool,
+		chatHub:           chatHub,
+		serverAddr:        serverAddr,
+		authEnabled:       authEnabled,
+		configuredBaseURL: baseURL,
 	}
+}
+
+func (h *ConversationHandler) baseURL() string {
+	// Use configured baseURL if set
+	if h.configuredBaseURL != "" {
+		return h.configuredBaseURL
+	}
+
+	// Fallback to server address
+	addr := h.serverAddr
+	if strings.HasPrefix(addr, ":") {
+		return "http://127.0.0.1" + addr
+	}
+	return "http://" + addr
+}
+
+func (h *ConversationHandler) authHeader() string {
+	if !h.authEnabled {
+		return ""
+	}
+	return `-H "Authorization: Bearer $ORCHESTRA_AUTH_TOKEN" \`
 }
 
 type ConversationListResponse struct {
@@ -818,9 +848,11 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 		}
 
 		// Build prompt based on role
+		baseURL := h.baseURL()
+		authHdr := h.authHeader()
+
 		var fullPrompt string
 		if member != nil && member.RoleType == models.RoleSecretary {
-			// Secretary prompt - coordinator role with task management
 			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
 
 你是团队的协调者（秘书）。你的职责：
@@ -828,32 +860,76 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 2. 查询助手负载，智能分配任务
 3. 追踪任务进度，协调多个助手协作
 
-【可用工具】
+【可用工具 - 使用 curl 命令调用，注意每个命令都是完整的 shell 命令可以直接执行】
 
-使用 orchestra_workload_list 查询助手负载。
-使用 orchestra_task_create 创建任务分配给助手。
-使用 orchestra_chat_send 回复用户。
+1. 查询助手负载（决定任务分配给谁）：
+curl -s --max-time 10 %s/api/internal/workloads/list?workspaceId=%s
 
-规则：先查询负载，再分配任务。任务完成后助手会汇报，你审核后回复用户。`,
+2. 创建任务分配给助手：
+curl -s --max-time 10 -X POST %s/api/internal/tasks/create \
+  -H "Content-Type: application/json" \
+  %s\
+  -d '{"workspaceId":"%s","conversationId":"%s","secretaryId":"%s","title":"任务标题","description":"详细描述","assigneeId":"助手memberId"}'
+
+3. 回复用户：
+curl -s --max-time 10 -X POST %s/api/internal/chat/send \
+  -H "Content-Type: application/json" \
+  %s\
+  -d '{"workspaceId":"%s","conversationId":"%s","senderId":"%s","senderName":"秘书","text":"回复内容"}'
+
+规则：
+- 先用 1 查询负载，选择 idle 或负载最低的助手。
+- 用 2 创建任务，创建成功后在回复中用 @助手名 的格式通知对方（必须包含 @ 符号，例如 @Claude Assistant，不要用 ** 或其他格式包裹）。系统会自动检测 @ 并转发消息给对应助手。
+- 任务完成后助手会汇报，你审核后用 3 回复用户。`,
 				convID,
 				memberID,
 				cleanText,
+				baseURL, workspaceID,
+				baseURL, authHdr,
+				workspaceID, convID, memberID,
+				baseURL, authHdr,
+				workspaceID, convID, memberID,
 			)
 		} else {
-			// Regular assistant prompt with task status reporting
 			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
 
-【可用工具】
+【可用工具 - 使用 curl 命令调用】
 
-使用 orchestra_task_start 开始执行任务。
-使用 orchestra_task_complete 完成任务汇报。
-使用 orchestra_task_fail 报告任务失败。
-使用 orchestra_chat_send 回复用户。
+1. 开始执行任务：
+curl -s --max-time 10 -X POST %s/api/internal/tasks/start \
+  -H "Content-Type: application/json" \
+  %s\
+  -d '{"taskId":"{taskId}","message":"开始执行"}'
 
-规则：完成任务要求。若收到秘书分配的任务(taskId)，开始执行时调用start，完成后调用complete，失败时调用fail。`,
+2. 完成任务：
+curl -s --max-time 10 -X POST %s/api/internal/tasks/complete \
+  -H "Content-Type: application/json" \
+  %s\
+  -d '{"taskId":"{taskId}","resultSummary":"完成结果"}'
+
+3. 报告失败：
+curl -s --max-time 10 -X POST %s/api/internal/tasks/fail \
+  -H "Content-Type: application/json" \
+  %s\
+  -d '{"taskId":"{taskId}","errorMessage":"失败原因"}'
+
+4. 回复/汇报进度：
+curl -s --max-time 10 -X POST %s/api/internal/chat/send \
+  -H "Content-Type: application/json" \
+  %s\
+  -d '{"workspaceId":"%s","conversationId":"%s","senderId":"%s","senderName":"%s","text":"回复内容"}'
+
+规则：
+- 收到秘书分配的任务(taskId)后，先调用 1 开始，完成后调用 2，失败调用 3。
+- 完成任务后通过 @秘书 汇报结果。`,
 				convID,
 				memberID,
 				cleanText,
+				baseURL, authHdr,
+				baseURL, authHdr,
+				baseURL, authHdr,
+				baseURL, authHdr,
+				workspaceID, convID, memberID, memberName,
 			)
 		}
 
@@ -906,8 +982,13 @@ func findMentionIndex(text, mention string) int {
 	for i := 0; i <= len(text)-len(mention); i++ {
 		if text[i:i+len(mention)] == mention {
 			// Check if it's a standalone mention (not part of another word)
-			if i > 0 && text[i-1] != ' ' && text[i-1] != '\n' {
-				continue
+			// Allow any non-alphanumeric character before the @ (space, newline, punctuation, CJK chars)
+			if i > 0 {
+				prev := text[i-1]
+				// Only skip if preceded by alphanumeric character
+				if (prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z') || (prev >= '0' && prev <= '9') {
+					continue
+				}
 			}
 			return i
 		}
@@ -917,11 +998,13 @@ func findMentionIndex(text, mention string) int {
 
 // InternalChatSendRequest is the request body for internal chat send API.
 type InternalChatSendRequest struct {
-	ConversationID string `json:"conversationId"`
-	WorkspaceID    string `json:"workspaceId"`
-	SenderID       string `json:"senderId"`
-	SenderName     string `json:"senderName"`
-	Text           string `json:"text"`
+	ConversationID   string   `json:"conversationId"`
+	WorkspaceID      string   `json:"workspaceId"`
+	SenderID         string   `json:"senderId"`
+	SenderName       string   `json:"senderName"`
+	Text             string   `json:"text"`
+	Depth            int      `json:"depth"`
+	VisitedMemberIDs []string `json:"visitedMemberIDs"`
 }
 
 // InternalChatSend provides a simplified API for AI assistants to send messages.
@@ -1005,6 +1088,13 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 	// Check if sender is secretary - auto-forward @mentions to assistants
 	senderMember, err := h.memberRepo.GetByID(c.Request.Context(), req.SenderID)
 	if err == nil && senderMember != nil && senderMember.RoleType == models.RoleSecretary {
+		// Loop detection: stop forwarding if depth >= 3
+		if req.Depth >= 3 {
+			// Log the attempt and return
+			log.Printf("[conversation] Loop detection: stopping forward at depth %d for sender %s", req.Depth, req.SenderID)
+			goto skipForward
+		}
+
 		// Get all workspace members for mention parsing
 		allMembers, err := h.memberRepo.ListByWorkspace(c.Request.Context(), req.WorkspaceID)
 		if err == nil {
@@ -1016,6 +1106,18 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 
 				// Forward to mentioned assistants
 				for _, targetID := range mentionedIDs {
+					// Skip if already visited in this chain
+					visited := false
+					for _, visitedID := range req.VisitedMemberIDs {
+						if visitedID == targetID {
+							visited = true
+							break
+						}
+					}
+					if visited {
+						continue
+					}
+
 					// Find target member
 					var targetMember *models.Member
 					for _, m := range allMembers {
@@ -1028,23 +1130,50 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 					// Only forward to assistants (not other secretaries or members)
 					if targetMember != nil && targetMember.RoleType == models.RoleAssistant {
 						targetSess := h.a2aPool.SessionForWorkspaceMember(req.WorkspaceID, targetID)
+						if targetSess == nil && h.wsRepo != nil {
+							// Session doesn't exist yet — create one (same logic as forwardUserTextToAgent)
+							ws, wsErr := h.wsRepo.GetByID(c.Request.Context(), req.WorkspaceID)
+							if wsErr == nil && ws != nil {
+								targetSess, _ = h.a2aPool.Acquire(c.Request.Context(), a2a.SessionConfig{
+									WorkspaceID:  req.WorkspaceID,
+									WorkspaceDir: ws.Path,
+									MemberID:     targetID,
+									MemberName:   targetMember.Name,
+									TerminalType: targetMember.TerminalType,
+									Member:       targetMember,
+								})
+								if targetSess != nil {
+									targetSess.SetLastChatTargetConversation(req.ConversationID)
+									log.Printf("[internal-chat] Created new session %s for assistant %s", targetSess.ID, targetMember.Name)
+								}
+							}
+						}
 						if targetSess != nil {
 							targetName := targetSess.MemberName
 							if targetName == "" {
 								targetName = targetID
 							}
 
-							// Build forwarded prompt
-							forwardPrompt := fmt.Sprintf(`#conversationId{%s}#senderId{%s}[秘书分配任务]: %s
+							// Build visited members list for next depth
+							nextVisitedMembers := append(req.VisitedMemberIDs, req.SenderID)
+							visitedMembersJSON, _ := json.Marshal(nextVisitedMembers)
+
+							// Build forwarded prompt with loop detection metadata
+							forwardPrompt := fmt.Sprintf(`#conversationId{%s}#senderId{%s}#depth{%d}#visitedMembers{%s}[秘书分配任务]: %s
 
 规则：完成秘书分配的任务。完成后可 @秘书 汇报结果。
 回复时使用 curl 调用内部 API：
-curl -X POST http://127.0.0.1:8080/api/internal/chat/send \
+curl -s --max-time 10 -X POST %s/api/internal/chat/send \
   -H "Content-Type: application/json" \
+  %s\
   -d '{"workspaceId":"%s","conversationId":"%s","senderId":"%s","senderName":"%s","text":"你的回复内容"}'`,
 								req.ConversationID,
 								targetID,
+								req.Depth+1,
+								string(visitedMembersJSON),
 								cleanText,
+								h.baseURL(),
+								h.authHeader(),
 								req.WorkspaceID,
 								req.ConversationID,
 								targetID,
@@ -1058,6 +1187,56 @@ curl -X POST http://127.0.0.1:8080/api/internal/chat/send \
 			}
 		}
 	}
+
+	// Check if sender is assistant - auto-forward result to all active secretaries (result reporting)
+	// Does not require @mention: any message from an assistant is treated as a result report.
+	// Note: intentionally does NOT check visitedMemberIDs — the assistant is *returning* to the
+	// secretary that dispatched it, not entering a new forward hop. Depth limit prevents loops.
+	if err == nil && senderMember != nil && senderMember.RoleType == models.RoleAssistant && req.Depth < 3 {
+		allMembers, mErr := h.memberRepo.ListByWorkspace(c.Request.Context(), req.WorkspaceID)
+		if mErr == nil {
+			// Strip any @mentions so the secretary receives clean text
+			cleanText := stripMentions(req.Text, allMembers)
+			for _, m := range allMembers {
+				if m.RoleType != models.RoleSecretary {
+					continue
+				}
+				targetID := m.ID
+				targetSess := h.a2aPool.SessionForWorkspaceMember(req.WorkspaceID, targetID)
+				if targetSess == nil && h.wsRepo != nil {
+					ws, wsErr := h.wsRepo.GetByID(c.Request.Context(), req.WorkspaceID)
+					if wsErr == nil && ws != nil {
+						targetSess, _ = h.a2aPool.Acquire(c.Request.Context(), a2a.SessionConfig{
+							WorkspaceID:  req.WorkspaceID,
+							WorkspaceDir: ws.Path,
+							MemberID:     targetID,
+							MemberName:   m.Name,
+							TerminalType: m.TerminalType,
+							Member:       m,
+						})
+						if targetSess != nil {
+							targetSess.SetLastChatTargetConversation(req.ConversationID)
+							log.Printf("[internal-chat] Created new session %s for secretary %s", targetSess.ID, m.Name)
+						}
+					}
+				}
+				if targetSess != nil {
+					nextVisited := append(req.VisitedMemberIDs, req.SenderID)
+					visitedJSON, _ := json.Marshal(nextVisited)
+					forwardPrompt := fmt.Sprintf(
+						"#conversationId{%s}#senderId{%s}#depth{%d}#visitedMembers{%s}[助手汇报结果]: %s\n\n请将以上结果汇总后回复给用户：\ncurl -s --max-time 10 -X POST %s/api/internal/chat/send \\\n  -H \"Content-Type: application/json\" \\\n  %s\\\n  -d '{\"workspaceId\":\"%s\",\"conversationId\":\"%s\",\"senderId\":\"%s\",\"senderName\":\"%s\",\"text\":\"请填写结果摘要\"}'",
+						req.ConversationID, req.SenderID, req.Depth+1, string(visitedJSON), cleanText,
+						h.baseURL(), h.authHeader(),
+						req.WorkspaceID, req.ConversationID, targetID, m.Name,
+					)
+					_ = targetSess.SendUserMessage(forwardPrompt)
+					log.Printf("[internal-chat] Forwarded assistant result from %s to secretary %s", req.SenderID, targetID)
+				}
+			}
+		}
+	}
+
+skipForward:
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":        true,

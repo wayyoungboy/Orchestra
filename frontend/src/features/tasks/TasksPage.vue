@@ -6,10 +6,32 @@
         <h1 class="page-title">任务管理</h1>
         <p class="page-subtitle">{{ workspaceName }} · {{ tasks.length }} 个任务</p>
       </div>
+      <div class="view-toggle">
+        <button
+          :class="['view-btn', { active: viewMode === 'list' }]"
+          @click="viewMode = 'list'"
+          title="列表视图"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+          <span>列表</span>
+        </button>
+        <button
+          :class="['view-btn', { active: viewMode === 'kanban' }]"
+          @click="viewMode = 'kanban'"
+          title="看板视图"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+          </svg>
+          <span>看板</span>
+        </button>
+      </div>
     </div>
 
-    <!-- Filter Tabs -->
-    <div class="filter-tabs">
+    <!-- Filter Tabs (List View Only) -->
+    <div v-if="viewMode === 'list'" class="filter-tabs">
       <button
         v-for="tab in tabs"
         :key="tab.value"
@@ -28,18 +50,26 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="filteredTasks.length === 0" class="empty-state">
+    <div v-else-if="tasks.length === 0" class="empty-state">
       <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
       </svg>
       <h3>暂无任务</h3>
-      <p>{{ activeTab === 'all' ? '任务由秘书自动分配' : '此分类下没有任务' }}</p>
+      <p>任务由秘书自动分配</p>
     </div>
 
-    <!-- Task List -->
-    <div v-else class="task-list custom-scrollbar">
+    <!-- List View -->
+    <div v-else-if="viewMode === 'list'" class="task-list custom-scrollbar">
+      <div v-if="filteredTasks.length === 0" class="empty-state">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        </svg>
+        <h3>暂无任务</h3>
+        <p>此分类下没有任务</p>
+      </div>
       <TaskCard
         v-for="task in filteredTasks"
+        v-else
         :key="task.id"
         :task="task"
         @start="handleStartTask"
@@ -47,15 +77,44 @@
         @fail="handleFailTask"
       />
     </div>
+
+    <!-- Kanban View -->
+    <div v-else-if="viewMode === 'kanban'" class="kanban-view-wrapper">
+      <TasksKanban
+        :tasks="tasks"
+        @select-task="selectedTask = $event; showTaskDetailDrawer = true"
+        @update-status="handleUpdateTaskStatus"
+      />
+    </div>
+
+    <!-- Task Action Modal -->
+    <TaskActionModal
+      v-if="showTaskActionModal"
+      :open="showTaskActionModal"
+      :action="taskActionType"
+      :task-title="selectedTaskTitle"
+      @submit="handleTaskActionSubmit"
+      @cancel="showTaskActionModal = false"
+    />
+
+    <!-- Task Detail Drawer -->
+    <TaskDetailDrawer
+      :open="showTaskDetailDrawer"
+      :task="selectedTask"
+      @close="showTaskDetailDrawer = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useTaskStore } from './taskStore'
+import { useTaskStore, type Task } from './taskStore'
 import { useWorkspaceStore } from '../workspace/workspaceStore'
 import TaskCard from './TaskCard.vue'
+import TaskActionModal from './components/TaskActionModal.vue'
+import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
+import TasksKanban from './TasksKanban.vue'
 
 const route = useRoute()
 const taskStore = useTaskStore()
@@ -65,6 +124,13 @@ const workspaceId = computed(() => route.params.id as string)
 const workspaceName = computed(() => workspaceStore.currentWorkspace?.name || '工作区')
 
 const activeTab = ref('all')
+const viewMode = ref<'list' | 'kanban'>('list')
+const showTaskActionModal = ref(false)
+const taskActionType = ref<'complete' | 'fail'>('complete')
+const selectedTaskId = ref('')
+const selectedTaskTitle = ref('')
+const showTaskDetailDrawer = ref(false)
+const selectedTask = ref<Task | null>(null)
 
 const tabs = [
   { label: '全部', value: 'all' },
@@ -93,18 +159,39 @@ async function handleStartTask(taskId: string) {
   await taskStore.startTask(taskId)
 }
 
-async function handleCompleteTask(taskId: string) {
-  const result = prompt('请输入任务结果摘要：')
-  if (result) {
-    await taskStore.completeTask(taskId, result)
+function handleCompleteTask(taskId: string) {
+  const task = tasks.value.find(t => t.id === taskId)
+  if (task) {
+    selectedTaskId.value = taskId
+    selectedTaskTitle.value = task.title
+    taskActionType.value = 'complete'
+    showTaskActionModal.value = true
   }
 }
 
-async function handleFailTask(taskId: string) {
-  const reason = prompt('请输入失败原因：')
-  if (reason) {
-    await taskStore.failTask(taskId, reason)
+function handleFailTask(taskId: string) {
+  const task = tasks.value.find(t => t.id === taskId)
+  if (task) {
+    selectedTaskId.value = taskId
+    selectedTaskTitle.value = task.title
+    taskActionType.value = 'fail'
+    showTaskActionModal.value = true
   }
+}
+
+async function handleTaskActionSubmit(value: string) {
+  if (taskActionType.value === 'complete') {
+    await taskStore.completeTask(selectedTaskId.value, value)
+  } else {
+    await taskStore.failTask(selectedTaskId.value, value)
+  }
+  showTaskActionModal.value = false
+  selectedTaskId.value = ''
+  selectedTaskTitle.value = ''
+}
+
+async function handleUpdateTaskStatus(taskId: string, newStatus: Task['status']) {
+  await taskStore.updateTaskStatus(taskId, newStatus)
 }
 
 watch(workspaceId, async (id) => {
@@ -127,6 +214,8 @@ watch(workspaceId, async (id) => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
 .page-title {
@@ -237,5 +326,51 @@ watch(workspaceId, async (id) => {
 
 .task-list > * + * {
   margin-top: 16px;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 10px;
+}
+
+.view-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-btn:hover {
+  background: rgba(15, 23, 42, 0.05);
+  color: #475569;
+}
+
+.view-btn.active {
+  background: white;
+  color: #4f46e5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.view-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.kanban-view-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 </style>

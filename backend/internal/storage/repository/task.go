@@ -18,19 +18,25 @@ func NewTaskRepository(db *sql.DB) *TaskRepo {
 }
 
 func (r *TaskRepo) Create(ctx context.Context, task *models.Task) error {
+	// Convert empty string to nil for nullable FK columns
+	var assigneeID *string
+	if task.AssigneeID != "" {
+		assigneeID = &task.AssigneeID
+	}
+
 	query := `
 		INSERT INTO tasks (
 			id, workspace_id, conversation_id, secretary_id,
 			title, description, status, assignee_id, priority,
 			deadline_at, assigned_at, started_at, completed_at,
-			result_summary, error_message, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			result_summary, error_message, version, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := r.db.ExecContext(ctx, query,
 		task.ID, task.WorkspaceID, task.ConversationID, task.SecretaryID,
-		task.Title, task.Description, task.Status, task.AssigneeID, task.Priority,
+		task.Title, task.Description, task.Status, assigneeID, task.Priority,
 		task.DeadlineAt, task.AssignedAt, task.StartedAt, task.CompletedAt,
-		task.ResultSummary, task.ErrorMessage, task.CreatedAt, task.UpdatedAt,
+		task.ResultSummary, task.ErrorMessage, task.Version, task.CreatedAt, task.UpdatedAt,
 	)
 	return err
 }
@@ -40,7 +46,7 @@ func (r *TaskRepo) GetByID(ctx context.Context, id string) (*models.Task, error)
 		SELECT id, workspace_id, conversation_id, secretary_id,
 			title, description, status, assignee_id, priority,
 			deadline_at, assigned_at, started_at, completed_at,
-			result_summary, error_message, created_at, updated_at
+			result_summary, error_message, version, created_at, updated_at
 		FROM tasks WHERE id = ?
 	`
 	task := &models.Task{}
@@ -48,7 +54,7 @@ func (r *TaskRepo) GetByID(ctx context.Context, id string) (*models.Task, error)
 		&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
 		&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
 		&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-		&task.ResultSummary, &task.ErrorMessage, &task.CreatedAt, &task.UpdatedAt,
+		&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
 	)
 	if err != nil {
 		return nil, err
@@ -61,7 +67,7 @@ func (r *TaskRepo) ListByWorkspace(ctx context.Context, workspaceID string, stat
 		SELECT id, workspace_id, conversation_id, secretary_id,
 			title, description, status, assignee_id, priority,
 			deadline_at, assigned_at, started_at, completed_at,
-			result_summary, error_message, created_at, updated_at
+			result_summary, error_message, version, created_at, updated_at
 		FROM tasks WHERE workspace_id = ?
 	`
 	args := []interface{}{workspaceID}
@@ -90,7 +96,7 @@ func (r *TaskRepo) ListByWorkspace(ctx context.Context, workspaceID string, stat
 			&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
 			&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
 			&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-			&task.ResultSummary, &task.ErrorMessage, &task.CreatedAt, &task.UpdatedAt,
+			&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -105,7 +111,7 @@ func (r *TaskRepo) ListByAssignee(ctx context.Context, assigneeID string) ([]*mo
 		SELECT id, workspace_id, conversation_id, secretary_id,
 			title, description, status, assignee_id, priority,
 			deadline_at, assigned_at, started_at, completed_at,
-			result_summary, error_message, created_at, updated_at
+			result_summary, error_message, version, created_at, updated_at
 		FROM tasks WHERE assignee_id = ?
 		ORDER BY priority DESC, created_at DESC
 	`
@@ -122,7 +128,7 @@ func (r *TaskRepo) ListByAssignee(ctx context.Context, assigneeID string) ([]*mo
 			&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
 			&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
 			&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-			&task.ResultSummary, &task.ErrorMessage, &task.CreatedAt, &task.UpdatedAt,
+			&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -137,7 +143,7 @@ func (r *TaskRepo) ListBySecretary(ctx context.Context, secretaryID string) ([]*
 		SELECT id, workspace_id, conversation_id, secretary_id,
 			title, description, status, assignee_id, priority,
 			deadline_at, assigned_at, started_at, completed_at,
-			result_summary, error_message, created_at, updated_at
+			result_summary, error_message, version, created_at, updated_at
 		FROM tasks WHERE secretary_id = ?
 		ORDER BY priority DESC, created_at DESC
 	`
@@ -154,7 +160,7 @@ func (r *TaskRepo) ListBySecretary(ctx context.Context, secretaryID string) ([]*
 			&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
 			&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
 			&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-			&task.ResultSummary, &task.ErrorMessage, &task.CreatedAt, &task.UpdatedAt,
+			&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -165,8 +171,22 @@ func (r *TaskRepo) ListBySecretary(ctx context.Context, secretaryID string) ([]*
 }
 
 func (r *TaskRepo) UpdateStatus(ctx context.Context, id string, status models.TaskStatus, updates map[string]interface{}) error {
-	// Build dynamic update query
-	setClauses := []string{"status = ?", "updated_at = ?"}
+	// Get current task to check version and validate transition
+	currentTask, err := r.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if currentTask == nil {
+		return fmt.Errorf("task %s not found", id)
+	}
+
+	// Validate state transition
+	if !models.IsValidTaskTransition(currentTask.Status, status) {
+		return fmt.Errorf("invalid task transition from %s to %s", currentTask.Status, status)
+	}
+
+	// Build dynamic update query with optimistic locking
+	setClauses := []string{"status = ?", "version = version + 1", "updated_at = ?"}
 	args := []interface{}{string(status), updates["updated_at"]}
 
 	// Add optional fields
@@ -195,11 +215,23 @@ func (r *TaskRepo) UpdateStatus(ctx context.Context, id string, status models.Ta
 		args = append(args, v)
 	}
 
-	args = append(args, id)
+	args = append(args, id, currentTask.Version)
 
-	query := fmt.Sprintf("UPDATE tasks SET %s WHERE id = ?", strings.Join(setClauses, ", "))
-	_, err := r.db.ExecContext(ctx, query, args...)
-	return err
+	query := fmt.Sprintf("UPDATE tasks SET %s WHERE id = ? AND version = ?", strings.Join(setClauses, ", "))
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("concurrent update: task %s was modified", id)
+	}
+
+	return nil
 }
 
 func (r *TaskRepo) Delete(ctx context.Context, id string) error {

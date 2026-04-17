@@ -7,6 +7,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,15 +22,28 @@ type ChatBroadcaster interface {
 	BroadcastToWorkspace(workspaceID string, event interface{})
 }
 
+// SessionLookup finds an active session for a workspace member.
+// Defined here to avoid import cycles between a2a and handler packages.
+type SessionLookup interface {
+	SessionForWorkspaceMember(workspaceID, memberID string) *Session
+	Acquire(ctx context.Context, config SessionConfig) (*Session, error)
+}
+
 // ToolHandler executes Orchestra tools on behalf of A2A sessions.
 type ToolHandler struct {
-	msgRepo    *repository.MessageRepository
-	taskRepo   *repository.TaskRepo
-	memberRepo repository.MemberRepository
-	convRepo   *repository.ConversationRepository
-	chatHub    ChatBroadcaster
-	browser   *filesystem.Browser
-	validator *filesystem.Validator
+	msgRepo      *repository.MessageRepository
+	taskRepo     *repository.TaskRepo
+	memberRepo   repository.MemberRepository
+	convRepo     *repository.ConversationRepository
+	chatHub      ChatBroadcaster
+	browser      *filesystem.Browser
+	validator    *filesystem.Validator
+	pool         SessionLookup
+	workspaceRepo  repository.WorkspaceRepository
+
+	dispatchWg     sync.WaitGroup
+	dispatchCtx    context.Context
+	dispatchCancel context.CancelFunc
 }
 
 func NewToolHandler(
@@ -40,31 +55,54 @@ func NewToolHandler(
 	browser *filesystem.Browser,
 	validator *filesystem.Validator,
 ) *ToolHandler {
+	ctx, cancel := context.WithCancel(context.Background())
 	return &ToolHandler{
-		msgRepo:    msgRepo,
-		taskRepo:   taskRepo,
-		memberRepo: memberRepo,
-		convRepo:   convRepo,
-		chatHub:    chatHub,
-		browser:    browser,
-		validator:  validator,
+		msgRepo:        msgRepo,
+		taskRepo:       taskRepo,
+		memberRepo:     memberRepo,
+		convRepo:       convRepo,
+		chatHub:        chatHub,
+		browser:        browser,
+		validator:      validator,
+		dispatchCtx:    ctx,
+		dispatchCancel: cancel,
 	}
 }
 
-// ExecuteTool executes a tool call and sends the result back to the session.
-func (h *ToolHandler) ExecuteTool(msg *ACPMessage, sess *Session) {
+// SetPool sets the session pool for task dispatch.
+func (h *ToolHandler) SetPool(pool SessionLookup) {
+	h.pool = pool
+}
+
+// SetWorkspaceRepo sets the workspace repo for task dispatch.
+func (h *ToolHandler) SetWorkspaceRepo(repo repository.WorkspaceRepository) {
+	h.workspaceRepo = repo
+}
+
+// Shutdown gracefully shuts down the tool handler and waits for pending dispatch goroutines.
+func (h *ToolHandler) Shutdown(ctx context.Context) error {
+	h.dispatchCancel()
+	done := make(chan struct{})
+	go func() { h.dispatchWg.Wait(); close(done) }()
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return fmt.Errorf("tool handler shutdown timeout")
+	}
+}
+
+// ExecuteTool executes a tool call and returns the result.
+// The caller is responsible for sending the result back to the session.
+func (h *ToolHandler) ExecuteTool(msg *ACPMessage, sess *Session) *ToolResult {
 	toolUse, err := msg.ParseToolUseMessage()
 	if err != nil {
-		sess.OutputChan <- &ACPMessage{
-			Type: TypeToolResult,
-			Content: mustJSON(map[string]any{
-				"type":      "tool_result",
-				"tool_use_id": "",
-				"is_error":  true,
-				"content":   fmt.Sprintf("Failed to parse tool use: %v", err),
-			}),
+		return &ToolResult{
+			Type:      TypeToolResult,
+			ToolUseID: "",
+			IsError:   true,
+			Content:   fmt.Sprintf("Failed to parse tool use: %v", err),
 		}
-		return
 	}
 
 	ctx := context.Background()
@@ -100,15 +138,7 @@ func (h *ToolHandler) ExecuteTool(msg *ACPMessage, sess *Session) {
 		}
 	}
 
-	sess.OutputChan <- &ACPMessage{
-		Type:    TypeToolResult,
-		Content: mustJSON(map[string]any{
-			"type":      string(result.Type),
-			"tool_use_id": result.ToolUseID,
-			"is_error":  result.IsError,
-			"content":   result.Content,
-		}),
-	}
+	return result
 }
 
 func (h *ToolHandler) handleChatSend(ctx context.Context, toolUse *ToolUseMessage, sess *Session) *ToolResult {
@@ -163,13 +193,13 @@ func (h *ToolHandler) handleTaskCreate(ctx context.Context, toolUse *ToolUseMess
 		Title:          input.Title,
 		Description:    input.Description,
 		Status:         models.TaskStatusPending,
-		AssigneeID:     input.AssigneeID,
 		Priority:       input.Priority,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
 
 	if input.AssigneeID != "" {
+		task.AssigneeID = input.AssigneeID
 		task.Status = models.TaskStatusAssigned
 		task.AssignedAt = now
 	}
@@ -178,10 +208,93 @@ func (h *ToolHandler) handleTaskCreate(ctx context.Context, toolUse *ToolUseMess
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to create task: %v", err)}
 	}
 
+	// Dispatch task to assignee via their session
+	if input.AssigneeID != "" && h.pool != nil {
+		h.dispatchWg.Add(1)
+		go h.dispatchTaskToAssignee(task)
+	}
+
 	return &ToolResult{
 		Type:      TypeToolResult,
 		ToolUseID: toolUse.ToolUseID,
 		Content:   fmt.Sprintf(`{"success":true,"taskId":"%s","status":"%s"}`, task.ID, task.Status),
+	}
+}
+
+// dispatchTaskToAssignee finds the assignee's session and sends a task notification.
+func (h *ToolHandler) dispatchTaskToAssignee(task *models.Task) {
+	defer h.dispatchWg.Done()
+
+	// Try existing session first
+	sess := h.pool.SessionForWorkspaceMember(task.WorkspaceID, task.AssigneeID)
+	if sess == nil {
+		// No existing session — need to acquire one via Acquire
+		// Look up member config
+		ctx, cancel := context.WithTimeout(h.dispatchCtx, 10*time.Second)
+		defer cancel()
+
+		member, err := h.memberRepo.GetByID(ctx, task.AssigneeID)
+		if err != nil {
+			log.Printf("[a2a] Task dispatch: failed to get assignee member %s: %v", task.AssigneeID, err)
+			return
+		}
+		if member == nil {
+			log.Printf("[a2a] Task dispatch: assignee member %s not found", task.AssigneeID)
+			return
+		}
+
+		// Only dispatch if member has ACP enabled
+		if !member.ACPEnabled || member.ACPCommand == "" {
+			log.Printf("[a2a] Task dispatch: assignee %s has no ACP configured, skipping", member.Name)
+			return
+		}
+
+		// Look up workspace for path info
+		workspaceDir := ""
+		if h.workspaceRepo != nil {
+			workspace, err := h.workspaceRepo.GetByID(ctx, task.WorkspaceID)
+			if err == nil && workspace != nil {
+				workspaceDir = workspace.Path
+			}
+		}
+
+		newSess, err := h.pool.Acquire(ctx, SessionConfig{
+			WorkspaceID:  task.WorkspaceID,
+			WorkspaceDir: workspaceDir,
+			MemberID:     member.ID,
+			MemberName:   member.Name,
+			TerminalType: member.TerminalType,
+			Member:       member,
+		})
+		if err != nil {
+			log.Printf("[a2a] Task dispatch: failed to acquire session for assignee %s: %v", member.Name, err)
+			return
+		}
+		if newSess == nil {
+			log.Printf("[a2a] Task dispatch: no session created for assignee %s", member.Name)
+			return
+		}
+		sess = newSess
+	}
+
+	// Send task notification to the assignee
+	prompt := fmt.Sprintf(`#conversationId{%s}#taskId{%s}[秘书分配任务]: %s`,
+		task.ConversationID,
+		task.ID,
+		task.Description,
+	)
+	if task.Title != "" {
+		prompt = fmt.Sprintf(`#conversationId{%s}#taskId{%s}[秘书分配任务] %s: %s`,
+			task.ConversationID,
+			task.ID,
+			task.Title,
+			task.Description,
+		)
+	}
+
+	log.Printf("[a2a] Dispatching task %s to %s", task.ID, sess.MemberName)
+	if err := sess.SendUserMessage(prompt); err != nil {
+		log.Printf("[a2a] Failed to dispatch task %s to %s: %v", task.ID, sess.MemberName, err)
 	}
 }
 
@@ -193,11 +306,24 @@ func (h *ToolHandler) handleTaskStart(ctx context.Context, toolUse *ToolUseMessa
 
 	now := time.Now().UnixMilli()
 	updates := map[string]interface{}{"updated_at": now, "started_at": now}
-	if err := h.taskRepo.UpdateStatus(ctx, input.TaskID, models.TaskStatusInProgress, updates); err != nil {
-		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to start task: %v", err)}
+
+	// Retry logic for concurrent updates (max 3 attempts)
+	backoffs := []time.Duration{50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond}
+	for i := 0; i < len(backoffs); i++ {
+		if err := h.taskRepo.UpdateStatus(ctx, input.TaskID, models.TaskStatusInProgress, updates); err != nil {
+			if strings.Contains(err.Error(), "concurrent update") {
+				if i < len(backoffs)-1 {
+					time.Sleep(backoffs[i])
+					continue
+				}
+				return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to start task after retries: %v", err)}
+			}
+			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to start task: %v", err)}
+		}
+		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"in_progress"}`}
 	}
 
-	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"in_progress"}`}
+	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: "Failed to start task after retries"}
 }
 
 func (h *ToolHandler) handleTaskComplete(ctx context.Context, toolUse *ToolUseMessage, sess *Session) *ToolResult {
@@ -208,11 +334,24 @@ func (h *ToolHandler) handleTaskComplete(ctx context.Context, toolUse *ToolUseMe
 
 	now := time.Now().UnixMilli()
 	updates := map[string]interface{}{"updated_at": now, "completed_at": now, "result_summary": input.ResultSummary}
-	if err := h.taskRepo.UpdateStatus(ctx, input.TaskID, models.TaskStatusCompleted, updates); err != nil {
-		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to complete task: %v", err)}
+
+	// Retry logic for concurrent updates (max 3 attempts)
+	backoffs := []time.Duration{50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond}
+	for i := 0; i < len(backoffs); i++ {
+		if err := h.taskRepo.UpdateStatus(ctx, input.TaskID, models.TaskStatusCompleted, updates); err != nil {
+			if strings.Contains(err.Error(), "concurrent update") {
+				if i < len(backoffs)-1 {
+					time.Sleep(backoffs[i])
+					continue
+				}
+				return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to complete task after retries: %v", err)}
+			}
+			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to complete task: %v", err)}
+		}
+		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"completed"}`}
 	}
 
-	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"completed"}`}
+	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: "Failed to complete task after retries"}
 }
 
 func (h *ToolHandler) handleTaskFail(ctx context.Context, toolUse *ToolUseMessage, sess *Session) *ToolResult {
@@ -223,11 +362,24 @@ func (h *ToolHandler) handleTaskFail(ctx context.Context, toolUse *ToolUseMessag
 
 	now := time.Now().UnixMilli()
 	updates := map[string]interface{}{"updated_at": now, "completed_at": now, "error_message": input.ErrorMessage}
-	if err := h.taskRepo.UpdateStatus(ctx, input.TaskID, models.TaskStatusFailed, updates); err != nil {
-		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to mark task as failed: %v", err)}
+
+	// Retry logic for concurrent updates (max 3 attempts)
+	backoffs := []time.Duration{50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond}
+	for i := 0; i < len(backoffs); i++ {
+		if err := h.taskRepo.UpdateStatus(ctx, input.TaskID, models.TaskStatusFailed, updates); err != nil {
+			if strings.Contains(err.Error(), "concurrent update") {
+				if i < len(backoffs)-1 {
+					time.Sleep(backoffs[i])
+					continue
+				}
+				return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to mark task as failed after retries: %v", err)}
+			}
+			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to mark task as failed: %v", err)}
+		}
+		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"failed"}`}
 	}
 
-	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"failed"}`}
+	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: "Failed to mark task as failed after retries"}
 }
 
 func (h *ToolHandler) handleWorkloadList(ctx context.Context, toolUse *ToolUseMessage, sess *Session) *ToolResult {

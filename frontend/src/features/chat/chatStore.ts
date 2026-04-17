@@ -34,6 +34,7 @@ export const useChatStore = defineStore('chat', () => {
   const workspaceId = ref<string | null>(null)
   const agentStatuses = ref<Record<string, AgentStatus>>({})
   const wsConnected = ref(false)
+  const connectionStatus = ref<'connected' | 'disconnected' | 'reconnecting'>('disconnected')
 
   // Pagination state for active conversation
   const oldestMessageId = ref<string | null>(null)
@@ -117,10 +118,12 @@ export const useChatStore = defineStore('chat', () => {
     const wsUrl = `${protocol}//${host}/ws/chat/${wsId}?token=${encodeURIComponent(token)}`
 
     wsConnected.value = false
+    connectionStatus.value = 'reconnecting'
     chatWs = new WebSocket(wsUrl)
 
     chatWs.onopen = () => {
       wsConnected.value = true
+      connectionStatus.value = 'connected'
       console.log('[ChatWS] connected')
     }
 
@@ -135,11 +138,13 @@ export const useChatStore = defineStore('chat', () => {
 
     chatWs.onerror = () => {
       wsConnected.value = false
+      connectionStatus.value = 'disconnected'
       console.warn('[ChatWS] error')
     }
 
     chatWs.onclose = () => {
       wsConnected.value = false
+      connectionStatus.value = 'disconnected'
       console.log('[ChatWS] disconnected, reconnecting in 3s...')
       chatWsReconnectTimer = setTimeout(() => connectChatWebSocket(wsId), 3000)
     }
@@ -213,6 +218,13 @@ export const useChatStore = defineStore('chat', () => {
       chatWsReconnectTimer = null
     }
     wsConnected.value = false
+    connectionStatus.value = 'disconnected'
+  }
+
+  function reconnectChatWebSocket() {
+    if (workspaceId.value) {
+      connectChatWebSocket(workspaceId.value)
+    }
   }
 
   async function loadMessages(wsId: string, convId: string, beforeId?: string) {
@@ -326,6 +338,7 @@ export const useChatStore = defineStore('chat', () => {
     hasMoreMessages,
     oldestMessageId,
     wsConnected,
+    connectionStatus,
     currentUserId,
     workspaceId,
     loadConversations,
@@ -333,6 +346,7 @@ export const useChatStore = defineStore('chat', () => {
     sendMessage,
     updatePresence,
     disconnectChatWebSocket,
+    reconnectChatWebSocket,
     loadOlderMessages,
     getConversationTitle: (c: any) => c.customName || c.id
   }

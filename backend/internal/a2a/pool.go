@@ -2,7 +2,6 @@ package a2a
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -59,6 +58,12 @@ func (p *Pool) Acquire(ctx context.Context, config SessionConfig) (*Session, err
 	// Check if we already have an active session for this member
 	for _, sess := range p.sessions {
 		if sess.WorkspaceID == config.WorkspaceID && sess.MemberID == config.MemberID {
+			// Check if session is still alive
+			if !sess.IsAlive() {
+				log.Printf("[a2a-pool] Session %s is dead, removing and recreating", sess.ID)
+				delete(p.sessions, sess.ID)
+				continue
+			}
 			sess.mu.Lock()
 			sess.lastActive = time.Now()
 			sess.mu.Unlock()
@@ -122,6 +127,10 @@ func (p *Pool) createLocalSession(ctx context.Context, config SessionConfig) (*S
 	sess.localRunner = runner
 
 	// Wire up runner callbacks
+	runner.onDeath = func() {
+		log.Printf("[a2a-pool] Agent %s subprocess died, auto-releasing session %s", sess.MemberName, sess.ID)
+		p.Release(sess.ID)
+	}
 	runner.onOutput = func(text string) {
 		if text == "" {
 			return
@@ -349,25 +358,49 @@ func (p *Pool) processOutput(sess *Session) {
 				return // Session was released, stop processing
 			}
 			if msg.Type == TypeToolUse && p.toolHandler != nil {
-				go func() {
-					// Capture tool use ID and name for result correlation
+				go func(sess *Session) {
+					// Check session existence before execution
+					p.mu.RLock()
+					_, sessionExists := p.sessions[sess.ID]
+					p.mu.RUnlock()
+					if !sessionExists {
+						return // Session was released, abort
+					}
+
+					// Monitor session closure during tool execution
+					done := make(chan struct{})
+					go func() {
+						select {
+						case <-sess.DoneChan:
+						}
+						close(done)
+					}()
+
+					// Check if session is already closed
+					select {
+					case <-done:
+						return // Session already closed
+					default:
+					}
+
+					// Execute the tool
+					result := p.toolHandler.ExecuteTool(msg, sess)
+
+					// Check if session is still open after execution
+					select {
+					case <-sess.DoneChan:
+						return // Session closed during execution
+					default:
+					}
+
+					// Send tool result back to agent
 					toolUseParsed, _ := msg.ParseToolUseMessage()
-					toolUseID := ""
-					toolName := ""
-					if toolUseParsed != nil {
-						toolUseID = toolUseParsed.ToolUseID
-						toolName = toolUseParsed.Name
+					if toolUseParsed != nil && result != nil {
+						if err := sess.SendToolResultToAgent(toolUseParsed.ToolUseID, result.Content, result.IsError); err != nil {
+							log.Printf("[a2a-pool] Failed to send tool result: %v", err)
+						}
 					}
-
-					// Execute the tool (broadcasts to frontend)
-					p.toolHandler.ExecuteTool(msg, sess)
-
-					// Send tool result back to agent's stdin so it can continue
-					content := fmt.Sprintf("Tool '%s' executed successfully", toolName)
-					if err := sess.SendToolResultToAgent(toolUseID, content, false); err != nil {
-						log.Printf("[a2a-pool] Failed to send tool result to agent: %v", err)
-					}
-				}()
+				}(sess)
 			}
 			if p.outputHook != nil {
 				p.outputHook(sess, msg)

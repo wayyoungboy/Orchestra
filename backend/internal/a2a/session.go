@@ -14,6 +14,15 @@ import (
 	"github.com/a2aproject/a2a-go/v2/a2aclient"
 )
 
+// agentSender is the interface implemented by LocalRunner (and test doubles)
+// for sending messages to the agent process.
+type agentSender interface {
+	SendUserMessage(text string) error
+	SendToolResult(toolUseID, content string, isError bool) error
+	Stop()
+	IsRunning() bool
+}
+
 // Session represents an agent session (A2A HTTP or Local CLI).
 // It implements the same interface as the old ACP session for ACPBridge compatibility.
 type Session struct {
@@ -28,7 +37,7 @@ type Session struct {
 	AgentURL string
 
 	// Local CLI runner (PTY alternative)
-	localRunner *LocalRunner
+	localRunner agentSender
 
 	mu               sync.Mutex
 	lastActive       time.Time
@@ -45,6 +54,7 @@ type Session struct {
 	ErrorChan  chan error
 	DoneChan   chan struct{}
 	done       bool
+	released   bool
 
 	// Active subscriptions
 	subscriptions map[string]context.CancelFunc // taskID -> cancel
@@ -105,6 +115,10 @@ func NewSession(id, workspaceID, memberID, memberName, terminalType string, clie
 // Supports both A2A HTTP-based and Local CLI agents.
 func (s *Session) SendUserMessage(content string) error {
 	s.mu.Lock()
+	if s.released {
+		s.mu.Unlock()
+		return fmt.Errorf("session already released")
+	}
 	s.lastActive = time.Now()
 	s.mu.Unlock()
 
@@ -149,7 +163,7 @@ func (s *Session) SendUserMessage(content string) error {
 }
 
 // subscribeToTask subscribes to SSE events for a task and converts them to ACP messages.
-// It implements exponential backoff reconnection on SSE stream failure.
+// It implements exponential backoff reconnection on SSE stream failure with a maximum retry limit.
 func (s *Session) subscribeToTask(taskID string) {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -166,6 +180,8 @@ func (s *Session) subscribeToTask(taskID string) {
 
 		backoff := 1 * time.Second
 		const maxBackoff = 30 * time.Second
+		retryCount := 0
+		const maxRetries = 12
 
 		for {
 			select {
@@ -186,8 +202,9 @@ func (s *Session) subscribeToTask(taskID string) {
 					continue
 				}
 
-				// Reset backoff on successful reception
+				// Reset backoff and retry count on successful reception
 				backoff = 1 * time.Second
+				retryCount = 0
 
 				acpMsg := s.convertA2AEventToACP(event)
 				if acpMsg != nil {
@@ -200,6 +217,13 @@ func (s *Session) subscribeToTask(taskID string) {
 				// Stream completed normally, check task status
 				return
 			}
+
+			// Check retry limit
+			if retryCount >= maxRetries {
+				log.Printf("[a2a] Task %s subscription exceeded max retries (%d)", taskID, maxRetries)
+				return
+			}
+			retryCount++
 
 			// Exponential backoff before reconnect
 			select {
@@ -238,6 +262,10 @@ func (s *Session) subscribeToTask(taskID string) {
 // SendToolResult sends a tool result back to the A2A agent.
 func (s *Session) SendToolResult(toolUseID, content string, isError bool) error {
 	s.mu.Lock()
+	if s.released {
+		s.mu.Unlock()
+		return fmt.Errorf("session already released")
+	}
 	s.lastActive = time.Now()
 	s.mu.Unlock()
 
@@ -287,6 +315,16 @@ func (s *Session) SendToolResultToAgent(toolUseID, content string, isError bool)
 	return s.SendToolResult(toolUseID, content, isError)
 }
 
+// IsAlive returns true if the session is still active.
+func (s *Session) IsAlive() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.localRunner != nil {
+		return s.localRunner.IsRunning()
+	}
+	return s.Client != nil
+}
+
 // Release closes the session and all active subscriptions.
 func (s *Session) Release() {
 	s.subMu.Lock()
@@ -302,6 +340,7 @@ func (s *Session) Release() {
 	}
 
 	s.mu.Lock()
+	s.released = true
 	if !s.done {
 		s.done = true
 		close(s.DoneChan)
@@ -368,6 +407,7 @@ func (s *Session) SetChatStreamSink(ch chan<- []byte) {
 }
 
 // TrySendChatStream sends data to the chat stream sink if configured.
+// Attempts to send with a 5-second timeout to avoid blocking indefinitely.
 func (s *Session) TrySendChatStream(data []byte) {
 	s.chatStreamMu.Lock()
 	ch := s.chatStream
@@ -376,8 +416,8 @@ func (s *Session) TrySendChatStream(data []byte) {
 	if ch != nil {
 		select {
 		case ch <- data:
-		default:
-			log.Printf("[a2a] Chat stream channel full, dropping data")
+		case <-time.After(5 * time.Second):
+			log.Printf("[a2a] WARN: output channel full for session %s, message dropped (type=%s)", s.ID, "chat_stream")
 		}
 	}
 }

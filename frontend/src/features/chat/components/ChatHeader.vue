@@ -6,6 +6,41 @@
     </div>
 
     <div class="header-right">
+      <!-- Connection Status Indicator -->
+      <div
+        v-if="connectionStatus === 'connected'"
+        class="connection-status connected"
+        title="已连接"
+      >
+        <div class="status-dot"></div>
+      </div>
+      <div
+        v-else-if="connectionStatus === 'reconnecting'"
+        class="connection-status reconnecting"
+        title="重连中..."
+      >
+        <div class="status-dot"></div>
+        <span class="status-text">重连中...</span>
+      </div>
+      <div
+        v-else
+        class="connection-status disconnected"
+        title="已断线"
+      >
+        <div class="status-dot"></div>
+        <span class="status-text">已断线</span>
+        <button
+          type="button"
+          class="reconnect-btn"
+          @click="handleReconnect"
+          title="重新连接"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+      </div>
+
       <button
         type="button"
         class="action-btn search-btn"
@@ -33,16 +68,27 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+import { useChatStore } from '@/features/chat/chatStore'
+
+const props = defineProps<{
   title: string
   description?: string
   memberCount?: number
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'open-members'): void
   (e: 'open-search'): void
 }>()
+
+const chatStore = useChatStore()
+
+const connectionStatus = computed(() => chatStore.connectionStatus)
+
+function handleReconnect() {
+  chatStore.reconnectChatWebSocket()
+}
 </script>
 
 <style scoped>
@@ -135,5 +181,84 @@ defineEmits<{
   font-size: 12px;
   font-weight: 700;
   color: #475569;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.connection-status.connected {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.connection-status.connected .status-dot {
+  background: #10b981;
+}
+
+.connection-status.reconnecting {
+  background: rgba(234, 179, 8, 0.1);
+  color: #ca8a04;
+  border-color: rgba(234, 179, 8, 0.2);
+}
+
+.connection-status.reconnecting .status-dot {
+  background: #eab308;
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.connection-status.disconnected {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.connection-status.disconnected .status-dot {
+  background: #ef4444;
+}
+
+.status-text {
+  line-height: 1;
+}
+
+.reconnect-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  background: transparent;
+  color: #ef4444;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.reconnect-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 </style>

@@ -11,16 +11,22 @@ The design concepts of this project were inspired by [golutra](https://github.co
 ## Features
 
 - **Multi-Agent Terminal Management**: Run multiple AI agent terminals in parallel, each with independent PTY sessions
+- **A2A Protocol**: Agent-to-Agent communication with tool calling, task delegation, and structured JSON messaging
 - **ACP Support**: Structured JSON communication with AI agents (stdin/stdout) for reliable message exchange
 - **Native Tool Calling**: AI agents can call Orchestra tools directly (task management, chat, status updates)
+- **Task Management**: Full task lifecycle (create/start/complete/fail) with optimistic locking and Kanban view
+- **Internal Chat Routing**: Secretary-to-assistant task forwarding, @mentions, and auto-forwarding of results
+- **Loop Detection**: Message depth tracking and parent references to prevent infinite agent loops
 - **Real-time Collaboration Chat**: Built-in chat interface with @mentions for directing messages to specific members
 - **Workspace Management**: Create and switch between multiple workspaces with configurable server-side paths
 - **Member Roles**: Role-based permissions (Owner, Admin, Secretary, Assistant, Member)
 - **Secretary Coordination**: Coordinator role for task distribution and multi-agent orchestration
 - **Path Browser**: Browse and select server-side directories for each workspace
+- **API Key Management**: Per-member API keys with encrypted storage and test endpoints
 - **Modern Soft-Light Glass UI**: Clean, modern interface built with Vue 3, TypeScript, and Tailwind CSS
 - **WebSocket Terminal Streaming**: Real-time terminal output via WebSocket with ANSI color support
-- **i18n Support**: English and Chinese language support
+- **Language & Theme**: English/Chinese language switching and light/dark theme toggle
+- **i18n Support**: Internationalization support
 
 ## Screenshots
 
@@ -108,13 +114,14 @@ Orchestra/
 ├── backend/              # Go backend
 │   ├── cmd/              # Entry points (main.go)
 │   ├── internal/         # Internal modules
+│   │   ├── a2a/          # Agent-to-Agent protocol (runner, pool, sessions, tools)
 │   │   ├── acp/          # ACP protocol implementation
 │   │   ├── api/          # HTTP handlers & router
 │   │   ├── chatbridge/   # Terminal-to-chat bridge
 │   │   ├── config/       # Configuration loader
 │   │   ├── filesystem/   # Path browser service
 │   │   ├── models/       # Data models
-│   │   ├── storage/      # SQLite repository layer
+│   │   ├── storage/      # SQLite repository layer + migrations
 │   │   ├── terminal/     # PTY management
 │   │   └── ws/           # WebSocket handlers
 │   ├── pkg/              # Public utilities
@@ -172,6 +179,13 @@ Orchestra/
 | `/api/browse` | GET | Browse server paths |
 | `/api/conversations/:workspaceId` | GET | Get chat history |
 | `/api/conversations/:workspaceId/messages` | POST | Send chat message |
+| `/api/tasks` | POST | Create task |
+| `/api/tasks/:id` | PATCH | Update task status |
+| `/api/tasks/:id/start` | POST | Start task |
+| `/api/tasks/:id/complete` | POST | Complete task |
+| `/api/tasks/:id/fail` | POST | Fail task |
+| `/api/keys` | GET/POST/DELETE | API key management |
+| `/api/keys/:id/test` | POST | Test API key |
 
 ### WebSocket
 
@@ -251,11 +265,10 @@ make clean      # Remove build artifacts
 ## Roadmap
 
 - [ ] Terminal session persistence and reconnection
-- [ ] Member presence indicators
-- [ ] Command history per member
+- [ ] Member presence indicators (real-time)
 - [ ] Workspace templates
-- [ ] API key management per member
 - [ ] Export chat transcripts
+- [ ] E2E encryption for inter-agent messages
 
 ## License
 

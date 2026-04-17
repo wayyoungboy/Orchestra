@@ -76,6 +76,16 @@
     <!-- Modals -->
     <AddMemberModal v-if="showAddModal" :mode="addModalMode" @close="showAddModal = false" @invite="handleInviteMember" />
     <EditMemberModal v-if="editingMember" :member="editingMember" :show-remove="editingMember.roleType !== 'owner'" @close="editingMember = null" @save="handleSaveMember" @remove="handleDelete" />
+    <ConfirmModal
+      v-if="showDeleteConfirm"
+      :open="showDeleteConfirm"
+      title="移除成员"
+      message="确定要移除该成员吗？所有的聊天记录和终端会话都将被清理。"
+      confirm-text="移除"
+      :danger="true"
+      @confirm="handleDeleteConfirm"
+      @cancel="showDeleteConfirm = false"
+    />
   </div>
 </template>
 
@@ -86,6 +96,7 @@ import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
 import { notifyUserError } from '@/shared/notifyError'
 import AddMemberModal from './AddMemberModal.vue'
 import EditMemberModal from './EditMemberModal.vue'
+import ConfirmModal from '@/shared/components/ConfirmModal.vue'
 
 const workspaceStore = useWorkspaceStore()
 const members = ref<any[]>([])
@@ -94,6 +105,8 @@ const showAddModal = ref(false)
 const showAddDropdown = ref(false)
 const addModalMode = ref<'assistant' | 'secretary'>('assistant')
 const editingMember = ref<any>(null)
+const showDeleteConfirm = ref(false)
+const pendingDeleteMemberId = ref<string | null>(null)
 
 function openAddModal(mode: 'assistant' | 'secretary') {
   addModalMode.value = mode
@@ -154,17 +167,24 @@ async function handleSaveMember(id: string, name: string, acpEnabled: boolean, a
   }
 }
 
-async function handleDelete(id: string) {
-  const wsId = workspaceStore.currentWorkspace?.id
-  if (!wsId) return
+function handleDelete(id: string) {
+  pendingDeleteMemberId.value = id
+  showDeleteConfirm.value = true
+}
 
-  if (confirm('确定要移除该成员吗？所有的聊天记录和终端会话都将被清理。')) {
-    try {
-      await client.delete(`/workspaces/${wsId}/members/${id}`)
-      await loadMembers()
-    } catch (e) {
-      notifyUserError('Failed to remove member', e)
-    }
+async function handleDeleteConfirm() {
+  const wsId = workspaceStore.currentWorkspace?.id
+  const id = pendingDeleteMemberId.value
+  if (!wsId || !id) return
+
+  try {
+    await client.delete(`/workspaces/${wsId}/members/${id}`)
+    await loadMembers()
+  } catch (e) {
+    notifyUserError('Failed to remove member', e)
+  } finally {
+    showDeleteConfirm.value = false
+    pendingDeleteMemberId.value = null
   }
 }
 

@@ -49,7 +49,8 @@
         <button
           type="button"
           class="send-btn"
-          :disabled="!modelValue.trim()"
+          :disabled="!modelValue.trim() || connectionStatus !== 'connected'"
+          :title="connectionStatus !== 'connected' ? '已断线，无法发送消息' : '发送消息'"
           @click="handleSend"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,9 +77,13 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useProjectStore } from '@/features/workspace/projectStore'
+import { useChatStore } from '@/features/chat/chatStore'
 
 const { t } = useI18n()
 const projectStore = useProjectStore()
+const chatStore = useChatStore()
+
+const connectionStatus = computed(() => chatStore.connectionStatus)
 
 function roleTypeLabel(roleType: string) {
   switch (roleType) {

@@ -184,6 +184,35 @@ export const useTaskStore = defineStore('task', () => {
     tasks.value = tasks.value.filter(t => t.id !== taskId)
   }
 
+  async function updateTaskStatus(taskId: string, newStatus: Task['status']) {
+    try {
+      // Determine the appropriate endpoint based on status
+      let endpoint = ''
+      switch (newStatus) {
+        case 'in_progress':
+          endpoint = '/internal/tasks/start'
+          break
+        case 'completed':
+          endpoint = '/internal/tasks/complete'
+          break
+        case 'failed':
+          endpoint = '/internal/tasks/fail'
+          break
+        default:
+          return
+      }
+
+      await client.post(endpoint, { taskId })
+      const task = tasks.value.find(t => t.id === taskId)
+      if (task) {
+        task.status = newStatus
+      }
+    } catch (e: any) {
+      console.error(`Failed to update task status to ${newStatus}:`, e)
+      throw e
+    }
+  }
+
   return {
     tasks,
     workloads,
@@ -203,6 +232,7 @@ export const useTaskStore = defineStore('task', () => {
     failTask,
     addTask,
     updateTask,
-    removeTask
+    removeTask,
+    updateTaskStatus
   }
 })
