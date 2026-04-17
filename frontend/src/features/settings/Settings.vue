@@ -39,11 +39,11 @@
             <label>{{ t('settingsSections.themeMode') }}</label>
             <div class="theme-toggle">
               <button
-                :class="['theme-btn', theme === 'light' ? 'is-active' : '']"
+                :class="['theme-btn', settingsStore.theme === 'light' ? 'is-active' : '']"
                 @click="handleThemeChange('light')"
               >Light</button>
               <button
-                :class="['theme-btn', theme === 'dark' ? 'is-active' : '']"
+                :class="['theme-btn', settingsStore.theme === 'dark' ? 'is-active' : '']"
                 @click="handleThemeChange('dark')"
               >Dark</button>
             </div>
@@ -102,16 +102,17 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/features/auth/authStore'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
+import { useSettingsStore } from '@/features/settings/settingsStore'
 import ApiKeysSection from './ApiKeysSection.vue'
 
 const { t } = useI18n()
 const { locale } = useI18n()
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
+const settingsStore = useSettingsStore()
 const router = useRouter()
 const activeTab = ref('general')
 const isSaving = ref(false)
-const theme = ref<'light' | 'dark'>((localStorage.getItem('orchestra.theme') as 'light' | 'dark') || 'light')
 
 const currentLocale = computed(() => locale.value)
 
@@ -134,18 +135,7 @@ function handleLocaleChange(event: Event) {
 }
 
 function handleThemeChange(newTheme: 'light' | 'dark') {
-  theme.value = newTheme
-  localStorage.setItem('orchestra.theme', newTheme)
-  applyTheme(newTheme)
-}
-
-function applyTheme(t: 'light' | 'dark') {
-  const root = document.documentElement
-  if (t === 'dark') {
-    root.classList.add('dark-theme')
-  } else {
-    root.classList.remove('dark-theme')
-  }
+  settingsStore.setTheme(newTheme)
 }
 
 onMounted(() => {
@@ -154,8 +144,6 @@ onMounted(() => {
   if (savedLocale && (savedLocale === 'en' || savedLocale === 'zh')) {
     locale.value = savedLocale
   }
-  // Apply saved theme
-  applyTheme(theme.value)
 
   if (workspaceStore.currentWorkspace) {
     editWorkspace.name = workspaceStore.currentWorkspace.name

@@ -106,11 +106,12 @@ const loadStoredSettings = (): Partial<Settings> | null => {
  */
 const applyTheme = (theme: AppTheme) => {
   const root = document.documentElement
+  root.classList.remove('dark-theme')
   if (theme === 'system') {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    root.classList.toggle('dark', prefersDark)
-  } else {
-    root.classList.toggle('dark', theme === 'dark')
+    if (prefersDark) root.classList.add('dark-theme')
+  } else if (theme === 'dark') {
+    root.classList.add('dark-theme')
   }
 }
 
@@ -298,7 +299,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (newTheme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       const handler = (e: MediaQueryListEvent) => {
-        document.documentElement.classList.toggle('dark', e.matches)
+        document.documentElement.classList.toggle('dark-theme', e.matches)
       }
       mediaQuery.addEventListener('change', handler)
     }
