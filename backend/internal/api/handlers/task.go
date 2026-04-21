@@ -7,18 +7,27 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/orchestra/backend/internal/models"
 	"github.com/orchestra/backend/internal/storage/repository"
+	"github.com/orchestra/backend/internal/ws"
 )
 
 type TaskHandler struct {
-	taskRepo *repository.TaskRepo
+	taskRepo   *repository.TaskRepo
 	memberRepo repository.MemberRepository
+	chatHub    *ws.ChatHub
 }
 
-func NewTaskHandler(taskRepo *repository.TaskRepo, memberRepo repository.MemberRepository) *TaskHandler {
+func NewTaskHandler(taskRepo *repository.TaskRepo, memberRepo repository.MemberRepository, chatHub *ws.ChatHub) *TaskHandler {
 	return &TaskHandler{
 		taskRepo:   taskRepo,
 		memberRepo: memberRepo,
+		chatHub:    chatHub,
 	}
+}
+
+func (h *TaskHandler) broadcastTaskStatus(task *models.Task, newStatus models.TaskStatus) {
+	h.chatHub.BroadcastRawToWorkspace(task.WorkspaceID, []byte(
+		`{"type":"task_status","workspaceId":"` + task.WorkspaceID + `","taskId":"` + task.ID + `","status":"` + string(newStatus) + `","assigneeId":"` + task.AssigneeID + `","title":"` + task.Title + `"}`,
+	))
 }
 
 // TaskCreateRequest is the request body for creating a task
@@ -94,6 +103,8 @@ func (h *TaskHandler) StartTask(c *gin.Context) {
 		return
 	}
 
+	h.broadcastTaskStatus(task, models.TaskStatusInProgress)
+
 	c.JSON(http.StatusOK, gin.H{
 		"ok":            true,
 		"taskId":        req.TaskID,
@@ -135,6 +146,8 @@ func (h *TaskHandler) CompleteTask(c *gin.Context) {
 		return
 	}
 
+	h.broadcastTaskStatus(task, models.TaskStatusCompleted)
+
 	c.JSON(http.StatusOK, gin.H{
 		"ok":           true,
 		"taskId":       req.TaskID,
@@ -174,6 +187,8 @@ func (h *TaskHandler) FailTask(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	h.broadcastTaskStatus(task, models.TaskStatusFailed)
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":            true,
@@ -220,6 +235,8 @@ func (h *TaskHandler) AssignTask(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	h.broadcastTaskStatus(task, models.TaskStatusAssigned)
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":           true,
@@ -272,6 +289,8 @@ func (h *TaskHandler) CancelTask(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	h.broadcastTaskStatus(task, models.TaskStatusCancelled)
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":           true,

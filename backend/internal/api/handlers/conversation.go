@@ -171,6 +171,21 @@ func (h *ConversationHandler) List(c *gin.Context) {
 	viewerID := c.Query("userId")
 	var totalUnread int
 
+	// Batch-fetch unread counts to avoid N+1 queries
+	unreadCounts := make(map[string]int)
+	if viewerID != "" && h.readRepo != nil {
+		convIDs := make([]string, len(conversations))
+		for i, conv := range conversations {
+			convIDs[i] = conv.ID
+		}
+		var err error
+		unreadCounts, err = h.readRepo.BatchGetUnreadCounts(convIDs, viewerID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
 	for _, conv := range conversations {
 		dto := ConversationDTO{
 			ID:        conv.ID,
@@ -182,17 +197,7 @@ func (h *ConversationHandler) List(c *gin.Context) {
 			Muted:     conv.Muted,
 		}
 
-		if viewerID != "" && h.readRepo != nil {
-			lastRead, err := h.readRepo.GetLastRead(conv.ID, viewerID)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
-			unread, err := h.msgRepo.CountUnreadForViewer(conv.ID, viewerID, lastRead)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
-			}
+		if unread, ok := unreadCounts[conv.ID]; ok {
 			dto.UnreadCount = unread
 			totalUnread += unread
 		}
@@ -744,7 +749,7 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 	if err != nil {
 		return
 	}
-	// Forward user messages to assistants and secretaries (ACP-enabled members)
+	// Forward user messages to ACP-enabled members (assistants or secretaries) in this conversation
 	acpRecipientIDs := make(map[string]struct{})
 	for _, m := range members {
 		if m.RoleType == models.RoleAssistant || m.RoleType == models.RoleSecretary {
@@ -754,9 +759,6 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 	if len(acpRecipientIDs) == 0 {
 		return
 	}
-
-	// Parse @mentions from text
-	mentionedIDs := parseMentions(text, members)
 
 	targets := make([]string, 0)
 	add := func(id string) {
@@ -774,29 +776,23 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 		targets = append(targets, id)
 	}
 
-	// If there are @mentions, only send to mentioned members
-	if len(mentionedIDs) > 0 {
-		for _, id := range mentionedIDs {
-			add(id)
+	switch conv.Type {
+	case repository.ConversationTypeDM:
+		add(conv.TargetID)
+		for _, mid := range conv.MemberIDs {
+			add(mid)
 		}
-	} else {
-		// No @mentions - use original logic based on conversation type
-		switch conv.Type {
-		case repository.ConversationTypeDM:
-			add(conv.TargetID)
-			for _, mid := range conv.MemberIDs {
-				add(mid)
+	case repository.ConversationTypeChannel:
+		// For channels, forward only to secretaries
+		for _, mid := range conv.MemberIDs {
+			for _, m := range members {
+				if m.ID == mid && m.RoleType == models.RoleSecretary {
+					add(mid)
+					break
+				}
 			}
-		case repository.ConversationTypeChannel:
-			for _, mid := range conv.MemberIDs {
-				add(mid)
-			}
-			// Channel without @mention: don't forward (align with reference behavior)
 		}
 	}
-
-	// Strip @mentions from text before sending
-	cleanText := stripMentions(text, members)
 
 	for _, memberID := range targets {
 		sess := h.a2aPool.SessionForWorkspaceMember(workspaceID, memberID)
@@ -879,11 +875,11 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 
 规则：
 - 先用 1 查询负载，选择 idle 或负载最低的助手。
-- 用 2 创建任务，创建成功后在回复中用 @助手名 的格式通知对方（必须包含 @ 符号，例如 @Claude Assistant，不要用 ** 或其他格式包裹）。系统会自动检测 @ 并转发消息给对应助手。
+- 用 2 创建任务，任务创建后系统会自动转发给对应助手。
 - 任务完成后助手会汇报，你审核后用 3 回复用户。`,
 				convID,
 				memberID,
-				cleanText,
+				text,
 				baseURL, workspaceID,
 				baseURL, authHdr,
 				workspaceID, convID, memberID,
@@ -921,10 +917,10 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 
 规则：
 - 收到秘书分配的任务(taskId)后，先调用 1 开始，完成后调用 2，失败调用 3。
-- 完成任务后通过 @秘书 汇报结果。`,
+- 完成任务后直接通过 4 回复汇报结果。`,
 				convID,
 				memberID,
-				cleanText,
+				text,
 				baseURL, authHdr,
 				baseURL, authHdr,
 				baseURL, authHdr,
@@ -936,64 +932,6 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 		// Send via ACP protocol
 		_ = sess.SendUserMessage(fullPrompt)
 	}
-}
-
-// parseMentions extracts member IDs from @mentions in text
-func parseMentions(text string, members []*models.Member) []string {
-	var mentionIDs []string
-	for _, m := range members {
-		if m == nil {
-			continue
-		}
-		mention := "@" + m.Name
-		if idx := findMentionIndex(text, mention); idx != -1 {
-			mentionIDs = append(mentionIDs, m.ID)
-		}
-	}
-	return mentionIDs
-}
-
-// stripMentions removes @memberName mentions from text before sending to terminal.
-func stripMentions(text string, members []*models.Member) string {
-	result := text
-	for _, m := range members {
-		if m == nil {
-			continue
-		}
-		mention := "@" + m.Name
-		// Remove all occurrences of the mention
-		for {
-			idx := findMentionIndex(result, mention)
-			if idx == -1 {
-				break
-			}
-			// Remove the mention and any trailing space
-			end := idx + len(mention)
-			if end < len(result) && result[end] == ' ' {
-				end++
-			}
-			result = result[:idx] + result[end:]
-		}
-	}
-	return strings.TrimSpace(result)
-}
-
-func findMentionIndex(text, mention string) int {
-	for i := 0; i <= len(text)-len(mention); i++ {
-		if text[i:i+len(mention)] == mention {
-			// Check if it's a standalone mention (not part of another word)
-			// Allow any non-alphanumeric character before the @ (space, newline, punctuation, CJK chars)
-			if i > 0 {
-				prev := text[i-1]
-				// Only skip if preceded by alphanumeric character
-				if (prev >= 'a' && prev <= 'z') || (prev >= 'A' && prev <= 'Z') || (prev >= '0' && prev <= '9') {
-					continue
-				}
-			}
-			return i
-		}
-	}
-	return -1
 }
 
 // InternalChatSendRequest is the request body for internal chat send API.
@@ -1085,118 +1023,13 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 		}
 	}
 
-	// Check if sender is secretary - auto-forward @mentions to assistants
-	senderMember, err := h.memberRepo.GetByID(c.Request.Context(), req.SenderID)
-	if err == nil && senderMember != nil && senderMember.RoleType == models.RoleSecretary {
-		// Loop detection: stop forwarding if depth >= 3
-		if req.Depth >= 3 {
-			// Log the attempt and return
-			log.Printf("[conversation] Loop detection: stopping forward at depth %d for sender %s", req.Depth, req.SenderID)
-			goto skipForward
-		}
-
-		// Get all workspace members for mention parsing
-		allMembers, err := h.memberRepo.ListByWorkspace(c.Request.Context(), req.WorkspaceID)
-		if err == nil {
-			// Parse @mentions from secretary's response
-			mentionedIDs := parseMentions(req.Text, allMembers)
-			if len(mentionedIDs) > 0 {
-				// Strip @mentions from forwarded text
-				cleanText := stripMentions(req.Text, allMembers)
-
-				// Forward to mentioned assistants
-				for _, targetID := range mentionedIDs {
-					// Skip if already visited in this chain
-					visited := false
-					for _, visitedID := range req.VisitedMemberIDs {
-						if visitedID == targetID {
-							visited = true
-							break
-						}
-					}
-					if visited {
-						continue
-					}
-
-					// Find target member
-					var targetMember *models.Member
-					for _, m := range allMembers {
-						if m.ID == targetID {
-							targetMember = m
-							break
-						}
-					}
-
-					// Only forward to assistants (not other secretaries or members)
-					if targetMember != nil && targetMember.RoleType == models.RoleAssistant {
-						targetSess := h.a2aPool.SessionForWorkspaceMember(req.WorkspaceID, targetID)
-						if targetSess == nil && h.wsRepo != nil {
-							// Session doesn't exist yet — create one (same logic as forwardUserTextToAgent)
-							ws, wsErr := h.wsRepo.GetByID(c.Request.Context(), req.WorkspaceID)
-							if wsErr == nil && ws != nil {
-								targetSess, _ = h.a2aPool.Acquire(c.Request.Context(), a2a.SessionConfig{
-									WorkspaceID:  req.WorkspaceID,
-									WorkspaceDir: ws.Path,
-									MemberID:     targetID,
-									MemberName:   targetMember.Name,
-									TerminalType: targetMember.TerminalType,
-									Member:       targetMember,
-								})
-								if targetSess != nil {
-									targetSess.SetLastChatTargetConversation(req.ConversationID)
-									log.Printf("[internal-chat] Created new session %s for assistant %s", targetSess.ID, targetMember.Name)
-								}
-							}
-						}
-						if targetSess != nil {
-							targetName := targetSess.MemberName
-							if targetName == "" {
-								targetName = targetID
-							}
-
-							// Build visited members list for next depth
-							nextVisitedMembers := append(req.VisitedMemberIDs, req.SenderID)
-							visitedMembersJSON, _ := json.Marshal(nextVisitedMembers)
-
-							// Build forwarded prompt with loop detection metadata
-							forwardPrompt := fmt.Sprintf(`#conversationId{%s}#senderId{%s}#depth{%d}#visitedMembers{%s}[秘书分配任务]: %s
-
-规则：完成秘书分配的任务。完成后可 @秘书 汇报结果。
-回复时使用 curl 调用内部 API：
-curl -s --max-time 10 -X POST %s/api/internal/chat/send \
-  -H "Content-Type: application/json" \
-  %s\
-  -d '{"workspaceId":"%s","conversationId":"%s","senderId":"%s","senderName":"%s","text":"你的回复内容"}'`,
-								req.ConversationID,
-								targetID,
-								req.Depth+1,
-								string(visitedMembersJSON),
-								cleanText,
-								h.baseURL(),
-								h.authHeader(),
-								req.WorkspaceID,
-								req.ConversationID,
-								targetID,
-								targetName,
-							)
-
-							_ = targetSess.SendUserMessage(forwardPrompt)
-						}
-					}
-				}
-			}
-		}
-	}
+	// Secretary dispatch via chat messages removed — tasks are the dispatch mechanism.
 
 	// Check if sender is assistant - auto-forward result to all active secretaries (result reporting)
-	// Does not require @mention: any message from an assistant is treated as a result report.
-	// Note: intentionally does NOT check visitedMemberIDs — the assistant is *returning* to the
-	// secretary that dispatched it, not entering a new forward hop. Depth limit prevents loops.
+	senderMember, err := h.memberRepo.GetByID(c.Request.Context(), req.SenderID)
 	if err == nil && senderMember != nil && senderMember.RoleType == models.RoleAssistant && req.Depth < 3 {
 		allMembers, mErr := h.memberRepo.ListByWorkspace(c.Request.Context(), req.WorkspaceID)
 		if mErr == nil {
-			// Strip any @mentions so the secretary receives clean text
-			cleanText := stripMentions(req.Text, allMembers)
 			for _, m := range allMembers {
 				if m.RoleType != models.RoleSecretary {
 					continue
@@ -1225,7 +1058,7 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 					visitedJSON, _ := json.Marshal(nextVisited)
 					forwardPrompt := fmt.Sprintf(
 						"#conversationId{%s}#senderId{%s}#depth{%d}#visitedMembers{%s}[助手汇报结果]: %s\n\n请将以上结果汇总后回复给用户：\ncurl -s --max-time 10 -X POST %s/api/internal/chat/send \\\n  -H \"Content-Type: application/json\" \\\n  %s\\\n  -d '{\"workspaceId\":\"%s\",\"conversationId\":\"%s\",\"senderId\":\"%s\",\"senderName\":\"%s\",\"text\":\"请填写结果摘要\"}'",
-						req.ConversationID, req.SenderID, req.Depth+1, string(visitedJSON), cleanText,
+						req.ConversationID, req.SenderID, req.Depth+1, string(visitedJSON), req.Text,
 						h.baseURL(), h.authHeader(),
 						req.WorkspaceID, req.ConversationID, targetID, m.Name,
 					)
@@ -1235,8 +1068,6 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 			}
 		}
 	}
-
-skipForward:
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":        true,

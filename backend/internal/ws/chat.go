@@ -16,6 +16,7 @@ const (
 	EventNewMessage    ChatEventType = "new_message"
 	EventMessageStatus ChatEventType = "message_status"
 	EventUnreadSync    ChatEventType = "unread_sync"
+	EventTaskStatus    ChatEventType = "task_status"
 )
 
 // ChatEvent represents a chat event to be broadcast

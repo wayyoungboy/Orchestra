@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/orchestra/backend/internal/filesystem"
 	"github.com/orchestra/backend/internal/models"
+	"github.com/orchestra/backend/pkg/utils"
 	"github.com/orchestra/backend/internal/storage/repository"
 )
 
@@ -186,7 +186,7 @@ func (h *ToolHandler) handleTaskCreate(ctx context.Context, toolUse *ToolUseMess
 
 	now := time.Now().UnixMilli()
 	task := &models.Task{
-		ID:             "task_" + uuid.New().String()[:8],
+		ID:             "task_" + utils.GenerateID()[:10],
 		WorkspaceID:    sess.WorkspaceID,
 		ConversationID: input.ConversationID,
 		SecretaryID:    sess.MemberID,

@@ -137,8 +137,6 @@ async function handleInviteMember(data: any) {
     await client.post(`/workspaces/${wsId}/members`, {
       name: data.name,
       roleType: data.roleType,
-      terminalCommand: data.command,
-      terminalType: data.terminalType
     })
     showAddModal.value = false
     await loadMembers()
@@ -268,8 +266,9 @@ onMounted(loadMembers)
 .member-badge.member { background: #f1f5f9; color: #64748b; }
 
 .member-info h3 { font-size: 18px; font-weight: 800; color: #0f172a; }
-.member-terminal-hint { font-size: 12px; color: #64748b; margin-top: 4px; }
-.member-terminal-hint code { background: rgba(15, 23, 42, 0.05); padding: 2px 6px; border-radius: 6px; font-family: monospace; }
+.member-agent-hint { font-size: 12px; color: #64748b; margin-top: 4px; }
+.member-agent-hint code { background: rgba(15, 23, 42, 0.05); padding: 2px 6px; border-radius: 6px; font-family: monospace; }
+.member-agent-hint.is-disabled { color: #94a3b8; }
 .member-id { font-size: 11px; font-weight: 600; color: #cbd5e1; font-family: monospace; margin-top: 8px; }
 
 .member-actions { display: flex; gap: 10px; }

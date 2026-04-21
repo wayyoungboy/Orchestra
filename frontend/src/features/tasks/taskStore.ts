@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import client from '@/shared/api/client'
+import { notifyUserError } from '@/shared/notifyError'
 
 export interface Task {
   id: string
@@ -138,60 +139,75 @@ export const useTaskStore = defineStore('task', () => {
 
   async function startTask(taskId: string) {
     try {
-      await client.post('/internal/tasks/start', { taskId })
+      await client.post('/internal/tasks/start', { taskId }, { skipErrorToast: true })
       const task = tasks.value.find(t => t.id === taskId)
       if (task) {
         task.status = 'in_progress'
       }
     } catch (e: any) {
-      console.error('Failed to start task:', e)
+      notifyUserError('Failed to start task', e)
       throw e
     }
   }
 
   async function completeTask(taskId: string, resultSummary?: string) {
     try {
-      await client.post('/internal/tasks/complete', { taskId, resultSummary })
+      await client.post('/internal/tasks/complete', { taskId, resultSummary }, { skipErrorToast: true })
       const task = tasks.value.find(t => t.id === taskId)
       if (task) {
         task.status = 'completed'
         task.resultSummary = resultSummary
       }
     } catch (e: any) {
-      console.error('Failed to complete task:', e)
+      notifyUserError('Failed to complete task', e)
       throw e
     }
   }
 
   async function failTask(taskId: string, errorMessage: string) {
     try {
-      await client.post('/internal/tasks/fail', { taskId, errorMessage })
+      await client.post('/internal/tasks/fail', { taskId, errorMessage }, { skipErrorToast: true })
       const task = tasks.value.find(t => t.id === taskId)
       if (task) {
         task.status = 'failed'
         task.errorMessage = errorMessage
       }
     } catch (e: any) {
-      console.error('Failed to fail task:', e)
+      notifyUserError('Failed to fail task', e)
       throw e
     }
   }
 
   async function cancelTask(taskId: string) {
     try {
-      await client.post(`/workspaces/${currentWorkspaceId.value}/tasks/${taskId}/cancel`, {})
+      await client.post(`/workspaces/${currentWorkspaceId.value}/tasks/${taskId}/cancel`, {}, { skipErrorToast: true })
       const task = tasks.value.find(t => t.id === taskId)
       if (task) {
         task.status = 'cancelled'
       }
     } catch (e: any) {
-      console.error('Failed to cancel task:', e)
+      notifyUserError('Failed to cancel task', e)
       throw e
     }
   }
 
   function addTask(task: Task) {
     tasks.value.push(task)
+  }
+
+  /**
+   * Handle incoming task_status WebSocket events
+   */
+  function handleWsTaskStatus(event: { taskId: string; status: Task['status']; assigneeId?: string; title?: string }) {
+    const task = tasks.value.find(t => t.id === event.taskId)
+    if (task) {
+      task.status = event.status
+    } else {
+      // Task not in local cache — refetch from server
+      if (currentWorkspaceId.value) {
+        fetchTasks(currentWorkspaceId.value)
+      }
+    }
   }
 
   function updateTask(updatedTask: Task) {
@@ -234,7 +250,7 @@ export const useTaskStore = defineStore('task', () => {
         task.status = newStatus
       }
     } catch (e: any) {
-      console.error(`Failed to update task status to ${newStatus}:`, e)
+      notifyUserError(`Failed to update task status to ${newStatus}`, e)
       throw e
     }
   }
@@ -262,6 +278,7 @@ export const useTaskStore = defineStore('task', () => {
     addTask,
     updateTask,
     removeTask,
+    handleWsTaskStatus,
     updateTaskStatus
   }
 })

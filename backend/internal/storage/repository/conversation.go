@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/orchestra/backend/pkg/utils"
 )
 
 type ConversationType string
@@ -102,7 +102,7 @@ func (r *ConversationRepository) GetByID(id string) (*Conversation, error) {
 
 func (r *ConversationRepository) Create(workspaceID string, data ConversationCreate) (*Conversation, error) {
 	now := time.Now().UnixMilli()
-	id := "conv_" + uuid.New().String()[:8]
+	id := "conv_" + utils.GenerateID()[:10]
 
 	memberIDsJSON, err := json.Marshal(data.MemberIDs)
 	if err != nil {

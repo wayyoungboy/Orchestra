@@ -1,7 +1,10 @@
-.PHONY: build run test clean reset-data
+.PHONY: build run test clean reset-data build-cli
 
 build:
 	go build -o bin/orchestra ./cmd/server
+
+build-cli:
+	go build -o bin/orchestra-cli ./cmd/cli
 
 run:
 	go run ./cmd/server

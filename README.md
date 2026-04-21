@@ -10,13 +10,16 @@ The design concepts of this project were inspired by [golutra](https://github.co
 
 ## Features
 
-- **Multi-Agent Terminal Management**: Run multiple AI agent terminals in parallel, each with independent PTY sessions
-- **A2A Protocol**: Agent-to-Agent communication with tool calling, task delegation, and structured JSON messaging
-- **ACP Support**: Structured JSON communication with AI agents (stdin/stdout) for reliable message exchange
+- **Tmux-Backed Agent Sessions**: AI agent terminals run inside tmux sessions — processes survive backend restarts with automatic session recovery on startup
+- **Multi-Agent Terminal Management**: Run multiple AI agent terminals in parallel, each with independent tmux sessions and PTY streams
+- **ACP Support**: Structured JSON communication with AI agents for reliable message exchange
+- **Provider Abstraction**: Pluggable AI provider support (Claude, Gemini) with unified command interface
 - **Native Tool Calling**: AI agents can call Orchestra tools directly (task management, chat, status updates)
 - **Task Management**: Full task lifecycle (create/start/complete/fail) with optimistic locking and Kanban view
 - **Internal Chat Routing**: Secretary-to-assistant task forwarding, @mentions, and auto-forwarding of results
-- **Loop Detection**: Message depth tracking and parent references to prevent infinite agent loops
+- **Outbox Pattern**: Reliable async message delivery with retry and dead-letter handling
+- **Event Bus**: Internal pub/sub system for decoupled component communication
+- **Skills System**: CLI-based skill management (install/uninstall/list) for extending AI agents
 - **Real-time Collaboration Chat**: Built-in chat interface with @mentions for directing messages to specific members
 - **Workspace Management**: Create and switch between multiple workspaces with configurable server-side paths
 - **Member Roles**: Role-based permissions (Owner, Admin, Secretary, Assistant, Member)
@@ -112,18 +115,25 @@ Restart both dev processes after pulling changes:
 ```
 Orchestra/
 ├── backend/              # Go backend
-│   ├── cmd/              # Entry points (main.go)
+│   ├── cmd/              # Entry points (server, cli)
 │   ├── internal/         # Internal modules
-│   │   ├── a2a/          # Agent-to-Agent protocol (runner, pool, sessions, tools)
-│   │   ├── acp/          # ACP protocol implementation
+│   │   ├── a2a/          # Agent session management (pool, sessions, tools)
 │   │   ├── api/          # HTTP handlers & router
 │   │   ├── chatbridge/   # Terminal-to-chat bridge
+│   │   ├── cli/          # CLI commands (skills, providers)
 │   │   ├── config/       # Configuration loader
+│   │   ├── eventbus/     # Internal pub/sub system
 │   │   ├── filesystem/   # Path browser service
+│   │   ├── messagequeue/ # Async message queue
 │   │   ├── models/       # Data models
-│   │   ├── storage/      # SQLite repository layer + migrations
-│   │   ├── terminal/     # PTY management
-│   │   └── ws/           # WebSocket handlers
+│   │   ├── outbox/       # Reliable async delivery (outbox pattern)
+│   │   ├── persist/      # Atomic JSON saver with coalescing
+│   │   ├── provider/     # AI provider abstraction (Claude, Gemini)
+│   │   ├── security/     # Auth, encryption, whitelist
+│   │   ├── storage/      # SQLite repository + migrations
+│   │   ├── supervisor/   # Session lifecycle management
+│   │   ├── tmux/         # Tmux-backed session engine (persistence + recovery)
+│   │   └── ws/           # WebSocket handlers (terminal, chat)
 │   ├── pkg/              # Public utilities
 │   ├── configs/          # Configuration files
 │   └── Makefile          # Build commands
@@ -136,13 +146,13 @@ Orchestra/
 │   │   │   ├── chat/     # Chat interface
 │   │   │   ├── members/  # Member management
 │   │   │   ├── settings/ # Settings page
+│   │   │   ├── tasks/    # Task Kanban board
 │   │   │   ├── terminal/ # Terminal workspace
 │   │   │   └── workspace/# Workspace selection
-│   │   └── shared/       # Shared components, API, utils
+│   │   └── shared/       # Shared components, API, utils, bridge
 │   └── public/
 ├── docs/                 # Documentation
 │   ├── ARCHITECTURE.md   # System architecture
-│   ├── ACP-INTEGRATION.md# ACP protocol docs
 │   └── superpowers/      # Specs and plans
 ├── CLAUDE.md             # Project instructions
 ├── README.md             # This file
@@ -264,7 +274,6 @@ make clean      # Remove build artifacts
 
 ## Roadmap
 
-- [ ] Terminal session persistence and reconnection
 - [ ] Member presence indicators (real-time)
 - [ ] Workspace templates
 - [ ] Export chat transcripts

@@ -36,17 +36,14 @@
             </select>
           </div>
           <div class="setting-card">
-            <label>{{ t('settingsSections.themeMode') }}</label>
-            <div class="theme-toggle">
-              <button
-                :class="['theme-btn', settingsStore.theme === 'light' ? 'is-active' : '']"
-                @click="handleThemeChange('light')"
-              >Light</button>
-              <button
-                :class="['theme-btn', settingsStore.theme === 'dark' ? 'is-active' : '']"
-                @click="handleThemeChange('dark')"
-              >Dark</button>
-            </div>
+            <label>{{ t('settingsSections.defaultMember') }}</label>
+            <select class="setting-input" v-model="defaultMemberId" @change="saveDefaultMember">
+              <option value="">{{ t('settingsSections.noDefaultMember') }}</option>
+              <option v-for="member in availableMembers" :key="member.id" :value="member.id">
+                {{ member.name }} ({{ member.roleType }})
+              </option>
+            </select>
+            <p class="setting-hint">{{ t('settingsSections.defaultMemberHint') }}</p>
           </div>
         </div>
       </div>
@@ -102,19 +99,25 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/features/auth/authStore'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
-import { useSettingsStore } from '@/features/settings/settingsStore'
+import { useMemberStore } from '@/features/members/memberStore'
 import ApiKeysSection from './ApiKeysSection.vue'
 
 const { t } = useI18n()
 const { locale } = useI18n()
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
-const settingsStore = useSettingsStore()
+const memberStore = useMemberStore()
 const router = useRouter()
 const activeTab = ref('general')
 const isSaving = ref(false)
+const defaultMemberId = ref('')
 
 const currentLocale = computed(() => locale.value)
+
+const availableMembers = computed(() => {
+  const ws = workspaceStore.currentWorkspace
+  return ws ? memberStore.members.filter(m => m.workspaceId === ws.id) : []
+})
 
 const editWorkspace = reactive({
   name: '',
@@ -134,10 +137,6 @@ function handleLocaleChange(event: Event) {
   localStorage.setItem('orchestra.locale', newLocale)
 }
 
-function handleThemeChange(newTheme: 'light' | 'dark') {
-  settingsStore.setTheme(newTheme)
-}
-
 onMounted(() => {
   // Restore saved locale
   const savedLocale = localStorage.getItem('orchestra.locale')
@@ -145,9 +144,17 @@ onMounted(() => {
     locale.value = savedLocale
   }
 
+  // Restore saved default member
+  const savedDefaultMember = localStorage.getItem('orchestra.defaultMemberId')
+  if (savedDefaultMember) {
+    defaultMemberId.value = savedDefaultMember
+  }
+
   if (workspaceStore.currentWorkspace) {
     editWorkspace.name = workspaceStore.currentWorkspace.name
     editWorkspace.path = workspaceStore.currentWorkspace.path
+    // Fetch members for this workspace
+    memberStore.fetchMembers(workspaceStore.currentWorkspace.id)
   }
 })
 
@@ -170,6 +177,10 @@ async function handleUpdateWorkspace() {
 function handleLogout() {
   authStore.logout()
   router.push('/login')
+}
+
+function saveDefaultMember() {
+  localStorage.setItem('orchestra.defaultMemberId', defaultMemberId.value)
 }
 </script>
 
@@ -203,6 +214,8 @@ function handleLogout() {
 .setting-card { display: flex; flex-direction: column; gap: 12px; }
 .setting-card label { font-size: 11px; font-weight: 900; color: rgb(var(--color-overlay) / 0.4); text-transform: uppercase; letter-spacing: 0.15em; margin-left: 4px; }
 
+.setting-hint { font-size: 12px; color: rgb(var(--color-overlay) / 0.4); font-style: italic; margin-top: -4px; margin-left: 4px; }
+
 .setting-input, .setting-select {
   width: 100%; padding: 14px 18px; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.4); color: rgb(var(--color-overlay)); font-size: 15px; font-weight: 600; outline: none;
@@ -220,12 +233,6 @@ function handleLogout() {
 .save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .setting-value { font-size: 16px; font-weight: 700; color: rgb(var(--color-overlay)); }
-.theme-toggle { display: flex; gap: 4px; padding: 4px; background: rgba(255, 255, 255, 0.3); border-radius: 12px; width: fit-content; }
-.theme-btn {
-  padding: 8px 16px; border-radius: 10px; border: none; background: transparent;
-  font-size: 13px; font-weight: 700; color: rgb(var(--color-overlay) / 0.5); cursor: pointer; transition: all 0.2s;
-}
-.theme-btn.is-active { background: rgba(255, 255, 255, 0.6); color: rgb(var(--color-primary)); box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
 
 .logout-btn {
   margin-top: 20px; padding: 14px; border-radius: 16px; border: 1px solid rgba(239, 68, 68, 0.3);

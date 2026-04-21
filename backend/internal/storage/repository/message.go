@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/orchestra/backend/pkg/utils"
 )
 
 type MessageStatus string
@@ -119,7 +119,7 @@ func (r *MessageRepository) GetByID(id string) (*Message, error) {
 
 func (r *MessageRepository) Create(data MessageCreate) (*Message, error) {
 	now := time.Now().UnixMilli()
-	id := "msg_" + uuid.New().String()[:8]
+	id := "msg_" + utils.GenerateID()[:10]
 
 	contentJSON, err := json.Marshal(data.Content)
 	if err != nil {

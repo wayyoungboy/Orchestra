@@ -77,14 +77,19 @@ func main() {
 		ensureDefaultUserAndWorkspace(db)
 	}
 
-	// Initialize A2A pool for agent communication
-	a2aRegistry := a2a.NewAgentRegistry()
+	// Initialize A2A pool for agent communication (tmux-backed)
 	workspacePath := cfg.Storage.Workspaces
 	a2aPool := a2a.NewPool(
 		cfg.Terminal.IdleTimeout,
-		a2aRegistry,
 		workspacePath,
 	)
+
+	// Recover existing tmux sessions on startup
+	recoverCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := a2aPool.RecoverSessions(recoverCtx); err != nil {
+		log.Printf("Session recovery error: %v", err)
+	}
+	cancel()
 
 	// Initialize WebSocket gateway with A2A terminal handler
 	a2aTerminalHandler := ws.NewA2ATerminalHandler(a2aPool)

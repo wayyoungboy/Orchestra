@@ -12,6 +12,11 @@ export interface WorkspaceCreate {
   ownerDisplayName?: string
 }
 
+export interface WorkspaceUpdate {
+  name?: string
+  path?: string
+}
+
 export interface FileInfo {
   name: string
   path: string

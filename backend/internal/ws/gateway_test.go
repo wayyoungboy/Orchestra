@@ -9,8 +9,7 @@ import (
 )
 
 func TestA2ATerminalHandler_Handle(t *testing.T) {
-	registry := a2a.NewAgentRegistry()
-	pool := a2a.NewPool(30*time.Minute, registry)
+	pool := a2a.NewPool(30*time.Minute, "/tmp")
 	handler := NewA2ATerminalHandler(pool)
 
 	if handler == nil {
@@ -19,8 +18,7 @@ func TestA2ATerminalHandler_Handle(t *testing.T) {
 }
 
 func TestGateway_NewGateway(t *testing.T) {
-	registry := a2a.NewAgentRegistry()
-	pool := a2a.NewPool(30*time.Minute, registry)
+	pool := a2a.NewPool(30*time.Minute, "/tmp")
 	handler := NewA2ATerminalHandler(pool)
 	allowedOrigins := []string{"http://localhost:3000", "http://example.com"}
 
@@ -35,8 +33,7 @@ func TestGateway_NewGateway(t *testing.T) {
 }
 
 func TestGateway_checkOrigin(t *testing.T) {
-	registry := a2a.NewAgentRegistry()
-	pool := a2a.NewPool(30*time.Minute, registry)
+	pool := a2a.NewPool(30*time.Minute, "/tmp")
 	handler := NewA2ATerminalHandler(pool)
 
 	tests := []struct {

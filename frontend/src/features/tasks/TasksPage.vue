@@ -72,10 +72,12 @@
         v-else
         :key="task.id"
         :task="task"
+        :clickable="true"
         @start="handleStartTask"
         @complete="handleCompleteTask"
         @fail="handleFailTask"
         @cancel="handleCancelTask"
+        @detail="handleOpenDetail"
       />
     </div>
 
@@ -108,10 +110,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTaskStore, type Task } from './taskStore'
 import { useWorkspaceStore } from '../workspace/workspaceStore'
+import { getChatSocket } from '@/shared/socket/chat'
 import TaskCard from './TaskCard.vue'
 import TaskActionModal from './components/TaskActionModal.vue'
 import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
@@ -186,6 +189,14 @@ async function handleCancelTask(taskId: string) {
   await taskStore.cancelTask(taskId)
 }
 
+function handleOpenDetail(taskId: string) {
+  const task = tasks.value.find(t => t.id === taskId)
+  if (task) {
+    selectedTask.value = task
+    showTaskDetailDrawer.value = true
+  }
+}
+
 async function handleTaskActionSubmit(value: string) {
   if (taskActionType.value === 'complete') {
     await taskStore.completeTask(selectedTaskId.value, value)
@@ -206,6 +217,20 @@ watch(workspaceId, async (id) => {
     await taskStore.fetchTasks(id)
   }
 }, { immediate: true })
+
+// Listen for task_status WebSocket events
+let wsUnsub: (() => void) | null = null
+onMounted(() => {
+  wsUnsub = getChatSocket().onMessage((msg: any) => {
+    if (msg.type === 'task_status') {
+      taskStore.handleWsTaskStatus(msg)
+    }
+  })
+})
+
+onBeforeUnmount(() => {
+  wsUnsub?.()
+})
 </script>
 
 <style scoped>

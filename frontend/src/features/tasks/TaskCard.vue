@@ -1,20 +1,20 @@
 <template>
-  <div class="task-card" :class="statusClass">
+  <div class="task-card" :class="[statusClass, { clickable: clickable }]" @click="handleClick">
     <div class="task-header">
       <div class="status-badge" :class="task.status">
         {{ statusLabel }}
       </div>
       <div class="task-actions">
-        <button v-if="task.status === 'pending' || task.status === 'assigned'" @click="$emit('start', task.id)" class="action-btn start">
+        <button v-if="task.status === 'pending' || task.status === 'assigned'" @click.stop="$emit('start', task.id)" class="action-btn start">
           开始
         </button>
-        <button v-if="task.status === 'in_progress'" @click="$emit('complete', task.id)" class="action-btn complete">
+        <button v-if="task.status === 'in_progress'" @click.stop="$emit('complete', task.id)" class="action-btn complete">
           完成
         </button>
-        <button v-if="task.status === 'in_progress'" @click="$emit('fail', task.id)" class="action-btn fail">
+        <button v-if="task.status === 'in_progress'" @click.stop="$emit('fail', task.id)" class="action-btn fail">
           失败
         </button>
-        <button v-if="task.status === 'pending' || task.status === 'assigned' || task.status === 'in_progress'" @click="$emit('cancel', task.id)" class="action-btn cancel">
+        <button v-if="task.status === 'pending' || task.status === 'assigned' || task.status === 'in_progress'" @click.stop="$emit('cancel', task.id)" class="action-btn cancel">
           取消
         </button>
       </div>
@@ -59,13 +59,15 @@ import type { Task } from './taskStore'
 
 const props = defineProps<{
   task: Task
+  clickable?: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'start', taskId: string): void
   (e: 'complete', taskId: string): void
   (e: 'fail', taskId: string): void
   (e: 'cancel', taskId: string): void
+  (e: 'detail', taskId: string): void
 }>()
 
 const statusLabel = computed(() => {
@@ -91,6 +93,12 @@ function formatDate(dateStr: string): string {
   if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
   if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
   return date.toLocaleDateString()
+}
+
+function handleClick() {
+  if (props.clickable) {
+    emit('detail', props.task.id)
+  }
 }
 </script>
 
@@ -121,6 +129,14 @@ function formatDate(dateStr: string): string {
 
 .task-card.status-cancelled {
   @apply border-l-4 border-l-gray-400;
+}
+
+.task-card.clickable {
+  cursor: pointer;
+}
+
+.task-card.clickable:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .task-header {

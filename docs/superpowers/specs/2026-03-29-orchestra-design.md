@@ -304,7 +304,7 @@ CREATE TABLE members (
     id TEXT PRIMARY KEY,
     workspace_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    role_type TEXT NOT NULL,      -- 'owner' | 'admin' | 'assistant' | 'member'
+    role_type TEXT NOT NULL,      -- 'owner' | 'secretary' | 'assistant'
     role_key TEXT,
     avatar TEXT,
     terminal_type TEXT,           -- 'claude' | 'gemini' | 'codex' | 'custom'
@@ -355,6 +355,35 @@ CREATE TABLE workflows (
     FOREIGN KEY (workspace_id) REFERENCES workspaces(id)
 );
 
+-- 任务表
+CREATE TABLE tasks (
+    id TEXT PRIMARY KEY,
+    workspace_id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL,
+    secretary_id TEXT NOT NULL,    -- 分配任务的秘书
+    assignee_id TEXT,              -- 被分配的助手
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL,          -- 'pending' | 'assigned' | 'in_progress' | 'completed' | 'failed' | 'cancelled'
+    priority TEXT DEFAULT 'normal',
+    result_summary TEXT,
+    error_message TEXT,
+    version INTEGER DEFAULT 1,     -- 乐观锁
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    completed_at INTEGER,
+    FOREIGN KEY (workspace_id) REFERENCES workspaces(id),
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id),
+    FOREIGN KEY (secretary_id) REFERENCES members(id),
+    FOREIGN KEY (assignee_id) REFERENCES members(id)
+);
+
+CREATE INDEX idx_tasks_workspace ON tasks(workspace_id);
+CREATE INDEX idx_tasks_conversation ON tasks(conversation_id);
+CREATE INDEX idx_tasks_status ON tasks(status);
+CREATE INDEX idx_tasks_assignee ON tasks(assignee_id);
+CREATE INDEX idx_tasks_secretary ON tasks(secretary_id);
+
 -- 设置表
 CREATE TABLE settings (
     key TEXT PRIMARY KEY,
@@ -403,20 +432,32 @@ CREATE INDEX idx_workspaces_user ON workspaces(user_id);
 | GET | /api/workspaces/:id | 获取工作区详情 |
 | DELETE | /api/workspaces/:id | 删除工作区 |
 | GET | /api/workspaces/:id/browse | 浏览工作区文件 |
-| **成员** |||
 | GET | /api/workspaces/:id/members | 获取成员列表 |
 | POST | /api/workspaces/:id/members | 添加成员 |
 | PUT | /api/workspaces/:id/members/:memberId | 更新成员 |
 | DELETE | /api/workspaces/:id/members/:memberId | 删除成员 |
+| DELETE | /api/workspaces/:id/members/:memberId/conversations | 删除成员的会话 |
 | **会话** |||
-| GET | /api/conversations | 获取会话列表 |
-| POST | /api/conversations | 创建会话 |
-| GET | /api/conversations/:id/messages | 获取消息列表 |
-| POST | /api/conversations/:id/messages | 发送消息 |
-| **工作流** |||
-| GET | /api/workflows | 获取工作流列表 |
-| POST | /api/workflows | 创建工作流 |
-| POST | /api/workflows/:id/execute | 执行工作流 |
+| GET | /api/workspaces/:id/conversations | 获取会话列表 |
+| POST | /api/workspaces/:id/conversations | 创建会话 |
+| GET | /api/workspaces/:id/conversations/:convId/messages | 获取消息列表 |
+| POST | /api/workspaces/:id/conversations/:convId/messages | 发送消息 |
+| PUT | /api/workspaces/:id/conversations/:convId/members | 设置会话成员 |
+| DELETE | /api/workspaces/:id/conversations/:convId | 删除会话 |
+| **任务（前端）** |||
+| GET | /api/workspaces/:id/tasks | 获取任务列表 |
+| GET | /api/workspaces/:id/tasks/:taskId | 获取单个任务 |
+| GET | /api/workspaces/:id/tasks/my-tasks | 获取我的任务 |
+| POST | /api/workspaces/:id/tasks/:taskId/cancel | 取消任务 |
+| **内部 API（AI Agent 使用）** |||
+| POST | /api/internal/tasks/create | 创建任务 |
+| POST | /api/internal/tasks/assign | 分配任务 |
+| POST | /api/internal/tasks/start | 开始任务 |
+| POST | /api/internal/tasks/complete | 完成任务 |
+| POST | /api/internal/tasks/fail | 任务失败 |
+| POST | /api/internal/tasks/cancel | 取消任务 |
+| POST | /api/internal/chat/send | 发送聊天消息 |
+| GET | /api/internal/workloads/list | 查询负载统计 |
 | **设置** |||
 | GET | /api/settings | 获取设置 |
 | PUT | /api/settings | 更新设置 |

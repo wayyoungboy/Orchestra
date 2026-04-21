@@ -33,7 +33,6 @@ export const useChatStore = defineStore('chat', () => {
   const loadingMessages = ref(false)
   const workspaceId = ref<string | null>(null)
   const agentStatuses = ref<Record<string, AgentStatus>>({})
-  const wsConnected = ref(false)
   const connectionStatus = ref<'connected' | 'disconnected' | 'reconnecting'>('disconnected')
 
   // Pagination state for active conversation
@@ -46,6 +45,8 @@ export const useChatStore = defineStore('chat', () => {
 
   let chatWs: WebSocket | null = null
   let chatWsReconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let chatWsReconnectAttempts = 0
+  const CHAT_WS_MAX_RECONNECT_ATTEMPTS = 10
 
   const currentUserId = computed(() => authStore.currentUserId || 'default')
 
@@ -102,8 +103,19 @@ export const useChatStore = defineStore('chat', () => {
    * Connect to chat WebSocket for real-time message broadcasting
    */
   function connectChatWebSocket(wsId: string) {
+    // Skip if already connected to the same workspace
+    if (chatWs?.readyState === WebSocket.OPEN) {
+      console.log('[ChatWS] already connected, skipping')
+      return
+    }
+
     // Close existing connection
     if (chatWs) {
+      // Clear handlers before closing to prevent stale onclose from firing
+      chatWs.onclose = null
+      chatWs.onerror = null
+      chatWs.onmessage = null
+      chatWs.onopen = null
       chatWs.close()
       chatWs = null
     }
@@ -111,19 +123,19 @@ export const useChatStore = defineStore('chat', () => {
       clearTimeout(chatWsReconnectTimer)
       chatWsReconnectTimer = null
     }
+    chatWsReconnectAttempts = 0
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host === 'localhost:5175' ? 'localhost:8080' : window.location.host
     const token = localStorage.getItem('orchestra.auth.token') || ''
     const wsUrl = `${protocol}//${host}/ws/chat/${wsId}?token=${encodeURIComponent(token)}`
 
-    wsConnected.value = false
     connectionStatus.value = 'reconnecting'
     chatWs = new WebSocket(wsUrl)
 
     chatWs.onopen = () => {
-      wsConnected.value = true
       connectionStatus.value = 'connected'
+      chatWsReconnectAttempts = 0
       console.log('[ChatWS] connected')
     }
 
@@ -137,16 +149,20 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     chatWs.onerror = () => {
-      wsConnected.value = false
       connectionStatus.value = 'disconnected'
       console.warn('[ChatWS] error')
     }
 
     chatWs.onclose = () => {
-      wsConnected.value = false
       connectionStatus.value = 'disconnected'
-      console.log('[ChatWS] disconnected, reconnecting in 3s...')
-      chatWsReconnectTimer = setTimeout(() => connectChatWebSocket(wsId), 3000)
+      if (chatWsReconnectAttempts >= CHAT_WS_MAX_RECONNECT_ATTEMPTS) {
+        console.log('[ChatWS] max reconnect attempts reached')
+        return
+      }
+      chatWsReconnectAttempts++
+      const delay = Math.min(1000 * 2 ** chatWsReconnectAttempts, 30000)
+      console.log(`[ChatWS] reconnecting in ${delay}ms (attempt ${chatWsReconnectAttempts}/${CHAT_WS_MAX_RECONNECT_ATTEMPTS})`)
+      chatWsReconnectTimer = setTimeout(() => connectChatWebSocket(wsId), delay)
     }
   }
 
@@ -217,7 +233,6 @@ export const useChatStore = defineStore('chat', () => {
       clearTimeout(chatWsReconnectTimer)
       chatWsReconnectTimer = null
     }
-    wsConnected.value = false
     connectionStatus.value = 'disconnected'
   }
 
@@ -362,7 +377,6 @@ export const useChatStore = defineStore('chat', () => {
     loadingMessages,
     hasMoreMessages,
     oldestMessageId,
-    wsConnected,
     connectionStatus,
     currentUserId,
     workspaceId,

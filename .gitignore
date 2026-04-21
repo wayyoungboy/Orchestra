@@ -77,3 +77,6 @@ workspaces/
 
 # Debug
 __debug_bin*
+
+# Reference projects (for research only, not tracked)
+docs/reference/

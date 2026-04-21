@@ -1,7 +1,4 @@
 {
-  "app": {
-    "name": "Orchestra"
-  },
   "auth": {
     "subtitle": "Multi-Agent Collaboration Platform",
     "accessRequired": "Begin your symphony",
@@ -11,30 +8,22 @@
     "passwordPlaceholder": "Enter password",
     "signIn": "Sign In",
     "validating": "Validating...",
-    "invalidCredentials": "Invalid username or password",
-    "defaultCredentialsHint": "Default: orchestra / orchestra"
-  },
-  "friends": {
-    "title": "Friends",
-    "add": "Add",
-    "invite": "Invite"
+    "invalidCredentials": "Invalid username or password"
   },
   "invite": {
     "menu": {
       "title": "Invite to Server",
       "subtitle": "Generate a unique invite link",
-      "admin": "Invite as Admin",
-      "adminDesc": "Full server access",
       "secretary": "Invite as Secretary",
       "secretaryDesc": "Oversees assistants (workspace supervisor)",
       "assistant": "Invite as Assistant",
-      "assistantDesc": "Moderation permissions",
-      "member": "General Member",
-      "memberDesc": "Standard access"
+      "assistantDesc": "Moderation permissions"
     }
   },
+  "friends": {
+    "invite": "Invite"
+  },
   "chat": {
-    "empty": "Select a conversation to start chatting",
     "channels": "Channels",
     "directMessages": "Direct Messages",
     "workspaceFallback": "Workspace",
@@ -44,7 +33,6 @@
     "inputSend": "Send",
     "inputHint": "Press Enter to send, Shift+Enter for new line",
     "inputPlaceholder": "Message {name}",
-    "mentionSuggestions": "Select a member to mention",
     "emptyStateTitle": "Start a Conversation",
     "emptyStateDesc": "Select a channel from the left to begin. Orchestra's AI assistant is ready to help you orchestrate tasks.",
     "searchPlaceholder": "Search messages...",
@@ -68,44 +56,17 @@
     "switcherNew": "New workspace"
   },
   "memberRow": {
-    "openTerminal": "Open Terminal",
     "sendMessage": "Send Message",
-    "mention": "Mention @",
     "rename": "Rename",
     "remove": "Remove",
     "statusHeading": "Status",
     "statusOnline": "Online",
     "statusWorking": "Working",
     "statusDnd": "Do Not Disturb",
-    "statusOffline": "Offline",
-    "badgeWsConnected": "Terminal WebSocket connected",
-    "badgeWsConnecting": "Connecting terminal…",
-    "badgeWsError": "Terminal connection error",
-    "badgeWsDisconnected": "Terminal disconnected",
-    "badgeServerPty": "PTY running on server — open terminal to attach",
-    "badgeNoSession": "No terminal session for this member yet",
-    "badgeWsPending": "Waiting for terminal connection",
-    "badgeWsWorking": "Terminal activity",
-    "terminalLinePending": "Terminal: pending",
-    "terminalLineConnecting": "Terminal: connecting",
-    "terminalLineConnected": "Terminal: connected",
-    "terminalLineWorking": "Terminal: working",
-    "terminalLineError": "Terminal: error",
-    "terminalLineDisconnected": "Terminal: disconnected",
-    "terminalLineIdle": "Terminal: not started",
-    "terminalLineServerPty": "Terminal: server PTY running (not attached)"
-  },
-  "terminal": {
-    "overlayPending": "Waiting…",
-    "overlayConnecting": "Connecting to terminal…",
-    "overlayError": "Terminal disconnected or unavailable",
-    "overlayErrorHint": "Check the server and WebSocket, or close the tab and try again"
+    "statusOffline": "Offline"
   },
   "members": {
     "title": "Members",
-    "addAssistant": "AI Assistant",
-    "addAdmin": "Admin",
-    "addMember": "Member",
     "loading": "Loading members...",
     "emptyRoleOwner": "No owner yet",
     "emptyRoleAdmin": "No administrator yet",
@@ -113,14 +74,13 @@
     "emptyRoleAssistant": "No assistant yet",
     "emptyRoleMember": "No member yet",
     "memberAdded": "Member added",
-    "terminalAutostartFailed": "Member added, but the terminal could not start automatically. Open it from the member list when ready.",
     "roleOwner": "Owner",
     "roleAdmin": "Admin",
     "roleAssistant": "Assistant",
     "roleSecretary": "Secretary",
     "roleMember": "Member",
     "roleOther": "Uncategorized",
-    "emptyRoleOther": "No uncategorized members",
+    "emptyRoleOther": "No uncategorized members yet",
     "unnamedMember": "Unnamed",
     "addMemberModal": {
       "titleAssistant": "Add AI Assistant",
@@ -141,12 +101,14 @@
       "submitMember": "Add member",
       "submitAdmin": "Add admin",
       "submitAdd": "Add",
-      "permFullAccess": "Full access",
-      "permFullAccessDesc": "Can manage all workspace settings",
-      "permMemberManage": "Member management",
-      "permMemberManageDesc": "Can add and remove members",
-      "permBilling": "Billing access",
-      "permBillingDesc": "Can view and manage billing"
+      "displayName": "Display name",
+      "displayNamePlaceholder": "Enter display name",
+      "cliCommand": "CLI Command",
+      "placeholderAssistantCli": "e.g., claude, gemini",
+      "cliArgs": "Command Args",
+      "cliArgsPlaceholder": "Space-separated arguments",
+      "hintSecretary": "Secretaries coordinate tasks across assistants.",
+      "hintAssistant": "Assistants execute tasks via their CLI runtime."
     },
     "editMemberModal": {
       "title": "Edit member",
@@ -179,16 +141,12 @@
     "title": "Settings",
     "general": "General",
     "language": "Language",
-    "terminal": "Terminal",
     "workspace": "Workspace",
     "account": "Account",
     "apiKeys": "API Keys",
     "keyboard": "Keyboard",
     "security": "Security",
-    "about": "About",
-    "diagnostics": "Diagnostics",
-    "diagnosticsHint": "Recent API errors are logged here automatically.",
-    "clearLog": "Clear log"
+    "about": "About"
   },
   "settingsTabs": {
     "general": "General",
@@ -202,12 +160,14 @@
     "account": "Account & Security",
     "currentUser": "Current User",
     "logout": "Sign Out",
-    "themeMode": "Theme Mode",
     "language": "Language",
     "saving": "Saving...",
     "saveChanges": "Save Changes",
     "workspaceName": "Workspace Name",
-    "serverPath": "Server Path"
+    "serverPath": "Server Path",
+    "defaultMember": "Default Member",
+    "noDefaultMember": "No default member",
+    "defaultMemberHint": "Auto-select this member when inviting assistants"
   },
   "loginPage": {
     "versionBadge": "VERSION 1.0 ALPHA",
@@ -220,9 +180,5 @@
     "featureTerminalDesc": "PTY-based real-time terminal with full ANSI color support and multi-tab parallel operations.",
     "footerText": "© 2026 Orchestra AI. All rights reserved.",
     "privateDeployment": "Private Deployment · Invitation Only"
-  },
-  "skills": {
-    "title": "Skills",
-    "webNote": "The reference desktop (Tauri) app's Skills / plugin marketplace depend on native capabilities. On Web, this screen documents the gap; a future HTTP-based plugin API may land here."
   }
 }

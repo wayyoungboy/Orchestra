@@ -5,7 +5,6 @@ import (
 )
 
 // ACPTerminalResponse is the WebSocket response format for agent sessions.
-// Defined here so ConvertACPToWS can return it without depending on ws package.
 type ACPTerminalResponse struct {
 	Type string `json:"type"`
 
@@ -32,8 +31,6 @@ type ACPTerminalResponse struct {
 	Error string `json:"error,omitempty"`
 	Code  int    `json:"code,omitempty"`
 }
-
-// ACP message parsing helpers for backward compatibility with ACPBridge and WebSocket handlers.
 
 // UserMessage represents a user message sent to an agent.
 type UserMessage struct {
@@ -65,10 +62,10 @@ type ToolResultMessage struct {
 
 // ResultMessage represents a session completion result.
 type ResultMessage struct {
-	Type      MessageType `json:"type"`
-	Message   string      `json:"message"`
-	CostUSD   float64     `json:"cost_usd"`
-	DurationMs int        `json:"duration_ms"`
+	Type       MessageType `json:"type"`
+	Message    string      `json:"message"`
+	CostUSD    float64     `json:"cost_usd"`
+	DurationMs int         `json:"duration_ms"`
 }
 
 // ErrorMessage represents an error from an agent.
@@ -84,48 +81,9 @@ type SystemMessage struct {
 	Level   string      `json:"level"`
 }
 
-// ParseAssistantMessage parses an ACPMessage as an assistant message.
-func (m *ACPMessage) ParseAssistantMessage() (*AssistantMessage, error) {
-	var msg AssistantMessage
-	if err := json.Unmarshal(m.Content, &msg); err != nil {
-		return nil, err
-	}
-	return &msg, nil
-}
-
-// ParseResultMessage parses an ACPMessage as a result message.
-func (m *ACPMessage) ParseResultMessage() (*ResultMessage, error) {
-	var msg ResultMessage
-	if err := json.Unmarshal(m.Content, &msg); err != nil {
-		return nil, err
-	}
-	return &msg, nil
-}
-
-// ParseErrorMessage parses an ACPMessage as an error message.
-func (m *ACPMessage) ParseErrorMessage() (*ErrorMessage, error) {
-	var msg ErrorMessage
-	if err := json.Unmarshal(m.Content, &msg); err != nil {
-		return nil, err
-	}
-	return &msg, nil
-}
-
-// ParseToolUseMessage parses an ACPMessage as a tool use message.
-func (m *ACPMessage) ParseToolUseMessage() (*ToolUseMessage, error) {
-	var msg ToolUseMessage
-	if err := json.Unmarshal(m.Content, &msg); err != nil {
-		return nil, err
-	}
-	return &msg, nil
-}
-
 // NewUserMessage creates a user message.
 func NewUserMessage(content string) *ACPMessage {
-	data, _ := json.Marshal(UserMessage{
-		Type:    TypeUserMessage,
-		Content: content,
-	})
+	data, _ := marshalACPContent("user_message", content)
 	return &ACPMessage{
 		Type:    TypeUserMessage,
 		Content: data,

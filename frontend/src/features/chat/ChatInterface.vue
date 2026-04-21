@@ -44,7 +44,6 @@
         <ChatInput
           v-model="newMessage"
           :placeholder="t('chat.inputPlaceholder', { name: getConversationTitle(activeConversation) })"
-          :members="chatMembers"
           @send="handleSendMessage"
           @input="handleTyping"
         />
@@ -67,7 +66,6 @@
       v-if="showMembersSidebar"
       :members="chatMembers"
       :current-user-id="chatStore.currentUserId"
-      @mention="handleMentionMember"
       @open-invite="showInviteMenu = !showInviteMenu"
       @close="showMembersSidebar = false"
     />
@@ -82,12 +80,12 @@
         </div>
         <div class="search-results custom-scrollbar">
           <div v-if="!searchQuery" class="search-hint">{{ t('chat.searchHint') }}</div>
-          <div v-for="res in workspaceStore.searchResults" :key="res.id" class="search-item" @click="jumpToResult(res)">
+          <div v-for="res in workspaceStore.searchResults" :key="res.message?.id" class="search-item" @click="jumpToResult(res)">
             <div class="res-meta">
-              <span class="res-sender">{{ res.senderName }}</span>
-              <span class="res-time">{{ new Date(res.createdAt).toLocaleDateString() }}</span>
+              <span class="res-sender">{{ getSenderName(res.message?.senderId) }}</span>
+              <span class="res-time">{{ formatDate(res.message?.createdAt) }}</span>
             </div>
-            <p class="res-content">{{ res.content }}</p>
+            <p class="res-content">{{ messageText(res.message) || res.snippet }}</p>
           </div>
         </div>
       </div>
@@ -194,12 +192,19 @@ function handleTyping() {
   if (activeConversation.value) chatStore.updatePresence('typing', activeConversation.value.id)
 }
 
-// Handle @ mention from MembersSidebar
-function handleMentionMember(memberId: string) {
-  const member = chatMembers.value.find(m => m.id === memberId)
-  if (member) {
-    newMessage.value = newMessage.value + `@${member.name} `
-  }
+function getSenderName(senderId: string | undefined): string {
+  if (!senderId) return 'Unknown'
+  const member = chatMembers.value.find(m => m.id === senderId)
+  return member?.name || senderId
+}
+
+function formatDate(ts: number | undefined): string {
+  if (!ts) return ''
+  return new Date(ts).toLocaleDateString()
+}
+
+function messageText(content: any): string {
+  return content?.text || content?.content?.text || ''
 }
 
 let searchTimer: any = null
@@ -234,7 +239,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
-  chatStore.disconnectChatWebSocket()
+  // Don't disconnect here — the store handles reconnection.
+  // Disconnect only when navigating away from workspace entirely.
 })
 </script>
 

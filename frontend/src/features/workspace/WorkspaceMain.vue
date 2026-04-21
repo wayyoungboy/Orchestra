@@ -58,10 +58,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, reactive } from 'vue'
+import { ref, watch, computed, reactive, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
+import { useChatStore } from '@/features/chat/chatStore'
 import SidebarNav, { type TabId } from '@/shared/components/SidebarNav.vue'
 import WorkspaceSwitcher from '@/shared/components/WorkspaceSwitcher.vue'
 import WorkspaceSelection from '@/features/workspace/WorkspaceSelection.vue'
@@ -74,6 +75,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const workspaceStore = useWorkspaceStore()
+const chatStore = useChatStore()
 
 const activeTab = ref<TabId>('workspaces')
 
@@ -139,6 +141,11 @@ watch(() => route.params.id, async (workspaceId) => {
     }
   }
 }, { immediate: true })
+
+// Disconnect chat WebSocket when leaving the workspace entirely
+onBeforeUnmount(() => {
+  chatStore.disconnectChatWebSocket()
+})
 </script>
 
 <style scoped>

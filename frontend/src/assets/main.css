@@ -3,222 +3,234 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: 79 70 229;
-  --color-primary-hover: 67 56 202;
+  --color-primary: 129 140 248;
+  --color-primary-hover: 99 102 241;
   --color-on-primary: 255 255 255;
-  --color-panel: 255 255 255;
-  --color-surface: 226 232 240;
-  --color-background: 241 245 249;
-  --color-overlay: 15 23 42;
-  --scrollbar-thumb: 148 163 184;
-  --scrollbar-thumb-hover: 100 116 139;
-}
-
-/* Dark theme overrides */
-.dark-theme {
-  --color-primary: 99 102 241;
-  --color-primary-hover: 79 70 229;
-  --color-on-primary: 255 255 255;
-  --color-panel: 15 23 42;
-  --color-surface: 30 41 59;
-  --color-background: 9 14 30;
-  --color-overlay: 241 245 249;
+  --color-panel: 30 30 40;
+  --color-surface: 40 40 55;
+  --color-background: 18 18 28;
+  --color-overlay: 226 232 240;
   --scrollbar-thumb: 71 85 105;
   --scrollbar-thumb-hover: 100 116 139;
 }
 
-/* Dark theme — override hardcoded colors globally */
-.dark-theme body {
-  background-color: #090e1e !important;
+/* Theme overrides — single dark theme */
+body {
+  background-color: #12121c !important;
   color: #f1f5f9 !important;
 }
 
-.dark-theme ::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
 }
-.dark-theme ::-webkit-scrollbar-thumb:hover {
+::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 
-.dark-theme .glass-panel,
-.dark-theme .glass-panel *,
-.dark-theme .glass-modal {
-  background: rgba(30, 41, 59, 0.7) !important;
-  border-color: rgba(51, 65, 85, 0.5) !important;
+.glass-panel,
+.glass-panel *,
+.glass-modal {
+  background: rgba(40, 40, 55, 0.7) !important;
+  border-color: rgba(60, 60, 80, 0.5) !important;
   color: #f1f5f9 !important;
 }
 
 /* Dark theme — settings page */
-.dark-theme .settings-page-root {
+.settings-page-root {
   background: transparent !important;
 }
-.dark-theme .settings-nav {
-  background: rgba(15, 23, 42, 0.7) !important;
-  border-color: rgba(51, 65, 85, 0.4) !important;
+.settings-nav {
+  background: rgba(30, 30, 42, 0.7) !important;
+  border-color: rgba(60, 60, 80, 0.4) !important;
 }
-.dark-theme .settings-page-root .nav-title { color: #f1f5f9 !important; }
-.dark-theme .settings-page-root .nav-item { color: #94a3b8 !important; }
-.dark-theme .settings-page-root .nav-item:hover { background: rgba(51, 65, 85, 0.3) !important; color: #f1f5f9 !important; }
-.dark-theme .settings-page-root .nav-item.is-active { background: #6366f1 !important; }
-.dark-theme .settings-content {
-  background: rgba(30, 41, 59, 0.5) !important;
-  border-color: rgba(51, 65, 85, 0.4) !important;
+.settings-page-root .nav-title { color: #f1f5f9 !important; }
+.settings-page-root .nav-item { color: #94a3b8 !important; }
+.settings-page-root .nav-item:hover { background: rgba(60, 60, 80, 0.3) !important; color: #f1f5f9 !important; }
+.settings-page-root .nav-item.is-active { background: #818cf8 !important; }
+.settings-content {
+  background: rgba(40, 40, 55, 0.5) !important;
+  border-color: rgba(60, 60, 80, 0.4) !important;
 }
-.dark-theme .section-title { color: #f1f5f9 !important; }
-.dark-theme .setting-card label { color: #64748b !important; }
-.dark-theme .setting-input,
-.dark-theme .setting-select {
-  background: #1e293b !important;
-  border-color: #334155 !important;
+.section-title { color: #f1f5f9 !important; }
+.setting-card label { color: #64748b !important; }
+.setting-input,
+.setting-select {
+  background: #282837 !important;
+  border-color: #3c3c50 !important;
   color: #f1f5f9 !important;
 }
-.dark-theme .setting-value { color: #f1f5f9 !important; }
-.dark-theme .theme-toggle { background: #1e293b !important; }
-.dark-theme .theme-btn { color: #94a3b8 !important; }
-.dark-theme .theme-btn.is-active { background: #334155 !important; color: #a5b4fc !important; }
-.dark-theme .save-btn { background: #6366f1 !important; }
-.dark-theme .logout-btn { background: #450a0a !important; border-color: #7f1d1d !important; }
+.setting-value { color: #f1f5f9 !important; }
+.save-btn { background: #818cf8 !important; }
+.logout-btn { background: #450a0a !important; border-color: #7f1d1d !important; }
 
 /* Dark theme — chat */
-.dark-theme .messages-list { background: transparent !important; }
-.dark-theme .message-bubble {
-  background: rgba(30, 41, 59, 0.6) !important;
-  border-color: rgba(51, 65, 85, 0.3) !important;
+.messages-list { background: transparent !important; }
+.message-bubble {
+  background: rgba(40, 40, 55, 0.6) !important;
+  border-color: rgba(60, 60, 80, 0.3) !important;
   color: #f1f5f9 !important;
 }
-.dark-theme .chat-input {
-  background: rgba(30, 41, 59, 0.5) !important;
-  border-color: rgba(51, 65, 85, 0.3) !important;
+.chat-input {
+  background: rgba(40, 40, 55, 0.5) !important;
+  border-color: rgba(60, 60, 80, 0.3) !important;
   color: #f1f5f9 !important;
 }
-.dark-theme .chat-sidebar {
-  background: rgba(30, 41, 59, 0.5) !important;
-  border-color: rgba(51, 65, 85, 0.3) !important;
+.chat-sidebar {
+  background: rgba(40, 40, 55, 0.5) !important;
+  border-color: rgba(60, 60, 80, 0.3) !important;
 }
-.dark-theme .conv-item {
+.conv-item {
   background: transparent !important;
   color: #cbd5e1 !important;
 }
-.dark-theme .conv-item.is-active { background: rgba(79, 70, 229, 0.3) !important; }
-.dark-theme .conv-item:hover { background: rgba(51, 65, 85, 0.3) !important; }
-.dark-theme .conv-title { color: #f1f5f9 !important; }
-.dark-theme .conv-preview { color: #94a3b8 !important; }
+.conv-item.is-active { background: rgba(129, 140, 248, 0.3) !important; }
+.conv-item:hover { background: rgba(60, 60, 80, 0.3) !important; }
+.conv-title { color: #f1f5f9 !important; }
+.conv-preview { color: #94a3b8 !important; }
 
-/* Dark theme — workspace selection */
-.dark-theme .workspace-selection {
-  background: #090e1e !important;
+/* Workspace selection page — dark theme */
+.selection-container {
+  background: #12121c !important;
 }
-.dark-theme .workspace-card {
-  background: rgba(30, 41, 59, 0.6) !important;
-  border-color: rgba(51, 65, 85, 0.4) !important;
-  color: #f1f5f9 !important;
+html .selection-container .version-badge {
+  background: rgba(40, 40, 55, 0.8) !important;
+  border-color: rgba(60, 60, 80, 0.4) !important;
 }
-.dark-theme .workspace-card:hover {
-  background: rgba(51, 65, 85, 0.4) !important;
+html .selection-container .badge-text { color: #cbd5e1 !important; }
+html .selection-container .welcome-title { color: #f1f5f9 !important; }
+html .selection-container .welcome-sub { color: #94a3b8 !important; }
+html .selection-container .create-btn-card {
+  background: rgba(40, 40, 55, 0.6) !important;
+  border-color: rgba(60, 60, 80, 0.4) !important;
 }
+html .selection-container .create-btn-card:hover {
+  background: rgba(60, 60, 80, 0.4) !important;
+}
+html .selection-container .create-text h3 { color: #f1f5f9 !important; }
+html .selection-container .create-text p { color: #94a3b8 !important; }
+html .selection-container .workspace-item-card {
+  background: rgba(40, 40, 55, 0.6) !important;
+  border-color: rgba(60, 60, 80, 0.4) !important;
+}
+html .selection-container .workspace-item-card:hover {
+  background: rgba(60, 60, 80, 0.4) !important;
+}
+html .selection-container .ws-info h4 { color: #f1f5f9 !important; }
+html .selection-container .ws-icon {
+  background: rgba(60, 60, 80, 0.4) !important;
+  color: #94a3b8 !important;
+}
+html .selection-container .empty-list-card {
+  border-color: rgba(60, 60, 80, 0.2) !important;
+  color: #94a3b8 !important;
+}
+html .selection-container .header-line {
+  background: rgba(60, 60, 80, 0.3) !important;
+}
+html .selection-container .list-label { color: #94a3b8 !important; }
 
 /* Dark theme — login */
-.dark-theme .login-page-root {
-  background-color: #090e1e !important;
+.login-page-root {
+  background-color: #12121c !important;
   color: #f1f5f9 !important;
 }
-.dark-theme .login-card {
-  background: rgba(15, 23, 42, 0.85) !important;
-  border-color: rgba(51, 65, 85, 0.5) !important;
+.login-card {
+  background: rgba(30, 30, 42, 0.85) !important;
+  border-color: rgba(60, 60, 80, 0.5) !important;
 }
-.dark-theme .grid-pattern {
+.grid-pattern {
   background-image:
     linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px) !important;
 }
-.dark-theme .slogan-title { color: #f1f5f9 !important; }
-.dark-theme .slogan-sub { color: #94a3b8 !important; }
-.dark-theme .feature-text h3 { color: #f1f5f9 !important; }
-.dark-theme .feature-text p { color: #94a3b8 !important; }
-.dark-theme .login-form label { color: #94a3b8 !important; }
-.dark-theme .input-wrapper input {
-  background: rgba(30, 41, 59, 0.65) !important;
-  border-color: rgba(51, 65, 85, 0.4) !important;
+.slogan-title { color: #f1f5f9 !important; }
+.slogan-sub { color: #94a3b8 !important; }
+.feature-text h3 { color: #f1f5f9 !important; }
+.feature-text p { color: #94a3b8 !important; }
+.login-form label { color: #94a3b8 !important; }
+.input-wrapper input {
+  background: rgba(40, 40, 55, 0.65) !important;
+  border-color: rgba(60, 60, 80, 0.4) !important;
   color: #f1f5f9 !important;
 }
-.dark-theme .input-wrapper input:focus {
-  background: rgba(15, 23, 42, 0.9) !important;
+.input-wrapper input:focus {
+  background: rgba(30, 30, 42, 0.9) !important;
   border-color: #6366f1 !important;
 }
-.dark-theme .login-btn {
-  background: #4f46e5;
+.login-btn {
+  background: #6366f1;
   color: white;
 }
-.dark-theme .error-message {
+.error-message {
   background: rgba(127, 29, 29, 0.3) !important;
   border-color: rgba(248, 113, 113, 0.3) !important;
   color: #fca5a5 !important;
 }
-.dark-theme .card-footer-note p { color: #64748b !important; }
-.dark-theme .global-footer-simple p { color: #475569 !important; }
-.dark-theme .version-badge {
-  background: rgba(30, 41, 59, 0.8) !important;
-  border-color: rgba(51, 65, 85, 0.4) !important;
+.card-footer-note p { color: #64748b !important; }
+.global-footer-simple p { color: #475569 !important; }
+.version-badge {
+  background: rgba(40, 40, 55, 0.8) !important;
+  border-color: rgba(60, 60, 80, 0.4) !important;
 }
-.dark-theme .badge-text { color: #cbd5e1 !important; }
-.dark-theme .feature-icon {
-  background: rgba(30, 41, 59, 0.8) !important;
-  border-color: rgba(51, 65, 85, 0.4) !important;
+.badge-text { color: #cbd5e1 !important; }
+.feature-icon {
+  background: rgba(40, 40, 55, 0.8) !important;
+  border-color: rgba(60, 60, 80, 0.4) !important;
 }
-.dark-theme .app-name { color: #f1f5f9 !important; }
-.dark-theme .app-subtitle { color: #94a3b8 !important; }
-.dark-theme .app-logo {
-  background: linear-gradient(135deg, #4f46e5, #6366f1);
-  box-shadow: 0 12px 25px rgba(79, 70, 229, 0.4);
+.app-name { color: #f1f5f9 !important; }
+.app-subtitle { color: #94a3b8 !important; }
+.app-logo {
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+  box-shadow: 0 12px 25px rgba(99, 102, 241, 0.4);
 }
 
 /* Dark theme — sidebar navigation */
-.dark-theme .sidebar-nav {
-  background: rgba(30, 41, 59, 0.7) !important;
-  border-color: rgba(51, 65, 85, 0.4) !important;
+.sidebar-nav {
+  background: rgba(40, 40, 55, 0.7) !important;
+  border-color: rgba(60, 60, 80, 0.4) !important;
   color: #cbd5e1 !important;
 }
-.dark-theme .sidebar-nav button {
+.sidebar-nav button {
   color: #94a3b8 !important;
 }
-.dark-theme .sidebar-nav button.is-active {
-  background: rgba(79, 70, 229, 0.3) !important;
+.sidebar-nav button.is-active {
+  background: rgba(129, 140, 248, 0.3) !important;
   color: #a5b4fc !important;
 }
-.dark-theme .sidebar-nav button:hover {
-  background: rgba(51, 65, 85, 0.3) !important;
+.sidebar-nav button:hover {
+  background: rgba(60, 60, 80, 0.3) !important;
   color: #f1f5f9 !important;
 }
 
 /* Dark theme — tasks */
-.dark-theme .task-card {
-  background: rgba(30, 41, 59, 0.6) !important;
-  border-color: rgba(51, 65, 85, 0.3) !important;
+.task-card {
+  background: rgba(40, 40, 55, 0.6) !important;
+  border-color: rgba(60, 60, 80, 0.3) !important;
   color: #cbd5e1 !important;
 }
-.dark-theme .task-title { color: #f1f5f9 !important; }
+.task-title { color: #f1f5f9 !important; }
 
 /* Dark theme — members */
-.dark-theme .member-row {
-  background: rgba(30, 41, 59, 0.6) !important;
-  border-color: rgba(51, 65, 85, 0.3) !important;
+.member-row {
+  background: rgba(40, 40, 55, 0.6) !important;
+  border-color: rgba(60, 60, 80, 0.3) !important;
 }
-.dark-theme .member-name { color: #f1f5f9 !important; }
+.member-name { color: #f1f5f9 !important; }
 
 /* Dark theme — modals */
-.dark-theme .modal-overlay {
+.modal-overlay {
   background: rgba(0, 0, 0, 0.6) !important;
 }
-.dark-theme .modal-content {
-  background: rgba(30, 41, 59, 0.9) !important;
-  border-color: rgba(51, 65, 85, 0.5) !important;
+.modal-content {
+  background: rgba(40, 40, 55, 0.9) !important;
+  border-color: rgba(60, 60, 80, 0.5) !important;
 }
-.dark-theme .modal-title { color: #f1f5f9 !important; }
+.modal-title { color: #f1f5f9 !important; }
 
 /* Dark theme — notifications */
-.dark-theme .notification-toast {
-  background: rgba(30, 41, 59, 0.9) !important;
-  border-color: rgba(51, 65, 85, 0.5) !important;
+.notification-toast {
+  background: rgba(40, 40, 55, 0.9) !important;
+  border-color: rgba(60, 60, 80, 0.5) !important;
   color: #f1f5f9 !important;
 }
 

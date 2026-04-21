@@ -1,7 +1,4 @@
 {
-  "app": {
-    "name": "Orchestra"
-  },
   "auth": {
     "subtitle": "协作平台已就绪",
     "accessRequired": "开始你的交响乐",
@@ -10,30 +7,24 @@
     "usernamePlaceholder": "输入您的用户名",
     "passwordPlaceholder": "输入您的密码",
     "signIn": "登录",
+    "validating": "验证中...",
     "invalidCredentials": "用户名或密码错误",
     "restrictedAccess": "私有部署 · 仅限受邀访问"
-  },
-  "friends": {
-    "title": "好友",
-    "add": "添加",
-    "invite": "邀请"
   },
   "invite": {
     "menu": {
       "title": "邀请加入服务器",
       "subtitle": "生成唯一邀请链接",
-      "admin": "以管理员身份邀请",
-      "adminDesc": "完全服务器权限",
       "secretary": "以秘书身份邀请（监工）",
       "secretaryDesc": "监督与协调助手执行",
       "assistant": "以助手身份邀请",
-      "assistantDesc": "管理权限",
-      "member": "普通成员",
-      "memberDesc": "标准访问权限"
+      "assistantDesc": "管理权限"
     }
   },
+  "friends": {
+    "invite": "邀请"
+  },
   "chat": {
-    "empty": "选择会话开始聊天",
     "channels": "频道",
     "directMessages": "私信",
     "workspaceFallback": "工作区",
@@ -43,7 +34,6 @@
     "inputSend": "发送",
     "inputHint": "Enter 发送，Shift+Enter 换行",
     "inputPlaceholder": "发送到 {name}",
-    "mentionSuggestions": "选择要提及的成员",
     "emptyStateTitle": "开始对话",
     "emptyStateDesc": "从左侧选择频道开始。Orchestra 的 AI 助手随时准备协助您编排任务。",
     "searchPlaceholder": "搜索消息...",
@@ -67,44 +57,17 @@
     "switcherNew": "新建工作区"
   },
   "memberRow": {
-    "openTerminal": "打开终端",
     "sendMessage": "发消息",
-    "mention": "提及",
     "rename": "重命名",
     "remove": "移除",
     "statusHeading": "状态",
     "statusOnline": "在线",
     "statusWorking": "工作中",
     "statusDnd": "请勿打扰",
-    "statusOffline": "离线",
-    "badgeWsConnected": "终端 WebSocket 已连接",
-    "badgeWsConnecting": "正在连接终端…",
-    "badgeWsError": "终端连接错误",
-    "badgeWsDisconnected": "终端已断开",
-    "badgeServerPty": "服务端 PTY 运行中 — 打开终端以附加",
-    "badgeNoSession": "该成员尚无终端会话",
-    "badgeWsPending": "等待连接终端",
-    "badgeWsWorking": "终端有活动输出",
-    "terminalLinePending": "终端：等待连接",
-    "terminalLineConnecting": "终端：连接中",
-    "terminalLineConnected": "终端：已连接",
-    "terminalLineWorking": "终端：工作中",
-    "terminalLineError": "终端：连接异常",
-    "terminalLineDisconnected": "终端：已断开",
-    "terminalLineIdle": "终端：未启动",
-    "terminalLineServerPty": "终端：服务端 PTY 运行中（未附加）"
-  },
-  "terminal": {
-    "overlayPending": "等待连接…",
-    "overlayConnecting": "正在连接终端…",
-    "overlayError": "终端未连接或已断开",
-    "overlayErrorHint": "请检查后端与 WebSocket，或关闭标签后重试"
+    "statusOffline": "离线"
   },
   "members": {
     "title": "成员",
-    "addAssistant": "AI 助手",
-    "addAdmin": "管理员",
-    "addMember": "成员",
     "loading": "正在加载成员…",
     "emptyRoleOwner": "暂无所有者",
     "emptyRoleAdmin": "暂无管理员",
@@ -140,12 +103,14 @@
       "submitMember": "添加成员",
       "submitAdmin": "添加管理员",
       "submitAdd": "添加",
-      "permFullAccess": "完全访问",
-      "permFullAccessDesc": "可管理所有工作区设置",
-      "permMemberManage": "成员管理",
-      "permMemberManageDesc": "可添加和移除成员",
-      "permBilling": "账单访问",
-      "permBillingDesc": "可查看和管理账单"
+      "displayName": "显示名称",
+      "displayNamePlaceholder": "输入显示名称",
+      "cliCommand": "CLI 命令",
+      "placeholderAssistantCli": "例如：claude, gemini",
+      "cliArgs": "命令参数",
+      "cliArgsPlaceholder": "空格分隔的参数列表",
+      "hintSecretary": "秘书负责协调多个助手的任务分配。",
+      "hintAssistant": "助手通过 CLI 运行时执行任务。"
     },
     "editMemberModal": {
       "title": "编辑成员",
@@ -178,16 +143,12 @@
     "title": "设置",
     "general": "通用",
     "language": "语言",
-    "terminal": "终端",
     "workspace": "工作区",
     "account": "账号",
     "apiKeys": "API 密钥",
     "keyboard": "快捷键",
     "security": "安全",
-    "about": "关于",
-    "diagnostics": "诊断",
-    "diagnosticsHint": "最近的 API 错误会自动记录在此。",
-    "clearLog": "清空日志"
+    "about": "关于"
   },
   "settingsTabs": {
     "general": "通用",
@@ -201,24 +162,14 @@
     "account": "账号与安全",
     "currentUser": "当前用户",
     "logout": "退出登录",
-    "themeMode": "主题模式",
     "language": "语言",
     "saving": "保存中...",
     "saveChanges": "保存更改",
     "workspaceName": "工作区名称",
-    "serverPath": "物理路径 (Server Path)"
-  },
-  "auth": {
-    "subtitle": "协作平台已就绪",
-    "accessRequired": "开始你的交响乐",
-    "username": "用户名",
-    "password": "密码",
-    "usernamePlaceholder": "输入您的用户名",
-    "passwordPlaceholder": "输入您的密码",
-    "signIn": "登录",
-    "validating": "验证中...",
-    "invalidCredentials": "用户名或密码错误",
-    "restrictedAccess": "私有部署 · 仅限受邀访问"
+    "serverPath": "物理路径 (Server Path)",
+    "defaultMember": "默认成员",
+    "noDefaultMember": "无默认成员",
+    "defaultMemberHint": "邀请助手时自动预选此成员"
   },
   "loginPage": {
     "versionBadge": "VERSION 1.0 ALPHA",
@@ -231,9 +182,5 @@
     "featureTerminalDesc": "基于 PTY 的实时终端，支持 ANSI 全色彩输出与多标签并行操作。",
     "footerText": "© 2026 Orchestra AI. 保留所有权利。",
     "privateDeployment": "私有部署 · 仅限受邀访问"
-  },
-  "skills": {
-    "title": "技能",
-    "webNote": "参考桌面端的 Skills / 插件市场依赖桌面端（Tauri）能力。Web 端此处为占位说明；后续可接入基于 HTTP 的插件接口。"
   }
 }

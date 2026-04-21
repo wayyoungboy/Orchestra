@@ -68,7 +68,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'mention', memberId: string): void
   (e: 'open-invite'): void
   (e: 'member-action', payload: ActionPayload): void
 }>()
@@ -98,8 +97,7 @@ interface ActionPayload {
 
 function handleAction(payload: ActionPayload) {
   openMenuId.value = null
-  if (payload.action === 'mention') emit('mention', payload.member.id)
-  else emit('member-action', payload)
+  emit('member-action', payload)
 }
 </script>
 
