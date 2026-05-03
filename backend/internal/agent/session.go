@@ -34,6 +34,9 @@ type AgentSession struct {
 	tmuxMgr   *tmux.Manager
 	tmuxName  string
 
+	// Output buffer for semantic message batching
+	outputBuffer *OutputBuffer
+
 	// External dependencies
 	toolHandler *a2a.ToolHandler
 	onStatus    func(workspaceID, memberID string, state AgentState)
@@ -53,6 +56,9 @@ func NewAgentSession(id, workspaceID, memberID, memberName string) *AgentSession
 		createdAt:   time.Now(),
 		lastActive:  time.Now(),
 	}
+
+	// Create output buffer (bridge will be set later via SetBridge)
+	s.outputBuffer = NewOutputBuffer(s, nil)
 
 	s.queue.SetForceFlush(func(items []DispatchItem) {
 		s.dispatchItems(items)
@@ -89,6 +95,10 @@ func (s *AgentSession) SetOutputCallback(fn func(msg *a2a.ACPMessage)) {
 // SetBridge sets the output processor for this session.
 func (s *AgentSession) SetBridge(b OutputProcessor) {
 	s.bridge = b
+	// Also update the output buffer's bridge
+	if s.outputBuffer != nil {
+		s.outputBuffer.bridge = b
+	}
 }
 
 // Transport returns the underlying a2a.Session for WS/chat integration.
@@ -228,6 +238,11 @@ func (s *AgentSession) Start(ctx context.Context, member *models.Member, workspa
 
 	s.transport = a2a.NewSession(sessionID, s.WorkspaceID, s.MemberID, s.MemberName, member.TerminalType, tmuxSess)
 
+	// Start output buffer for semantic batching
+	if s.outputBuffer != nil {
+		s.outputBuffer.Start(ctx)
+	}
+
 	// Start output processing goroutine
 	go s.processOutput(ctx)
 
@@ -265,6 +280,9 @@ func (s *AgentSession) Start(ctx context.Context, member *models.Member, workspa
 
 // Kill stops the session and kills the tmux process.
 func (s *AgentSession) Kill() error {
+	if s.outputBuffer != nil {
+		s.outputBuffer.Stop()
+	}
 	if s.poller != nil {
 		s.poller.Stop()
 	}
@@ -285,6 +303,9 @@ func (s *AgentSession) Kill() error {
 
 // Release stops output processing but keeps the tmux session alive.
 func (s *AgentSession) Release() {
+	if s.outputBuffer != nil {
+		s.outputBuffer.Stop()
+	}
 	if s.poller != nil {
 		s.poller.Stop()
 	}
@@ -404,12 +425,18 @@ func (s *AgentSession) handleACPMessage(msg *a2a.ACPMessage) {
 			s.onStateChange()
 		}
 		s.sm.SetToolInFlight(false)
-		// Bridge to chat
-		if s.bridge != nil {
+		// Push to output buffer for semantic batching
+		if s.outputBuffer != nil {
+			s.outputBuffer.Push(msg)
+		} else if s.bridge != nil {
 			s.bridge.OnMessage(s, msg)
 		}
 
 	case a2a.TypeToolUse:
+		// Flush any pending assistant message buffer before tool_use
+		if s.outputBuffer != nil {
+			s.outputBuffer.Flush()
+		}
 		s.sm.SetToolInFlight(true)
 		// Execute tool if handler is configured
 		if s.toolHandler != nil {
@@ -417,6 +444,10 @@ func (s *AgentSession) handleACPMessage(msg *a2a.ACPMessage) {
 		}
 
 	case a2a.TypeResult:
+		// Flush any pending assistant message buffer before result
+		if s.outputBuffer != nil {
+			s.outputBuffer.Flush()
+		}
 		s.sm.SetToolInFlight(false)
 		// Bridge completion notification
 		if s.bridge != nil {

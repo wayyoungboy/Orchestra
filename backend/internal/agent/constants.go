@@ -59,4 +59,11 @@ const (
 	ScrollbackLines      = 2000
 	RedrawSuppressWindow = 400 * time.Millisecond
 	IdleTimeout          = 30 * time.Minute
+	TerminalAckTimeout   = 5 * time.Second  // Timeout for terminal acks
+	TerminalResizeDebounce = 100 * time.Millisecond // Debounce for resize events
+)
+
+// Session generation
+const (
+	SpawnEpochMax = 1000 // Maximum session generation epochs for recovery
 )
