@@ -31,7 +31,7 @@ func TestSetupRouterReturnsEngine(t *testing.T) {
 	registry := agent.NewRegistry()
 	gateway := ws.NewGateway(nil, nil)
 
-	r, toolHandler := SetupRouter(registry, gateway, db, cfg)
+	r, toolHandler, _ := SetupRouter(registry, gateway, db, cfg)
 	if r == nil {
 		t.Fatal("expected non-nil router")
 	}
@@ -48,7 +48,7 @@ func TestHealthEndpoint(t *testing.T) {
 	registry := agent.NewRegistry()
 	gateway := ws.NewGateway(nil, nil)
 
-	r, _ := SetupRouter(registry, gateway, db, cfg)
+	r, _, _ := SetupRouter(registry, gateway, db, cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
@@ -67,7 +67,7 @@ func TestSwaggerEndpoint(t *testing.T) {
 	registry := agent.NewRegistry()
 	gateway := ws.NewGateway(nil, nil)
 
-	r, _ := SetupRouter(registry, gateway, db, cfg)
+	r, _, _ := SetupRouter(registry, gateway, db, cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/swagger/index.html", nil)
 	w := httptest.NewRecorder()

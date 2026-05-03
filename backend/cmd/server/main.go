@@ -95,7 +95,7 @@ func main() {
 	gateway := ws.NewGateway(a2aTerminalHandler, cfg.Security.AllowedOrigins)
 
 	// Setup router
-	router, toolHandler := api.SetupRouter(registry, gateway, db, cfg)
+	router, toolHandler, deps := api.SetupRouter(registry, gateway, db, cfg)
 
 	log.Printf("Orchestra starting on %s", cfg.Server.HTTPAddr)
 	log.Printf("Authentication: enabled=%v", cfg.Auth.Enabled)
@@ -122,6 +122,10 @@ func main() {
 		if err := toolHandler.Shutdown(shutdownCtx); err != nil {
 			log.Printf("Error shutting down tool handler: %v", err)
 		}
+	}
+
+	if deps != nil {
+		deps.Stop()
 	}
 
 	_ = encryptor // TODO: use encryptor for API key encryption

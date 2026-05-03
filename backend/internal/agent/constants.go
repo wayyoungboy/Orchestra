@@ -20,7 +20,7 @@ const (
 // Dispatch queue
 const (
 	DispatchQueueSize = 32
-	MergeWindow       = 100 * time.Millisecond
+	MergeWindow       = 300 * time.Millisecond
 	DedupWindow       = 30 * time.Second
 	DedupRingSize     = 128
 	ForceFlushTimeout = 30 * time.Second

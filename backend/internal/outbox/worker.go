@@ -4,7 +4,6 @@ package outbox
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -23,15 +22,17 @@ const (
 
 // Item represents a single outbox entry.
 type Item struct {
-	ID            string     `json:"id"`
-	ConversationID string    `json:"conversation_id"`
-	SenderID      string     `json:"sender_id"`
-	Content       string     `json:"content"`
-	Status        ItemStatus `json:"status"`
-	AttemptCount  int        `json:"attempt_count"`
-	LastError     string     `json:"last_error"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
+	ID              string     `json:"id"`
+	ConversationID  string     `json:"conversation_id"`
+	SenderID        string     `json:"sender_id"`
+	Content         string     `json:"content"`
+	Status          ItemStatus `json:"status"`
+	AttemptCount    int        `json:"attempt_count"`
+	LastError       string     `json:"last_error"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+	WorkspaceID     string     `json:"workspace_id"`
+	TargetMemberID  string     `json:"target_member_id"`
 }
 
 // SenderFunc is the function that actually sends a message.
@@ -142,7 +143,8 @@ func (w *Worker) processNext(ctx context.Context) {
 func (w *Worker) pendingItems(ctx context.Context) ([]*Item, error) {
 	query := `
 		SELECT id, conversation_id, sender_id, content, status, attempt_count,
-		       COALESCE(last_error, ''), created_at, updated_at
+		       COALESCE(last_error, ''), created_at, updated_at,
+		       COALESCE(workspace_id, ''), COALESCE(target_member_id, '')
 		FROM outbox
 		WHERE status IN ('pending', 'failed')
 		ORDER BY created_at ASC
@@ -160,7 +162,8 @@ func (w *Worker) pendingItems(ctx context.Context) ([]*Item, error) {
 		var it Item
 		var createdAt, updatedAt int64
 		if err := rows.Scan(&it.ID, &it.ConversationID, &it.SenderID, &it.Content,
-			&it.Status, &it.AttemptCount, &it.LastError, &createdAt, &updatedAt); err != nil {
+			&it.Status, &it.AttemptCount, &it.LastError, &createdAt, &updatedAt,
+			&it.WorkspaceID, &it.TargetMemberID); err != nil {
 			return nil, fmt.Errorf("scan outbox item: %w", err)
 		}
 		it.CreatedAt = time.Unix(createdAt, 0)
@@ -283,25 +286,16 @@ func (w *Worker) markDead(id string, sendErr error) error {
 }
 
 // Enqueue adds a new message to the outbox.
-func (w *Worker) Enqueue(ctx context.Context, conversationID, senderID, content string) (string, error) {
+func (w *Worker) Enqueue(ctx context.Context, workspaceID, conversationID, targetMemberID, senderID, content string) (string, error) {
 	id := fmt.Sprintf("obx-%d", time.Now().UnixNano())
 	now := time.Now().Unix()
 
 	_, err := w.db.ExecContext(ctx, `
-		INSERT INTO outbox (id, conversation_id, sender_id, content, status, attempt_count, created_at, updated_at)
-		VALUES (?, ?, ?, ?, 'pending', 0, ?, ?)
-	`, id, conversationID, senderID, content, now, now)
+		INSERT INTO outbox (id, conversation_id, sender_id, content, status, attempt_count, created_at, updated_at, workspace_id, target_member_id)
+		VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?)
+	`, id, conversationID, senderID, content, now, now, workspaceID, targetMemberID)
 
 	return id, err
-}
-
-// EnqueueJSON marshals a value and enqueues it as JSON.
-func (w *Worker) EnqueueJSON(ctx context.Context, conversationID, senderID string, v interface{}) (string, error) {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return "", fmt.Errorf("marshal message: %w", err)
-	}
-	return w.Enqueue(ctx, conversationID, senderID, string(data))
 }
 
 // Stats returns counts by status.

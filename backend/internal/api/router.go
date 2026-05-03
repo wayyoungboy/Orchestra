@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"log"
 	"os"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +17,7 @@ import (
 	"github.com/orchestra/backend/internal/chatbridge"
 	"github.com/orchestra/backend/internal/config"
 	"github.com/orchestra/backend/internal/filesystem"
+	"github.com/orchestra/backend/internal/outbox"
 	"github.com/orchestra/backend/internal/security"
 	"github.com/orchestra/backend/internal/storage"
 	"github.com/orchestra/backend/internal/storage/repository"
@@ -44,6 +47,9 @@ type Dependencies struct {
 	TaskRepo       *repository.TaskRepo
 	APIKeyRepo     repository.APIKeyRepository
 
+	// Outbox worker
+	OutboxWorker *outbox.Worker
+
 	// Handlers (created by registerRepositories)
 	WsHandler         *handlers.WorkspaceHandler
 	MemberHandler     *handlers.MemberHandler
@@ -55,8 +61,16 @@ type Dependencies struct {
 	AuthHandler       *handlers.AuthHandler
 }
 
+// Stop gracefully stops background workers.
+func (d *Dependencies) Stop() {
+	if d.OutboxWorker != nil {
+		d.OutboxWorker.Stop()
+		log.Printf("[outbox] Worker stopped")
+	}
+}
+
 // SetupRouter creates and configures the Gin engine with all routes.
-func SetupRouter(registry *agent.Registry, gateway *ws.Gateway, db *storage.Database, cfg *config.Config) (*gin.Engine, *a2a.ToolHandler) {
+func SetupRouter(registry *agent.Registry, gateway *ws.Gateway, db *storage.Database, cfg *config.Config) (*gin.Engine, *a2a.ToolHandler, *Dependencies) {
 	r := gin.New()
 	r.SetTrustedProxies([]string{"127.0.0.1", "::1"})
 
@@ -72,7 +86,7 @@ func SetupRouter(registry *agent.Registry, gateway *ws.Gateway, db *storage.Data
 	registerWebSocketRoutes(r, deps)
 	wireUpIntegrations(deps)
 
-	return r, deps.wireUpToolHandler()
+	return r, deps.wireUpToolHandler(), deps
 }
 
 func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engine, registry *agent.Registry, gateway *ws.Gateway) *Dependencies {
@@ -102,10 +116,37 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 
 	registry.SetTmuxManager(tmux.NewManager(""))
 
+	// Create outbox worker with sender function that uses registry
+	outboxWorker := outbox.New(db.DB(), outbox.Config{
+		MaxRetries:    agent.OutboxMaxRetries,
+		MinBackoff:    agent.OutboxBaseBackoff,
+		MaxBackoff:    agent.OutboxMaxBackoff,
+		PollInterval:  agent.OutboxPollInterval,
+		MaxConcurrent: 5,
+	}, func(ctx context.Context, item *outbox.Item) error {
+		// Look up the member
+		member, err := memberRepo.GetByID(ctx, item.TargetMemberID)
+		if err != nil {
+			return err
+		}
+		// Get workspace path
+		workspace, err := wsRepo.GetByID(ctx, item.WorkspaceID)
+		if err != nil {
+			return err
+		}
+		// Acquire or create session
+		sess, err := registry.AcquireOrCreate(ctx, member, workspace.Path)
+		if err != nil {
+			return err
+		}
+		// Send the message
+		return sess.SendUserMessage(item.Content)
+	})
+
 	wsHandler := handlers.NewWorkspaceHandler(wsRepo, memberRepo, msgRepo, browser)
 	memberHandler := handlers.NewMemberHandler(memberRepo, wsRepo, ws.GlobalChatHub)
 	terminalHandler := handlers.NewTerminalHandler(registry, wsRepo)
-	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, wsRepo, registry, ws.GlobalChatHub, cfg.Server.HTTPAddr, cfg.Auth.Enabled, baseURL)
+	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, wsRepo, registry, ws.GlobalChatHub, cfg.Server.HTTPAddr, cfg.Auth.Enabled, baseURL, outboxWorker)
 	attachmentHandler := handlers.NewAttachmentHandler(msgRepo, convRepo, attachRepo, cfg.Server.UploadDir)
 	taskHandler := handlers.NewTaskHandler(taskRepo, memberRepo, ws.GlobalChatHub)
 	apiKeyHandler, err := handlers.NewAPIKeyHandler(apiKeyRepo, cfg)
@@ -140,6 +181,8 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 		AttachRepo:    attachRepo,
 		TaskRepo:      taskRepo,
 		APIKeyRepo:    apiKeyRepo,
+
+		OutboxWorker: outboxWorker,
 
 		WsHandler:         wsHandler,
 		MemberHandler:     memberHandler,
@@ -287,6 +330,12 @@ func wireUpIntegrations(deps *Dependencies) {
 
 	// Wire bridge to registry sessions via an adapter that bridges the interface types
 	deps.Registry.SetBridge(&bridgeOutputAdapter{bridge: bridge})
+
+	// Start outbox worker for reliable message delivery
+	if deps.OutboxWorker != nil {
+		deps.OutboxWorker.Start(context.Background())
+		log.Printf("[outbox] Worker started")
+	}
 }
 
 func (deps *Dependencies) wireUpToolHandler() *a2a.ToolHandler {

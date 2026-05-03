@@ -27,7 +27,9 @@ func testDB(t *testing.T) *sql.DB {
 			attempt_count INTEGER NOT NULL DEFAULT 0,
 			last_error TEXT,
 			created_at INTEGER NOT NULL,
-			updated_at INTEGER NOT NULL
+			updated_at INTEGER NOT NULL,
+			workspace_id TEXT NOT NULL DEFAULT '',
+			target_member_id TEXT NOT NULL DEFAULT ''
 		)
 	`)
 	if err != nil {
@@ -72,7 +74,7 @@ func TestEnqueueAndProcess(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	id, err := w.Enqueue(ctx, "conv-1", "sender-1", `{"text":"hello"}`)
+	id, err := w.Enqueue(ctx, "ws-1", "conv-1", "member-1", "sender-1", `{"text":"hello"}`)
 	if err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
@@ -100,36 +102,6 @@ func TestEnqueueAndProcess(t *testing.T) {
 	mu.Unlock()
 }
 
-func TestEnqueueJSON(t *testing.T) {
-	db := testDB(t)
-
-	w := New(db, DefaultConfig(), func(ctx context.Context, item *Item) error {
-		return nil
-	})
-
-	ctx := context.Background()
-	id, err := w.EnqueueJSON(ctx, "conv-1", "sender-1", map[string]string{"key": "value"})
-	if err != nil {
-		t.Fatalf("enqueue json: %v", err)
-	}
-	if id == "" {
-		t.Error("expected non-empty id")
-	}
-}
-
-func TestEnqueueJSONInvalid(t *testing.T) {
-	db := testDB(t)
-	w := New(db, DefaultConfig(), func(ctx context.Context, item *Item) error {
-		return nil
-	})
-
-	// channel cannot be JSON marshaled
-	_, err := w.EnqueueJSON(context.Background(), "conv-1", "sender-1", make(chan int))
-	if err == nil {
-		t.Error("expected error for unmarshalable type")
-	}
-}
-
 func TestRetryExhaustionBecomesDead(t *testing.T) {
 	db := testDB(t)
 
@@ -145,7 +117,7 @@ func TestRetryExhaustionBecomesDead(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	_, err := w.Enqueue(ctx, "conv-1", "sender-1", "fail me")
+	_, err := w.Enqueue(ctx, "ws-1", "conv-1", "member-1", "sender-1", "fail me")
 	if err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}

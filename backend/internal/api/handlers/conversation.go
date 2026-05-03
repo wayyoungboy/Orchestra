@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/orchestra/backend/internal/agent"
 	"github.com/orchestra/backend/internal/models"
+	"github.com/orchestra/backend/internal/outbox"
 	"github.com/orchestra/backend/internal/storage/repository"
 	"github.com/orchestra/backend/internal/ws"
 )
@@ -27,6 +28,7 @@ type ConversationHandler struct {
 	serverAddr       string
 	authEnabled      bool
 	configuredBaseURL string
+	outbox           *outbox.Worker
 }
 
 func NewConversationHandler(
@@ -40,6 +42,7 @@ func NewConversationHandler(
 	serverAddr string,
 	authEnabled bool,
 	baseURL string,
+	outboxWorker *outbox.Worker,
 ) *ConversationHandler {
 	return &ConversationHandler{
 		convRepo:          convRepo,
@@ -52,6 +55,7 @@ func NewConversationHandler(
 		serverAddr:        serverAddr,
 		authEnabled:       authEnabled,
 		configuredBaseURL: baseURL,
+		outbox:            outboxWorker,
 	}
 }
 
@@ -540,6 +544,18 @@ func (h *ConversationHandler) MarkConversationRead(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	workspaceID := c.Param("id")
+	if workspaceID != "" {
+		h.chatHub.BroadcastToWorkspace(workspaceID, ws.ChatEvent{
+			Type:           ws.EventUnreadSync,
+			WorkspaceID:    workspaceID,
+			ConversationID: convID,
+			SenderID:       userID,
+			UnreadCount:    0,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
@@ -585,6 +601,13 @@ func (h *ConversationHandler) MarkAllConversationsRead(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+		h.chatHub.BroadcastToWorkspace(workspaceID, ws.ChatEvent{
+			Type:           ws.EventUnreadSync,
+			WorkspaceID:    workspaceID,
+			ConversationID: conv.ID,
+			SenderID:       body.UserID,
+			UnreadCount:    0,
+		})
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
@@ -926,7 +949,13 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 				)
 			}
 
-		_ = sess.SendUserMessage(fullPrompt)
+		if err := sess.Dispatch(fullPrompt, "user"); err != nil && h.outbox != nil {
+			if _, enqueueErr := h.outbox.Enqueue(c.Request.Context(), workspaceID, convID, memberID, memberID, fullPrompt); enqueueErr != nil {
+				log.Printf("[chat-forward] Failed to enqueue to outbox for member %s: %v", memberID, enqueueErr)
+			} else {
+				log.Printf("[chat-forward] Enqueued message to outbox for member %s (dispatch failed: %v)", memberID, err)
+			}
+		}
 	}
 }
 
@@ -1055,8 +1084,15 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 						h.baseURL(), h.authHeader(),
 						req.WorkspaceID, req.ConversationID, targetID, m.Name,
 					)
-					_ = targetSess.SendUserMessage(forwardPrompt)
-					log.Printf("[internal-chat] Forwarded assistant result from %s to secretary %s", req.SenderID, targetID)
+					if err := targetSess.Dispatch(forwardPrompt, req.SenderID); err != nil && h.outbox != nil {
+						if _, enqueueErr := h.outbox.Enqueue(c.Request.Context(), req.WorkspaceID, req.ConversationID, targetID, targetID, forwardPrompt); enqueueErr != nil {
+							log.Printf("[internal-chat] Failed to enqueue to outbox for secretary %s: %v", targetID, enqueueErr)
+						} else {
+							log.Printf("[internal-chat] Enqueued to outbox for secretary %s (dispatch failed: %v)", targetID, err)
+						}
+					} else {
+						log.Printf("[internal-chat] Forwarded assistant result from %s to secretary %s", req.SenderID, targetID)
+					}
 				}
 			}
 		}
