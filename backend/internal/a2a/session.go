@@ -68,8 +68,7 @@ func (m *ACPMessage) ParseToolUseMessage() (*ToolUseMessage, error) {
 	return &msg, nil
 }
 
-// Session represents an agent session backed by a tmux session.
-// It implements the same interface as the old ACP session for ACPBridge compatibility.
+// Session represents an agent session backed by tmux.
 type Session struct {
 	ID           string
 	WorkspaceID  string
@@ -77,18 +76,17 @@ type Session struct {
 	MemberName   string
 	TerminalType string
 
-	// Tmux session (replaces localRunner and A2A client)
 	tmuxSession *tmux.TmuxSession
 
-	mu               sync.Mutex
-	lastActive       time.Time
-	createdAt        time.Time
-	lastChatConvID   string
-	chatStreamMu     sync.Mutex
-	chatStream       chan<- []byte
-	streamSpanMu     sync.Mutex
-	streamSpanID     string
-	streamSeq        uint64
+	mu             sync.Mutex
+	lastActive     time.Time
+	createdAt      time.Time
+	lastChatConvID string
+	chatStreamMu   sync.Mutex
+	chatStream     chan<- []byte
+	streamSpanMu   sync.Mutex
+	streamSpanID   string
+	streamSeq      uint64
 
 	// Output channels for ACPBridge / AgentBridge compatibility
 	OutputChan chan *ACPMessage
@@ -97,15 +95,15 @@ type Session struct {
 	done       bool
 	released   bool
 
-	// Active subscriptions (kept for potential future use)
+	// Active subscriptions
 	subscriptions map[string]func() // taskID -> cancel
 	subMu         sync.Mutex
 
-	// Pending tool use tracking (for correlation when tool results arrive)
-	pendingToolUses map[string]string // toolUseID -> taskID that initiated it
+	// Pending tool use tracking
+	pendingToolUses map[string]string // toolUseID -> taskID
 	toolUseMu       sync.Mutex
 
-	// Test-only capture hook (set by tests to intercept SendUserMessage calls)
+	// Test-only capture hook
 	testCaptureHook func(content string)
 }
 
@@ -139,7 +137,6 @@ func (s *Session) SendUserMessage(content string) error {
 	s.lastActive = time.Now()
 	s.mu.Unlock()
 
-	// Test capture hook
 	if s.testCaptureHook != nil {
 		s.testCaptureHook(content)
 	}
@@ -150,8 +147,7 @@ func (s *Session) SendUserMessage(content string) error {
 	return s.tmuxSession.SendInput(content)
 }
 
-// SendToolResultToAgent sends a tool result back to the agent via tmux.
-// For Claude's stream-json format, this sends a structured JSON message.
+// SendToolResultToAgent sends a tool result back to the agent.
 func (s *Session) SendToolResultToAgent(toolUseID, content string, isError bool) error {
 	if s.tmuxSession == nil {
 		return fmt.Errorf("no tmux session configured for %s", s.ID)
@@ -180,12 +176,12 @@ func (s *Session) SendToolResultToAgent(toolUseID, content string, isError bool)
 	return s.tmuxSession.SendInput(string(data))
 }
 
-// SendToolResult sends a tool result (alias for SendToolResultToAgent for WS compatibility).
+// SendToolResult sends a tool result (alias for SendToolResultToAgent).
 func (s *Session) SendToolResult(toolUseID, content string, isError bool) error {
 	return s.SendToolResultToAgent(toolUseID, content, isError)
 }
 
-// IsAlive returns true if the tmux session still exists.
+// IsAlive returns true if the tmux session is still active.
 func (s *Session) IsAlive() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -204,7 +200,6 @@ func (s *Session) Release() {
 	s.subscriptions = make(map[string]func())
 	s.subMu.Unlock()
 
-	// Stop tmux session (does NOT kill the tmux process)
 	if s.tmuxSession != nil {
 		s.tmuxSession.Stop()
 	}
@@ -349,7 +344,6 @@ func marshalACPContent(typ, text string) (json.RawMessage, error) {
 }
 
 // ConvertACPToWS converts an ACP message to a WebSocket response.
-// This function is used by the A2A terminal handler.
 func ConvertACPToWS(msg *ACPMessage) *ACPTerminalResponse {
 	if msg == nil {
 		return nil

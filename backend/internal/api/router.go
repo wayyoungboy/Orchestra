@@ -9,6 +9,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/orchestra/backend/internal/a2a"
+	"github.com/orchestra/backend/internal/agent"
 	"github.com/orchestra/backend/internal/api/handlers"
 	"github.com/orchestra/backend/internal/api/middleware"
 	"github.com/orchestra/backend/internal/chatbridge"
@@ -17,6 +18,7 @@ import (
 	"github.com/orchestra/backend/internal/security"
 	"github.com/orchestra/backend/internal/storage"
 	"github.com/orchestra/backend/internal/storage/repository"
+	"github.com/orchestra/backend/internal/tmux"
 	"github.com/orchestra/backend/internal/ws"
 )
 
@@ -27,7 +29,7 @@ type Dependencies struct {
 	Validator  *filesystem.Validator
 	Browser    *filesystem.Browser
 	Gateway    *ws.Gateway
-	A2APool    *a2a.Pool
+	Registry   *agent.Registry
 	AuthConfig middleware.AuthConfig
 	JWTConfig  *security.JWTConfig
 
@@ -54,11 +56,11 @@ type Dependencies struct {
 }
 
 // SetupRouter creates and configures the Gin engine with all routes.
-func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, cfg *config.Config) (*gin.Engine, *a2a.ToolHandler) {
+func SetupRouter(registry *agent.Registry, gateway *ws.Gateway, db *storage.Database, cfg *config.Config) (*gin.Engine, *a2a.ToolHandler) {
 	r := gin.New()
 	r.SetTrustedProxies([]string{"127.0.0.1", "::1"})
 
-	deps := registerRepositories(db, cfg, r, a2aPool, gateway)
+	deps := registerRepositories(db, cfg, r, registry, gateway)
 	registerAuthRoutes(r, deps)
 	registerWorkspaceRoutes(r, deps)
 	registerMemberRoutes(r, deps)
@@ -68,12 +70,12 @@ func SetupRouter(a2aPool *a2a.Pool, gateway *ws.Gateway, db *storage.Database, c
 	registerAttachmentRoutes(r, deps)
 	registerAPIKeyRoutes(r, deps)
 	registerWebSocketRoutes(r, deps)
-	wireUpIntegrations(a2aPool, deps)
+	wireUpIntegrations(deps)
 
-	return r, deps.wireUpToolHandler(a2aPool)
+	return r, deps.wireUpToolHandler()
 }
 
-func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engine, a2aPool *a2a.Pool, gateway *ws.Gateway) *Dependencies {
+func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engine, registry *agent.Registry, gateway *ws.Gateway) *Dependencies {
 	allowedPaths := cfg.Security.AllowedPaths
 	if len(allowedPaths) == 0 {
 		allowedPaths = []string{"~"}
@@ -98,10 +100,12 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 
 	baseURL := os.Getenv("ORCHESTRA_BASE_URL")
 
+	registry.SetTmuxManager(tmux.NewManager(""))
+
 	wsHandler := handlers.NewWorkspaceHandler(wsRepo, memberRepo, msgRepo, browser)
 	memberHandler := handlers.NewMemberHandler(memberRepo, wsRepo, ws.GlobalChatHub)
-	terminalHandler := handlers.NewTerminalHandler(a2aPool, wsRepo)
-	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, wsRepo, a2aPool, ws.GlobalChatHub, cfg.Server.HTTPAddr, cfg.Auth.Enabled, baseURL)
+	terminalHandler := handlers.NewTerminalHandler(registry, wsRepo)
+	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, wsRepo, registry, ws.GlobalChatHub, cfg.Server.HTTPAddr, cfg.Auth.Enabled, baseURL)
 	attachmentHandler := handlers.NewAttachmentHandler(msgRepo, convRepo, attachRepo, cfg.Server.UploadDir)
 	taskHandler := handlers.NewTaskHandler(taskRepo, memberRepo, ws.GlobalChatHub)
 	apiKeyHandler, err := handlers.NewAPIKeyHandler(apiKeyRepo, cfg)
@@ -109,6 +113,7 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 		panic("failed to create API key handler: " + err.Error())
 	}
 	authHandler := handlers.NewAuthHandler(userRepo, jwtConfig, cfg.Auth.Enabled)
+
 
 	authConfig := middleware.DefaultAuthConfig(cfg.Auth.JWTSecret)
 
@@ -122,7 +127,7 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 		Validator:  validator,
 		Browser:    browser,
 		Gateway:    gateway,
-		A2APool:    a2aPool,
+		Registry:   registry,
 		AuthConfig: authConfig,
 		JWTConfig:  jwtConfig,
 
@@ -277,19 +282,21 @@ func registerWebSocketRoutes(r *gin.Engine, deps *Dependencies) {
 	r.GET("/ws/chat/:workspaceId", wsAuth, deps.Gateway.HandleChat)
 }
 
-func wireUpIntegrations(a2aPool *a2a.Pool, deps *Dependencies) {
+func wireUpIntegrations(deps *Dependencies) {
 	bridge := chatbridge.NewAgentBridge(deps.MsgRepo, ws.GlobalChatHub)
-	a2aPool.SetOutputHook(func(sess *a2a.Session, msg *a2a.ACPMessage) {
-		bridge.OnMessage(sess, msg)
-	})
+
+	// Wire bridge to registry sessions via an adapter that bridges the interface types
+	deps.Registry.SetBridge(&bridgeOutputAdapter{bridge: bridge})
 }
 
-func (deps *Dependencies) wireUpToolHandler(a2aPool *a2a.Pool) *a2a.ToolHandler {
+func (deps *Dependencies) wireUpToolHandler() *a2a.ToolHandler {
 	chatBroadcaster := &chatEventAdapter{hub: ws.GlobalChatHub}
 	toolHandler := a2a.NewToolHandler(deps.MsgRepo, deps.TaskRepo, deps.MemberRepo, deps.ConvRepo, chatBroadcaster, deps.Browser, deps.Validator)
-	a2aPool.SetToolHandler(toolHandler)
-	toolHandler.SetPool(a2aPool)
 	toolHandler.SetWorkspaceRepo(deps.WorkspaceRepo)
+
+	// Wire tool handler to all registry sessions for future output callback
+	deps.Registry.SetToolHandler(toolHandler)
+
 	return toolHandler
 }
 
@@ -314,4 +321,15 @@ func (a *chatEventAdapter) BroadcastToWorkspace(workspaceID string, event interf
 		}
 		a.hub.BroadcastRawToWorkspace(workspaceID, jsonBytes)
 	}
+}
+
+// bridgeOutputAdapter adapts chatbridge.AgentBridge to agent.OutputProcessor.
+type bridgeOutputAdapter struct {
+	bridge *chatbridge.AgentBridge
+}
+
+func (a *bridgeOutputAdapter) OnMessage(sess agent.SessionView, msg *a2a.ACPMessage) {
+	// AgentSession implements both agent.SessionView and chatbridge.SessionInterface.
+	// We pass it as the SessionInterface the bridge expects.
+	a.bridge.OnMessage(sess.(chatbridge.SessionInterface), msg)
 }

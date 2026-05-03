@@ -4,17 +4,18 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/orchestra/backend/internal/a2a"
+	"github.com/orchestra/backend/internal/agent"
+	"github.com/orchestra/backend/internal/models"
 	"github.com/orchestra/backend/internal/storage/repository"
 )
 
 type TerminalHandler struct {
-	pool   *a2a.Pool
-	wsRepo repository.WorkspaceRepository
+	registry *agent.Registry
+	wsRepo   repository.WorkspaceRepository
 }
 
-func NewTerminalHandler(pool *a2a.Pool, wsRepo repository.WorkspaceRepository) *TerminalHandler {
-	return &TerminalHandler{pool: pool, wsRepo: wsRepo}
+func NewTerminalHandler(registry *agent.Registry, wsRepo repository.WorkspaceRepository) *TerminalHandler {
+	return &TerminalHandler{registry: registry, wsRepo: wsRepo}
 }
 
 // CreateSessionRequest represents the request body for creating a terminal session
@@ -30,12 +31,11 @@ type CreateSessionRequest struct {
 // CreateSessionResponse represents the response for creating a terminal session
 type CreateSessionResponse struct {
 	SessionID string `json:"sessionId"`
-	PID       int    `json:"pid"` // Always 0 for A2A (HTTP-based)
 }
 
-// CreateSession creates a new A2A session
+// CreateSession creates a new agent session
 // @Summary Create terminal session
-// @Description Create a new A2A session for an AI assistant
+// @Description Create a new agent session for an AI assistant
 // @Tags terminals
 // @Accept json
 // @Produce json
@@ -61,15 +61,17 @@ func (h *TerminalHandler) CreateSession(c *gin.Context) {
 		}
 	}
 
-	config := a2a.SessionConfig{
+	member := &models.Member{
 		WorkspaceID:  req.WorkspaceID,
-		MemberID:     req.MemberID,
-		MemberName:   req.MemberName,
+		ID:           req.MemberID,
+		Name:         req.MemberName,
 		TerminalType: req.TerminalType,
+		ACPEnabled:   req.Command != "",
+		ACPCommand:   req.Command,
+		ACPArgs:      req.Args,
 	}
-	_ = workspacePath // A2A agents handle their own filesystem
 
-	session, err := h.pool.Acquire(c.Request.Context(), config)
+	session, err := h.registry.AcquireOrCreate(c.Request.Context(), member, workspacePath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -81,7 +83,6 @@ func (h *TerminalHandler) CreateSession(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, CreateSessionResponse{
 		SessionID: session.ID,
-		PID:       0,
 	})
 }
 
@@ -94,14 +95,17 @@ func (h *TerminalHandler) CreateSession(c *gin.Context) {
 // @Success 204 "No Content"
 // @Router /api/terminals/{sessionId} [delete]
 func (h *TerminalHandler) DeleteSession(c *gin.Context) {
-	sessionID := c.Param("sessionId")
-	h.pool.Release(sessionID)
+	sess := h.registry.GetByID(c.Param("sessionId"))
+	if sess != nil {
+		sess.Kill()
+		h.registry.Unregister(sess.ID)
+	}
 	c.JSON(http.StatusNoContent, nil)
 }
 
 // ListWorkspaceTerminalSessions lists active sessions for a workspace
 // @Summary List workspace terminal sessions
-// @Description Get all active A2A sessions for a workspace
+// @Description Get all active agent sessions for a workspace
 // @Tags terminals
 // @Produce json
 // @Security BearerAuth
@@ -115,13 +119,13 @@ func (h *TerminalHandler) ListWorkspaceTerminalSessions(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing workspace id"})
 		return
 	}
-	sessions := h.pool.ListSessionsForWorkspace(workspaceID)
+	sessions := h.registry.ListSessionsForWorkspace(workspaceID)
 	c.JSON(http.StatusOK, gin.H{"sessions": sessions})
 }
 
 // GetSessionForMember gets the session for a specific member
 // @Summary Get member's terminal session
-// @Description Get the active A2A session for a workspace member
+// @Description Get the active agent session for a workspace member
 // @Tags terminals
 // @Produce json
 // @Security BearerAuth
@@ -138,20 +142,19 @@ func (h *TerminalHandler) GetSessionForMember(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing workspace or member"})
 		return
 	}
-	s := h.pool.SessionForWorkspaceMember(workspaceID, memberID)
+	s := h.registry.GetByMember(workspaceID, memberID)
 	if s == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "no active session"})
 		return
 	}
 	c.JSON(http.StatusOK, CreateSessionResponse{
 		SessionID: s.ID,
-		PID:       0,
 	})
 }
 
 // GetOrCreateSessionForMember gets or creates a session for a member
 // @Summary Get or create member's terminal session
-// @Description Get existing A2A session or create a new one for the member
+// @Description Get existing agent session or create a new one for the member
 // @Tags terminals
 // @Accept json
 // @Produce json
@@ -172,11 +175,10 @@ func (h *TerminalHandler) GetOrCreateSessionForMember(c *gin.Context) {
 	}
 
 	// Check if session already exists
-	s := h.pool.SessionForWorkspaceMember(workspaceID, memberID)
+	s := h.registry.GetByMember(workspaceID, memberID)
 	if s != nil {
 		c.JSON(http.StatusOK, CreateSessionResponse{
 			SessionID: s.ID,
-			PID:       0,
 		})
 		return
 	}
@@ -185,14 +187,22 @@ func (h *TerminalHandler) GetOrCreateSessionForMember(c *gin.Context) {
 	var req CreateSessionRequest
 	c.ShouldBindJSON(&req) // Ignore error - body is optional
 
-	config := a2a.SessionConfig{
-		WorkspaceID:  workspaceID,
-		MemberID:     memberID,
-		MemberName:   req.MemberName,
-		TerminalType: req.TerminalType,
+	workspacePath := ""
+	if ws, err := h.wsRepo.GetByID(c.Request.Context(), workspaceID); err == nil {
+		workspacePath = ws.Path
 	}
 
-	session, err := h.pool.Acquire(c.Request.Context(), config)
+	member := &models.Member{
+		WorkspaceID:  workspaceID,
+		ID:           memberID,
+		Name:         req.MemberName,
+		TerminalType: req.TerminalType,
+		ACPEnabled:   req.Command != "",
+		ACPCommand:   req.Command,
+		ACPArgs:      req.Args,
+	}
+
+	session, err := h.registry.AcquireOrCreate(c.Request.Context(), member, workspacePath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -204,6 +214,5 @@ func (h *TerminalHandler) GetOrCreateSessionForMember(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, CreateSessionResponse{
 		SessionID: session.ID,
-		PID:       0,
 	})
 }

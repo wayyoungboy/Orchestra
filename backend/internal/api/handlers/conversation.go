@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/orchestra/backend/internal/a2a"
+	"github.com/orchestra/backend/internal/agent"
 	"github.com/orchestra/backend/internal/models"
 	"github.com/orchestra/backend/internal/storage/repository"
 	"github.com/orchestra/backend/internal/ws"
@@ -22,7 +22,7 @@ type ConversationHandler struct {
 	readRepo         *repository.ConversationReadRepository
 	memberRepo       repository.MemberRepository
 	wsRepo           repository.WorkspaceRepository
-	a2aPool          *a2a.Pool
+	registry         *agent.Registry
 	chatHub          *ws.ChatHub
 	serverAddr       string
 	authEnabled      bool
@@ -35,7 +35,7 @@ func NewConversationHandler(
 	readRepo *repository.ConversationReadRepository,
 	memberRepo repository.MemberRepository,
 	wsRepo repository.WorkspaceRepository,
-	a2aPool *a2a.Pool,
+	registry *agent.Registry,
 	chatHub *ws.ChatHub,
 	serverAddr string,
 	authEnabled bool,
@@ -47,7 +47,7 @@ func NewConversationHandler(
 		readRepo:          readRepo,
 		memberRepo:        memberRepo,
 		wsRepo:            wsRepo,
-		a2aPool:           a2aPool,
+		registry:          registry,
 		chatHub:           chatHub,
 		serverAddr:        serverAddr,
 		authEnabled:       authEnabled,
@@ -380,7 +380,7 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 		IsAI:           msg.IsAI,
 	})
 
-	if workspaceID != "" && h.a2aPool != nil && h.memberRepo != nil {
+	if workspaceID != "" && h.registry != nil && h.memberRepo != nil {
 		h.forwardUserTextToAgent(c, workspaceID, convID, req.Text)
 	}
 
@@ -795,9 +795,9 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 	}
 
 	for _, memberID := range targets {
-		sess := h.a2aPool.SessionForWorkspaceMember(workspaceID, memberID)
+		sess := h.registry.GetByMember(workspaceID, memberID)
 		if sess == nil {
-			// Create session on first message (ACP/Local CLI or A2A)
+			// Create session on first message
 			var targetMember *models.Member
 			for _, m := range members {
 				if m.ID == memberID {
@@ -809,14 +809,11 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 				continue
 			}
 			var err error
-			sess, err = h.a2aPool.Acquire(c.Request.Context(), a2a.SessionConfig{
-				WorkspaceID:  workspaceID,
-				WorkspaceDir: ws.Path,
-				MemberID:     memberID,
-				MemberName:   targetMember.Name,
-				TerminalType: targetMember.TerminalType,
-				Member:       targetMember,
-			})
+			var wsPath string
+			if ws, err2 := h.wsRepo.GetByID(c.Request.Context(), workspaceID); err2 == nil {
+				wsPath = ws.Path
+			}
+			sess, err = h.registry.AcquireOrCreate(c.Request.Context(), targetMember, wsPath)
 			if err != nil {
 				log.Printf("[chat-forward] Failed to acquire session for member %s: %v", memberID, err)
 				continue
@@ -824,7 +821,6 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 			if sess == nil {
 				continue
 			}
-			// Wire output to broadcast back to chat
 			log.Printf("[chat-forward] Created new session %s for member %s (acp=%v)", sess.ID, memberID, targetMember.ACPEnabled)
 		}
 		sess.SetLastChatTargetConversation(convID)
@@ -844,12 +840,13 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 		}
 
 		// Build prompt based on role
+		var fullPrompt string
+
 		baseURL := h.baseURL()
 		authHdr := h.authHeader()
 
-		var fullPrompt string
 		if member != nil && member.RoleType == models.RoleSecretary {
-			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
+				fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
 
 你是团队的协调者（秘书）。你的职责：
 1. 分析用户需求，拆解为可执行的任务
@@ -877,17 +874,17 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 - 先用 1 查询负载，选择 idle 或负载最低的助手。
 - 用 2 创建任务，任务创建后系统会自动转发给对应助手。
 - 任务完成后助手会汇报，你审核后用 3 回复用户。`,
-				convID,
-				memberID,
-				text,
-				baseURL, workspaceID,
-				baseURL, authHdr,
-				workspaceID, convID, memberID,
-				baseURL, authHdr,
-				workspaceID, convID, memberID,
-			)
-		} else {
-			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
+					convID,
+					memberID,
+					text,
+					baseURL, workspaceID,
+					baseURL, authHdr,
+					workspaceID, convID, memberID,
+					baseURL, authHdr,
+					workspaceID, convID, memberID,
+				)
+			} else {
+				fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
 
 【可用工具 - 使用 curl 命令调用】
 
@@ -918,18 +915,17 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 规则：
 - 收到秘书分配的任务(taskId)后，先调用 1 开始，完成后调用 2，失败调用 3。
 - 完成任务后直接通过 4 回复汇报结果。`,
-				convID,
-				memberID,
-				text,
-				baseURL, authHdr,
-				baseURL, authHdr,
-				baseURL, authHdr,
-				baseURL, authHdr,
-				workspaceID, convID, memberID, memberName,
-			)
-		}
+					convID,
+					memberID,
+					text,
+					baseURL, authHdr,
+					baseURL, authHdr,
+					baseURL, authHdr,
+					baseURL, authHdr,
+					workspaceID, convID, memberID, memberName,
+				)
+			}
 
-		// Send via ACP protocol
 		_ = sess.SendUserMessage(fullPrompt)
 	}
 }
@@ -999,17 +995,21 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 	})
 
 	// Broadcast to WebSocket clients via terminal session
-	if h.a2aPool != nil {
-		sess := h.a2aPool.SessionForWorkspaceMember(req.WorkspaceID, req.SenderID)
+	if h.registry != nil {
+		sess := h.registry.GetByMember(req.WorkspaceID, req.SenderID)
 		if sess != nil {
 			// Build terminal_chat_stream payload for WebSocket broadcast
+			transport := sess.Transport()
+			if transport == nil {
+				return
+			}
 			payload := map[string]interface{}{
 				"type":           "terminal_chat_stream",
-				"terminalId":     sess.ID,
+				"terminalId":     transport.ID,
 				"memberId":       req.SenderID,
 				"workspaceId":    req.WorkspaceID,
 				"conversationId": req.ConversationID,
-				"seq":            sess.NextStreamSeq(),
+				"seq":            transport.NextStreamSeq(),
 				"timestamp":      msg.CreatedAt,
 				"content":        req.Text,
 				"source":         "ai",
@@ -1018,7 +1018,7 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 				"isAi":           true,
 			}
 			if jsonBytes, err := json.Marshal(payload); err == nil {
-				sess.TrySendChatStream(jsonBytes)
+				transport.TrySendChatStream(jsonBytes)
 			}
 		}
 	}
@@ -1035,18 +1035,11 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 					continue
 				}
 				targetID := m.ID
-				targetSess := h.a2aPool.SessionForWorkspaceMember(req.WorkspaceID, targetID)
+				targetSess := h.registry.GetByMember(req.WorkspaceID, targetID)
 				if targetSess == nil && h.wsRepo != nil {
 					ws, wsErr := h.wsRepo.GetByID(c.Request.Context(), req.WorkspaceID)
 					if wsErr == nil && ws != nil {
-						targetSess, _ = h.a2aPool.Acquire(c.Request.Context(), a2a.SessionConfig{
-							WorkspaceID:  req.WorkspaceID,
-							WorkspaceDir: ws.Path,
-							MemberID:     targetID,
-							MemberName:   m.Name,
-							TerminalType: m.TerminalType,
-							Member:       m,
-						})
+						targetSess, _ = h.registry.AcquireOrCreate(c.Request.Context(), m, ws.Path)
 						if targetSess != nil {
 							targetSess.SetLastChatTargetConversation(req.ConversationID)
 							log.Printf("[internal-chat] Created new session %s for secretary %s", targetSess.ID, m.Name)

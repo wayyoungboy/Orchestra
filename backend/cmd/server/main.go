@@ -10,13 +10,14 @@ import (
 	"time"
 
 	_ "github.com/orchestra/backend/docs" // swagger docs
-	"github.com/orchestra/backend/internal/a2a"
+	"github.com/orchestra/backend/internal/agent"
 	"github.com/orchestra/backend/internal/api"
 	"github.com/orchestra/backend/internal/config"
 	"github.com/orchestra/backend/internal/models"
 	"github.com/orchestra/backend/internal/security"
 	"github.com/orchestra/backend/internal/storage"
 	"github.com/orchestra/backend/internal/storage/repository"
+	"github.com/orchestra/backend/internal/tmux"
 	"github.com/orchestra/backend/internal/ws"
 	"github.com/orchestra/backend/pkg/utils"
 )
@@ -77,26 +78,24 @@ func main() {
 		ensureDefaultUserAndWorkspace(db)
 	}
 
-	// Initialize A2A pool for agent communication (tmux-backed)
-	workspacePath := cfg.Storage.Workspaces
-	a2aPool := a2a.NewPool(
-		cfg.Terminal.IdleTimeout,
-		workspacePath,
-	)
+	// Initialize agent registry for session management
+	registry := agent.NewRegistry()
+	tmuxMgr := tmux.NewManager("")
+	registry.SetTmuxManager(tmuxMgr)
 
 	// Recover existing tmux sessions on startup
 	recoverCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	if err := a2aPool.RecoverSessions(recoverCtx); err != nil {
+	if err := registry.RecoverFromTmux(recoverCtx, tmuxMgr); err != nil {
 		log.Printf("Session recovery error: %v", err)
 	}
 	cancel()
 
-	// Initialize WebSocket gateway with A2A terminal handler
-	a2aTerminalHandler := ws.NewA2ATerminalHandler(a2aPool)
+	// Initialize WebSocket gateway with terminal handler
+	a2aTerminalHandler := ws.NewA2ATerminalHandler(registry)
 	gateway := ws.NewGateway(a2aTerminalHandler, cfg.Security.AllowedOrigins)
 
 	// Setup router
-	router, toolHandler := api.SetupRouter(a2aPool, gateway, db, cfg)
+	router, toolHandler := api.SetupRouter(registry, gateway, db, cfg)
 
 	log.Printf("Orchestra starting on %s", cfg.Server.HTTPAddr)
 	log.Printf("Authentication: enabled=%v", cfg.Auth.Enabled)

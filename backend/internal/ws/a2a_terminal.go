@@ -6,6 +6,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/orchestra/backend/internal/a2a"
+	"github.com/orchestra/backend/internal/agent"
 )
 
 // ACPTerminalMessage is the WebSocket message format for agent sessions.
@@ -25,24 +26,32 @@ type ACPTerminalMessage struct {
 	Rows int `json:"rows,omitempty"`
 }
 
-// A2ATerminalHandler handles WebSocket connections for A2A sessions.
-// It translates between WebSocket messages and A2A protocol via the A2A Session.
+// A2ATerminalHandler handles WebSocket connections for agent terminal sessions.
 type A2ATerminalHandler struct {
-	pool *a2a.Pool
+	registry *agent.Registry
 }
 
-// NewA2ATerminalHandler creates a new A2A terminal handler.
-func NewA2ATerminalHandler(pool *a2a.Pool) *A2ATerminalHandler {
-	return &A2ATerminalHandler{pool: pool}
+// NewA2ATerminalHandler creates a new terminal handler.
+func NewA2ATerminalHandler(registry *agent.Registry) *A2ATerminalHandler {
+	return &A2ATerminalHandler{registry: registry}
 }
 
-// Handle handles a WebSocket connection for an A2A session.
+// Handle handles a WebSocket connection for an agent session.
 func (h *A2ATerminalHandler) Handle(sessionID string, conn *websocket.Conn) error {
-	session := h.pool.Get(sessionID)
-	if session == nil {
+	sess := h.registry.GetByID(sessionID)
+	if sess == nil {
 		_ = h.sendMessage(conn, a2a.ACPTerminalResponse{
 			Type:  "error",
 			Error: "session not found",
+		})
+		return nil
+	}
+
+	transport := sess.Transport()
+	if transport == nil {
+		_ = h.sendMessage(conn, a2a.ACPTerminalResponse{
+			Type:  "error",
+			Error: "transport not configured",
 		})
 		return nil
 	}
@@ -54,42 +63,43 @@ func (h *A2ATerminalHandler) Handle(sessionID string, conn *websocket.Conn) erro
 		return err
 	}
 
-	go h.readLoop(conn, session)
-	return h.writeLoop(conn, session)
+	go h.readLoop(conn, transport)
+	return h.writeLoop(conn, transport)
 }
 
-// readLoop reads messages from WebSocket and sends to A2A session.
+// readLoop reads messages from WebSocket and sends to agent session.
 func (h *A2ATerminalHandler) readLoop(conn *websocket.Conn, session *a2a.Session) {
 	for {
 		_, message, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("[a2a-ws] Read message error: %v", err)
+			log.Printf("[agent-ws] Read message error: %v", err)
 			return
 		}
 
 		var msg ACPTerminalMessage
 		if err := json.Unmarshal(message, &msg); err != nil {
-			log.Printf("[a2a-ws] Unmarshal message error: %v", err)
+			log.Printf("[agent-ws] Unmarshal message error: %v", err)
 			continue
 		}
 
 		switch msg.Type {
 		case "user_message", "input":
 			if err := session.SendUserMessage(msg.Content); err != nil {
-				log.Printf("[a2a-ws] Failed to send user message: %v", err)
+				log.Printf("[agent-ws] Failed to send user message: %v", err)
 			}
 		case "tool_result":
 			if err := session.SendToolResult(msg.ToolUseID, msg.ToolResult, msg.IsError); err != nil {
-				log.Printf("[a2a-ws] Failed to send tool result: %v", err)
+				log.Printf("[agent-ws] Failed to send tool result: %v", err)
 			}
 		case "close":
-			h.pool.Release(session.ID)
+			// Find the AgentSession by its transport ID
+			h.registry.ReleaseByTransport(session.ID)
 			return
 		}
 	}
 }
 
-// writeLoop writes A2A messages (converted to ACP format) to WebSocket.
+// writeLoop writes agent output to WebSocket.
 func (h *A2ATerminalHandler) writeLoop(conn *websocket.Conn, session *a2a.Session) error {
 	streamCh := make(chan []byte, 256)
 	session.SetChatStreamSink(streamCh)

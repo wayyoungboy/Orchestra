@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/orchestra/backend/internal/a2a"
+	"github.com/orchestra/backend/internal/agent"
 	"github.com/orchestra/backend/internal/config"
 	"github.com/orchestra/backend/internal/storage"
 	"github.com/orchestra/backend/internal/ws"
@@ -28,10 +28,10 @@ func TestSetupRouterReturnsEngine(t *testing.T) {
 	cfg := config.Default()
 	cfg.Auth.Enabled = false
 
-	a2aPool := a2a.NewPool(0, "")
+	registry := agent.NewRegistry()
 	gateway := ws.NewGateway(nil, nil)
 
-	r, toolHandler := SetupRouter(a2aPool, gateway, db, cfg)
+	r, toolHandler := SetupRouter(registry, gateway, db, cfg)
 	if r == nil {
 		t.Fatal("expected non-nil router")
 	}
@@ -45,10 +45,10 @@ func TestHealthEndpoint(t *testing.T) {
 	cfg := config.Default()
 	cfg.Auth.Enabled = false
 
-	a2aPool := a2a.NewPool(0, "")
+	registry := agent.NewRegistry()
 	gateway := ws.NewGateway(nil, nil)
 
-	r, _ := SetupRouter(a2aPool, gateway, db, cfg)
+	r, _ := SetupRouter(registry, gateway, db, cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	w := httptest.NewRecorder()
@@ -64,10 +64,10 @@ func TestSwaggerEndpoint(t *testing.T) {
 	cfg := config.Default()
 	cfg.Auth.Enabled = false
 
-	a2aPool := a2a.NewPool(0, "")
+	registry := agent.NewRegistry()
 	gateway := ws.NewGateway(nil, nil)
 
-	r, _ := SetupRouter(a2aPool, gateway, db, cfg)
+	r, _ := SetupRouter(registry, gateway, db, cfg)
 
 	req := httptest.NewRequest(http.MethodGet, "/swagger/index.html", nil)
 	w := httptest.NewRecorder()

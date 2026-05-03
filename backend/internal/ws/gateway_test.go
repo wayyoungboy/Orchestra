@@ -3,14 +3,13 @@ package ws
 import (
 	"net/http"
 	"testing"
-	"time"
 
-	"github.com/orchestra/backend/internal/a2a"
+	"github.com/orchestra/backend/internal/agent"
 )
 
 func TestA2ATerminalHandler_Handle(t *testing.T) {
-	pool := a2a.NewPool(30*time.Minute, "/tmp")
-	handler := NewA2ATerminalHandler(pool)
+	registry := agent.NewRegistry()
+	handler := NewA2ATerminalHandler(registry)
 
 	if handler == nil {
 		t.Error("handler should not be nil")
@@ -18,8 +17,8 @@ func TestA2ATerminalHandler_Handle(t *testing.T) {
 }
 
 func TestGateway_NewGateway(t *testing.T) {
-	pool := a2a.NewPool(30*time.Minute, "/tmp")
-	handler := NewA2ATerminalHandler(pool)
+	registry := agent.NewRegistry()
+	handler := NewA2ATerminalHandler(registry)
 	allowedOrigins := []string{"http://localhost:3000", "http://example.com"}
 
 	gateway := NewGateway(handler, allowedOrigins)
@@ -33,8 +32,8 @@ func TestGateway_NewGateway(t *testing.T) {
 }
 
 func TestGateway_checkOrigin(t *testing.T) {
-	pool := a2a.NewPool(30*time.Minute, "/tmp")
-	handler := NewA2ATerminalHandler(pool)
+	registry := agent.NewRegistry()
+	handler := NewA2ATerminalHandler(registry)
 
 	tests := []struct {
 		name           string

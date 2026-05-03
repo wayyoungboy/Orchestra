@@ -13,13 +13,24 @@ import (
 
 	"github.com/orchestra/backend/internal/filesystem"
 	"github.com/orchestra/backend/internal/models"
-	"github.com/orchestra/backend/pkg/utils"
 	"github.com/orchestra/backend/internal/storage/repository"
+	"github.com/orchestra/backend/pkg/utils"
 )
 
 // ChatBroadcaster is an interface for broadcasting chat messages.
 type ChatBroadcaster interface {
 	BroadcastToWorkspace(workspaceID string, event interface{})
+}
+
+// SessionConfig contains parameters for creating a session.
+type SessionConfig struct {
+	ID            string
+	WorkspaceID   string
+	WorkspaceDir  string
+	MemberID      string
+	MemberName    string
+	TerminalType  string
+	Member        *models.Member
 }
 
 // SessionLookup finds an active session for a workspace member.

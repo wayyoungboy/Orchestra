@@ -32,7 +32,6 @@ func (r *sqlMemberRepo) Create(ctx context.Context, m *models.Member) error {
 	if m.ACPEnabled {
 		acpEnabled = 1
 	}
-	// Serialize ACPArgs to JSON
 	var acpArgsJSON interface{}
 	if len(m.ACPArgs) > 0 {
 		data, _ := json.Marshal(m.ACPArgs)
@@ -139,7 +138,6 @@ func (r *sqlMemberRepo) Update(ctx context.Context, m *models.Member) error {
 	if m.ACPEnabled {
 		acpEnabled = 1
 	}
-	// Serialize ACPArgs to JSON
 	var acpArgsJSON interface{}
 	if len(m.ACPArgs) > 0 {
 		data, _ := json.Marshal(m.ACPArgs)
@@ -153,7 +151,8 @@ func (r *sqlMemberRepo) Update(ctx context.Context, m *models.Member) error {
 		m.Name, m.RoleType, m.RoleKey, m.Avatar,
 		m.TerminalType, m.TerminalCommand, m.TerminalPath, autoStart, m.Status,
 		acpEnabled, m.ACPCommand, acpArgsJSON,
-		a2aEnabled, m.A2AAgentURL, m.A2AAuthType, m.A2AAuthToken, m.ID,
+		a2aEnabled, m.A2AAgentURL, m.A2AAuthType, m.A2AAuthToken,
+		m.ID,
 	)
 	return err
 }
