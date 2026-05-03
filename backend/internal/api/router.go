@@ -46,6 +46,7 @@ type Dependencies struct {
 	AttachRepo     *repository.AttachmentRepository
 	TaskRepo       *repository.TaskRepo
 	APIKeyRepo     repository.APIKeyRepository
+	NotifRepo      *repository.NotificationRepository
 
 	// Outbox worker
 	OutboxWorker *outbox.Worker
@@ -59,6 +60,7 @@ type Dependencies struct {
 	TaskHandler       *handlers.TaskHandler
 	APIKeyHandler     *handlers.APIKeyHandler
 	AuthHandler       *handlers.AuthHandler
+	NotifHandler      *handlers.NotificationHandler
 }
 
 // Stop gracefully stops background workers.
@@ -83,6 +85,7 @@ func SetupRouter(registry *agent.Registry, gateway *ws.Gateway, db *storage.Data
 	registerTaskRoutes(r, deps)
 	registerAttachmentRoutes(r, deps)
 	registerAPIKeyRoutes(r, deps)
+	registerNotificationRoutes(r, deps)
 	registerWebSocketRoutes(r, deps)
 	wireUpIntegrations(deps)
 
@@ -111,6 +114,7 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 	attachRepo := repository.NewAttachmentRepository(db.DB())
 	taskRepo := repository.NewTaskRepository(db.DB())
 	apiKeyRepo := repository.NewAPIKeyRepository(db.DB())
+	notifRepo := repository.NewNotificationRepository(db.DB())
 
 	baseURL := os.Getenv("ORCHESTRA_BASE_URL")
 
@@ -154,6 +158,7 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 		panic("failed to create API key handler: " + err.Error())
 	}
 	authHandler := handlers.NewAuthHandler(userRepo, jwtConfig, cfg.Auth.Enabled)
+	notifHandler := handlers.NewNotificationHandler(notifRepo, ws.GlobalChatHub)
 
 
 	authConfig := middleware.DefaultAuthConfig(cfg.Auth.JWTSecret)
@@ -181,6 +186,7 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 		AttachRepo:    attachRepo,
 		TaskRepo:      taskRepo,
 		APIKeyRepo:    apiKeyRepo,
+		NotifRepo:     notifRepo,
 
 		OutboxWorker: outboxWorker,
 
@@ -192,6 +198,7 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 		TaskHandler:       taskHandler,
 		APIKeyHandler:     apiKeyHandler,
 		AuthHandler:       authHandler,
+		NotifHandler:      notifHandler,
 	}
 }
 
@@ -262,6 +269,7 @@ func registerConversationRoutes(r *gin.Engine, deps *Dependencies) {
 	api.GET("/workspaces/:id/conversations", deps.ConvHandler.List)
 	api.GET("/workspaces/:id/conversations/:convId", deps.ConvHandler.GetConversation)
 	api.POST("/workspaces/:id/conversations", deps.ConvHandler.Create)
+	api.POST("/workspaces/:id/conversations/direct", deps.ConvHandler.GetOrCreateDM)
 	api.PUT("/workspaces/:id/conversations/:convId", deps.ConvHandler.UpdateSettings)
 	api.DELETE("/workspaces/:id/conversations/:convId", deps.ConvHandler.Delete)
 	api.DELETE("/workspaces/:id/conversations/:convId/messages", deps.ConvHandler.ClearMessages)
@@ -317,6 +325,16 @@ func registerAPIKeyRoutes(r *gin.Engine, deps *Dependencies) {
 	api.POST("/api-keys", deps.APIKeyHandler.Create)
 	api.DELETE("/api-keys/:id", deps.APIKeyHandler.Delete)
 	api.POST("/api-keys/test", deps.APIKeyHandler.Test)
+}
+
+func registerNotificationRoutes(r *gin.Engine, deps *Dependencies) {
+	api := r.Group("/api")
+	api.Use(middleware.Auth(deps.AuthConfig))
+
+	api.GET("/workspaces/:id/notifications", deps.NotifHandler.List)
+	api.GET("/workspaces/:id/notifications/badge", deps.NotifHandler.BadgeCounts)
+	api.POST("/workspaces/:id/notifications/:notifId/read", deps.NotifHandler.MarkRead)
+	api.POST("/workspaces/:id/notifications/read-all", deps.NotifHandler.MarkAllRead)
 }
 
 func registerWebSocketRoutes(r *gin.Engine, deps *Dependencies) {

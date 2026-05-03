@@ -88,15 +88,17 @@ type ConversationListResponse struct {
 }
 
 type ConversationDTO struct {
-	ID          string   `json:"id"`
-	Type        string   `json:"type"`
-	TargetID    string   `json:"targetId,omitempty"`
-	MemberIDs   []string `json:"memberIds"`
-	CustomName  string   `json:"customName,omitempty"`
-	Pinned      bool     `json:"pinned"`
-	Muted       bool     `json:"muted"`
-	IsDefault   bool     `json:"isDefault,omitempty"`
-	UnreadCount int      `json:"unreadCount"`
+	ID                 string   `json:"id"`
+	Type               string   `json:"type"`
+	TargetID           string   `json:"targetId,omitempty"`
+	MemberIDs          []string `json:"memberIds"`
+	CustomName         string   `json:"customName,omitempty"`
+	Pinned             bool     `json:"pinned"`
+	Muted              bool     `json:"muted"`
+	IsDefault          bool     `json:"isDefault,omitempty"`
+	UnreadCount        int      `json:"unreadCount"`
+	LastMessagePreview string   `json:"lastMessagePreview,omitempty"`
+	LastMessageAt      int64    `json:"lastMessageAt,omitempty"`
 }
 
 type MessageDTO struct {
@@ -192,13 +194,15 @@ func (h *ConversationHandler) List(c *gin.Context) {
 
 	for _, conv := range conversations {
 		dto := ConversationDTO{
-			ID:        conv.ID,
-			Type:      string(conv.Type),
-			TargetID:  conv.TargetID,
-			MemberIDs: conv.MemberIDs,
-			CustomName: conv.Name,
-			Pinned:    conv.Pinned,
-			Muted:     conv.Muted,
+			ID:                 conv.ID,
+			Type:               string(conv.Type),
+			TargetID:           conv.TargetID,
+			MemberIDs:          conv.MemberIDs,
+			CustomName:         conv.Name,
+			Pinned:             conv.Pinned,
+			Muted:              conv.Muted,
+			LastMessagePreview: conv.LastMessagePreview,
+			LastMessageAt:      conv.LastMessageAt,
 		}
 
 		if unread, ok := unreadCounts[conv.ID]; ok {
@@ -264,6 +268,51 @@ func (h *ConversationHandler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, ConversationDTO{
+		ID:        conv.ID,
+		Type:      string(conv.Type),
+		TargetID:  conv.TargetID,
+		MemberIDs: conv.MemberIDs,
+		CustomName: conv.Name,
+		Pinned:    conv.Pinned,
+		Muted:     conv.Muted,
+	})
+}
+
+// GetOrCreateDM finds or creates a DM conversation between two members
+// @Summary Get or create DM
+// @Description Find an existing DM between two members or create a new one
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Workspace ID"
+// @Success 200 {object} ConversationDTO
+// @Success 201 {object} ConversationDTO
+// @Router /api/workspaces/{id}/conversations/direct [post]
+func (h *ConversationHandler) GetOrCreateDM(c *gin.Context) {
+	workspaceID := c.Param("id")
+	if workspaceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace id required"})
+		return
+	}
+	var body struct {
+		UserID   string `json:"userId"`
+		TargetID string `json:"targetId"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.UserID == "" || body.TargetID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "userId and targetId required"})
+		return
+	}
+	conv, created, err := h.convRepo.GetOrCreateDM(workspaceID, body.UserID, body.TargetID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	status := http.StatusOK
+	if created {
+		status = http.StatusCreated
+	}
+	c.JSON(status, ConversationDTO{
 		ID:        conv.ID,
 		Type:      string(conv.Type),
 		TargetID:  conv.TargetID,
@@ -371,7 +420,8 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 
 	workspaceID := c.Param("id")
 
-	// Broadcast message to all WebSocket clients in the workspace
+	_ = h.convRepo.UpdateLastMessage(convID, req.Text, msg.CreatedAt)
+
 	ws.GlobalChatHub.BroadcastToWorkspace(workspaceID, ws.ChatEvent{
 		Type:           ws.EventNewMessage,
 		WorkspaceID:    workspaceID,
@@ -764,6 +814,9 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 	if err != nil || conv == nil {
 		return
 	}
+	if conv.Muted {
+		return
+	}
 	ws, err := h.wsRepo.GetByID(c.Request.Context(), workspaceID)
 	if err != nil || ws == nil {
 		return
@@ -1010,7 +1063,8 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 		return
 	}
 
-	// Broadcast to all WebSocket clients via ChatHub
+	_ = h.convRepo.UpdateLastMessage(req.ConversationID, req.Text, msg.CreatedAt)
+
 	ws.GlobalChatHub.BroadcastToWorkspace(req.WorkspaceID, ws.ChatEvent{
 		Type:           ws.EventNewMessage,
 		WorkspaceID:    req.WorkspaceID,

@@ -22,10 +22,12 @@ type Conversation struct {
 	Name        string          `json:"name,omitempty"`
 	TargetID    string          `json:"targetId,omitempty"`
 	MemberIDs   []string        `json:"memberIds"`
-	Pinned      bool            `json:"pinned"`
-	Muted       bool            `json:"muted"`
-	CreatedAt   int64           `json:"createdAt"`
-	UpdatedAt   int64           `json:"updatedAt"`
+	Pinned             bool            `json:"pinned"`
+	Muted              bool            `json:"muted"`
+	LastMessagePreview string          `json:"lastMessagePreview,omitempty"`
+	LastMessageAt      int64           `json:"lastMessageAt,omitempty"`
+	CreatedAt          int64           `json:"createdAt"`
+	UpdatedAt          int64           `json:"updatedAt"`
 }
 
 type ConversationCreate struct {
@@ -44,7 +46,7 @@ func NewConversationRepository(db *sql.DB) *ConversationRepository {
 }
 
 func (r *ConversationRepository) ListByWorkspace(workspaceID string) ([]Conversation, error) {
-	query := `SELECT id, workspace_id, type, name, target_id, member_ids, pinned, muted, created_at, updated_at
+	query := `SELECT id, workspace_id, type, name, target_id, member_ids, pinned, muted, last_message_preview, last_message_at, created_at, updated_at
 	          FROM conversations WHERE workspace_id = ? ORDER BY pinned DESC, updated_at DESC`
 
 	rows, err := r.db.Query(query, workspaceID)
@@ -60,7 +62,7 @@ func (r *ConversationRepository) ListByWorkspace(workspaceID string) ([]Conversa
 		var name, targetID sql.NullString
 
 		err := rows.Scan(&conv.ID, &conv.WorkspaceID, &conv.Type, &name, &targetID, &memberIDsJSON,
-			&conv.Pinned, &conv.Muted, &conv.CreatedAt, &conv.UpdatedAt)
+			&conv.Pinned, &conv.Muted, &conv.LastMessagePreview, &conv.LastMessageAt, &conv.CreatedAt, &conv.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +80,7 @@ func (r *ConversationRepository) ListByWorkspace(workspaceID string) ([]Conversa
 }
 
 func (r *ConversationRepository) GetByID(id string) (*Conversation, error) {
-	query := `SELECT id, workspace_id, type, name, target_id, member_ids, pinned, muted, created_at, updated_at
+	query := `SELECT id, workspace_id, type, name, target_id, member_ids, pinned, muted, last_message_preview, last_message_at, created_at, updated_at
 	          FROM conversations WHERE id = ?`
 
 	var conv Conversation
@@ -86,7 +88,7 @@ func (r *ConversationRepository) GetByID(id string) (*Conversation, error) {
 	var name, targetID sql.NullString
 
 	err := r.db.QueryRow(query, id).Scan(&conv.ID, &conv.WorkspaceID, &conv.Type, &name, &targetID,
-		&memberIDsJSON, &conv.Pinned, &conv.Muted, &conv.CreatedAt, &conv.UpdatedAt)
+		&memberIDsJSON, &conv.Pinned, &conv.Muted, &conv.LastMessagePreview, &conv.LastMessageAt, &conv.CreatedAt, &conv.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +111,8 @@ func (r *ConversationRepository) Create(workspaceID string, data ConversationCre
 		return nil, err
 	}
 
-	query := `INSERT INTO conversations (id, workspace_id, type, name, target_id, member_ids, pinned, muted, created_at, updated_at)
-	          VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`
+	query := `INSERT INTO conversations (id, workspace_id, type, name, target_id, member_ids, pinned, muted, last_message_preview, last_message_at, created_at, updated_at)
+	          VALUES (?, ?, ?, ?, ?, ?, 0, 0, '', 0, ?, ?)`
 
 	_, err = r.db.Exec(query, id, workspaceID, data.Type, data.Name, data.TargetID, memberIDsJSON, now, now)
 	if err != nil {
@@ -139,6 +141,19 @@ func (r *ConversationRepository) Update(id string, data map[string]interface{}) 
 	return nil
 }
 
+// UpdateLastMessage updates the conversation's last message preview and timestamp.
+func (r *ConversationRepository) UpdateLastMessage(id string, preview string, messageAt int64) error {
+	if len(preview) > 120 {
+		preview = preview[:120]
+	}
+	now := time.Now().UnixMilli()
+	_, err := r.db.Exec(
+		`UPDATE conversations SET last_message_preview = ?, last_message_at = ?, updated_at = ? WHERE id = ?`,
+		preview, messageAt, now, id,
+	)
+	return err
+}
+
 func (r *ConversationRepository) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM conversations WHERE id = ?`, id)
 	return err
@@ -155,9 +170,49 @@ func (r *ConversationRepository) SetMemberIDs(id string, memberIDs []string) err
 	return err
 }
 
+// GetOrCreateDM finds an existing DM between two members, or creates one.
+func (r *ConversationRepository) GetOrCreateDM(workspaceID, userID, targetID string) (*Conversation, bool, error) {
+	convs, err := r.ListByWorkspace(workspaceID)
+	if err != nil {
+		return nil, false, err
+	}
+	for _, c := range convs {
+		if c.Type != ConversationTypeDM {
+			continue
+		}
+		if c.TargetID == targetID && memberSliceContains(c.MemberIDs, userID) {
+			return &c, false, nil
+		}
+		if c.TargetID == userID && memberSliceContains(c.MemberIDs, targetID) {
+			return &c, false, nil
+		}
+		if memberSliceContains(c.MemberIDs, userID) && memberSliceContains(c.MemberIDs, targetID) && len(c.MemberIDs) == 2 {
+			return &c, false, nil
+		}
+	}
+	conv, err := r.Create(workspaceID, ConversationCreate{
+		Type:      ConversationTypeDM,
+		MemberIDs: []string{userID, targetID},
+		TargetID:  targetID,
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return conv, true, nil
+}
+
+func memberSliceContains(s []string, v string) bool {
+	for _, item := range s {
+		if item == v {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *ConversationRepository) GetOrCreateDefaultChannel(workspaceID string, memberIDs []string) (*Conversation, error) {
 	// Try to find existing default channel
-	query := `SELECT id, workspace_id, type, name, target_id, member_ids, pinned, muted, created_at, updated_at
+	query := `SELECT id, workspace_id, type, name, target_id, member_ids, pinned, muted, last_message_preview, last_message_at, created_at, updated_at
 	          FROM conversations WHERE workspace_id = ? AND type = 'channel' AND name = 'general'`
 
 	var conv Conversation
@@ -165,7 +220,7 @@ func (r *ConversationRepository) GetOrCreateDefaultChannel(workspaceID string, m
 	var name, targetID sql.NullString
 
 	err := r.db.QueryRow(query, workspaceID).Scan(&conv.ID, &conv.WorkspaceID, &conv.Type, &name, &targetID,
-		&memberIDsJSON, &conv.Pinned, &conv.Muted, &conv.CreatedAt, &conv.UpdatedAt)
+		&memberIDsJSON, &conv.Pinned, &conv.Muted, &conv.LastMessagePreview, &conv.LastMessageAt, &conv.CreatedAt, &conv.UpdatedAt)
 
 	if err == nil {
 		conv.Name = name.String
