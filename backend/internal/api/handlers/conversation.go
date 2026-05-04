@@ -121,10 +121,12 @@ type CreateConversationRequest struct {
 // Extra fields (conversationType, mentions, timestamp) may be sent by the web client for forward compatibility; only the fields below are persisted today.
 // ClientTraceID is optional idempotency / correlation (e.g. UUID); not stored in DB until a migration adds a column.
 type SendMessageRequest struct {
-	Text           string `json:"text"`
-	SenderID       string `json:"senderId"`
-	SenderName     string `json:"senderName"`
-	ClientTraceID  string `json:"clientTraceId,omitempty"`
+	Text           string   `json:"text"`
+	SenderID       string   `json:"senderId"`
+	SenderName     string   `json:"senderName"`
+	ClientTraceID  string   `json:"clientTraceId,omitempty"`
+	MentionIDs     []string `json:"mentionIds,omitempty"`
+	MentionAll     bool     `json:"mentionAll,omitempty"`
 }
 
 // List lists all conversations in a workspace
@@ -435,7 +437,7 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 	})
 
 	if workspaceID != "" && h.registry != nil && h.memberRepo != nil {
-		h.forwardUserTextToAgent(c, workspaceID, convID, req.Text)
+		h.forwardUserTextToAgent(c, workspaceID, convID, req.Text, req.MentionIDs, req.MentionAll)
 	}
 
 	c.JSON(http.StatusCreated, MessageDTO{
@@ -806,7 +808,7 @@ func (h *ConversationHandler) DeleteConversationsForMember(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID, convID, text string) {
+func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID, convID, text string, mentionIDs []string, mentionAll bool) {
 	if text == "" {
 		return
 	}
@@ -859,12 +861,28 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 			add(mid)
 		}
 	case repository.ConversationTypeChannel:
-		// For channels, forward only to secretaries
-		for _, mid := range conv.MemberIDs {
-			for _, m := range members {
-				if m.ID == mid && m.RoleType == models.RoleSecretary {
+		if mentionAll {
+			for _, mid := range conv.MemberIDs {
+				add(mid)
+			}
+		} else if len(mentionIDs) > 0 {
+			mentionSet := make(map[string]struct{}, len(mentionIDs))
+			for _, id := range mentionIDs {
+				mentionSet[id] = struct{}{}
+			}
+			for _, mid := range conv.MemberIDs {
+				if _, ok := mentionSet[mid]; ok {
 					add(mid)
-					break
+				}
+			}
+		} else {
+			// No explicit mentions: forward to secretaries only
+			for _, mid := range conv.MemberIDs {
+				for _, m := range members {
+					if m.ID == mid && m.RoleType == models.RoleSecretary {
+						add(mid)
+						break
+					}
 				}
 			}
 		}
