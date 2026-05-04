@@ -26,6 +26,17 @@ export interface ChatWsEvent {
   unreadCount?: number
 }
 
+function parseMentions(text: string, members: any[]): { mentionIds: string[], mentionAll: boolean } {
+  if (/@all\b/i.test(text)) return { mentionIds: [], mentionAll: true }
+  const mentionIds: string[] = []
+  for (const m of members) {
+    if (m.name && text.includes(`@${m.name}`)) {
+      if (!mentionIds.includes(m.id)) mentionIds.push(m.id)
+    }
+  }
+  return { mentionIds, mentionAll: false }
+}
+
 export const useChatStore = defineStore('chat', () => {
   const conversations = ref<Conversation[]>([])
   const activeConversationId = ref<string | null>(null)
@@ -311,10 +322,15 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
+      const projectStore = useProjectStore()
+      const { mentionIds, mentionAll } = parseMentions(payload.text, projectStore.members)
+
       await client.post(`/workspaces/${workspaceId.value}/conversations/${payload.conversationId}/messages`, {
         text: payload.text,
         senderId,
-        senderName
+        senderName,
+        ...(mentionAll ? { mentionAll: true } : {}),
+        ...(mentionIds.length > 0 ? { mentionIds } : {})
       })
       // Immediate pull after send for optimistic consistency
       await loadMessages(workspaceId.value, payload.conversationId)
