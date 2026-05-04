@@ -137,6 +137,9 @@ async function handleInviteMember(data: any) {
     await client.post(`/workspaces/${wsId}/members`, {
       name: data.name,
       roleType: data.roleType,
+      terminalType: data.terminalType || data.command,
+      terminalCommand: data.command,
+      acpArgs: data.args,
     })
     showAddModal.value = false
     await loadMembers()
