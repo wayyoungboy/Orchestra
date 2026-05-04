@@ -1,5 +1,36 @@
 <template>
   <div class="chat-input-wrapper">
+    <!-- @mention Autocomplete -->
+    <div v-if="mentionOpen" class="mention-popup">
+      <div class="mention-header">成员</div>
+      <div
+        v-for="(member, idx) in mentionFiltered"
+        :key="member.id"
+        :class="['mention-item', idx === mentionIndex ? 'is-active' : '']"
+        @mousedown.prevent="selectMention(member)"
+        @mouseenter="mentionIndex = idx"
+      >
+        <div :class="['mention-avatar', member.roleType === 'assistant' ? 'is-ai' : '', member.roleType === 'owner' ? 'is-owner' : '']">
+          {{ member.name.charAt(0).toUpperCase() }}
+        </div>
+        <div class="mention-info">
+          <span class="mention-name">{{ member.name }}</span>
+          <span class="mention-role">{{ roleLabel(member.roleType) }}</span>
+        </div>
+      </div>
+      <div
+        :class="['mention-item mention-all', mentionIndex === mentionFiltered.length ? 'is-active' : '']"
+        @mousedown.prevent="selectMentionAll"
+        @mouseenter="mentionIndex = mentionFiltered.length"
+      >
+        <div class="mention-avatar is-all">@</div>
+        <div class="mention-info">
+          <span class="mention-name">all</span>
+          <span class="mention-role">通知所有成员</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Input Container -->
     <div class="chat-input-root">
       <!-- Text Input -->
@@ -50,9 +81,11 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from '@/features/chat/chatStore'
+import { useProjectStore } from '@/features/workspace/projectStore'
 
 const { t } = useI18n()
 const chatStore = useChatStore()
+const projectStore = useProjectStore()
 
 const connectionStatus = computed(() => chatStore.connectionStatus)
 
@@ -71,14 +104,115 @@ const emit = defineEmits<{
 
 const inputRef = ref<HTMLTextAreaElement | null>(null)
 
+// --- @mention autocomplete ---
+const mentionOpen = ref(false)
+const mentionQuery = ref('')
+const mentionIndex = ref(0)
+const mentionStart = ref(-1)
+
+const mentionFiltered = computed(() => {
+  const q = mentionQuery.value.toLowerCase()
+  return projectStore.members.filter(m =>
+    m.name.toLowerCase().includes(q)
+  )
+})
+
+function roleLabel(role: string) {
+  const map: Record<string, string> = { owner: '所有者', admin: '管理员', assistant: 'AI 助手', secretary: '秘书', member: '成员' }
+  return map[role] || role
+}
+
+function checkMentionTrigger(value: string, cursorPos: number) {
+  const before = value.slice(0, cursorPos)
+  const atIdx = before.lastIndexOf('@')
+  if (atIdx === -1 || (atIdx > 0 && before[atIdx - 1] !== ' ' && before[atIdx - 1] !== '\n')) {
+    mentionOpen.value = false
+    return
+  }
+  const query = before.slice(atIdx + 1)
+  if (query.includes(' ') || query.includes('\n')) {
+    mentionOpen.value = false
+    return
+  }
+  mentionStart.value = atIdx
+  mentionQuery.value = query
+  mentionIndex.value = 0
+  mentionOpen.value = true
+}
+
+function selectMention(member: { name: string }) {
+  if (mentionStart.value < 0) return
+  const before = props.modelValue.slice(0, mentionStart.value)
+  const cursorPos = inputRef.value?.selectionStart ?? props.modelValue.length
+  const after = props.modelValue.slice(cursorPos)
+  const inserted = `@${member.name} `
+  emit('update:modelValue', before + inserted + after)
+  mentionOpen.value = false
+  nextTick(() => {
+    if (inputRef.value) {
+      const pos = before.length + inserted.length
+      inputRef.value.selectionStart = pos
+      inputRef.value.selectionEnd = pos
+      inputRef.value.focus()
+    }
+  })
+}
+
+function selectMentionAll() {
+  if (mentionStart.value < 0) return
+  const before = props.modelValue.slice(0, mentionStart.value)
+  const cursorPos = inputRef.value?.selectionStart ?? props.modelValue.length
+  const after = props.modelValue.slice(cursorPos)
+  const inserted = '@all '
+  emit('update:modelValue', before + inserted + after)
+  mentionOpen.value = false
+  nextTick(() => {
+    if (inputRef.value) {
+      const pos = before.length + inserted.length
+      inputRef.value.selectionStart = pos
+      inputRef.value.selectionEnd = pos
+      inputRef.value.focus()
+    }
+  })
+}
+
 function handleInput(event: Event) {
   const target = event.target as HTMLTextAreaElement
   emit('update:modelValue', target.value)
+  checkMentionTrigger(target.value, target.selectionStart ?? target.value.length)
   resizeInput()
 }
 
 function handleKeydown(event: KeyboardEvent) {
   if (event.isComposing || event.key === 'Process') return
+
+  if (mentionOpen.value) {
+    const totalItems = mentionFiltered.value.length + 1
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      mentionIndex.value = (mentionIndex.value + 1) % totalItems
+      return
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      mentionIndex.value = (mentionIndex.value - 1 + totalItems) % totalItems
+      return
+    }
+    if (event.key === 'Enter' || event.key === 'Tab') {
+      event.preventDefault()
+      if (mentionIndex.value < mentionFiltered.value.length) {
+        selectMention(mentionFiltered.value[mentionIndex.value])
+      } else {
+        selectMentionAll()
+      }
+      return
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      mentionOpen.value = false
+      return
+    }
+  }
 
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
@@ -104,7 +238,99 @@ watch(() => props.modelValue, async () => {
 
 <style scoped>
 .chat-input-wrapper {
+  position: relative;
   padding: 0 24px 24px;
+}
+
+/* @mention popup */
+.mention-popup {
+  position: absolute;
+  bottom: 100%;
+  left: 24px;
+  right: 24px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.08);
+  margin-bottom: 8px;
+  padding: 6px;
+  z-index: 100;
+}
+
+.mention-header {
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #94a3b8;
+}
+
+.mention-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.mention-item:hover,
+.mention-item.is-active {
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.mention-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.mention-avatar.is-ai {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.mention-avatar.is-owner {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+}
+
+.mention-avatar.is-all {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  font-weight: 900;
+}
+
+.mention-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mention-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.mention-role {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
 }
 
 .chat-input-root {

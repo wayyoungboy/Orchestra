@@ -964,10 +964,15 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
   %s\
   -d '{"workspaceId":"%s","conversationId":"%s","senderId":"%s","senderName":"秘书","text":"回复内容"}'
 
+4. 查看任务进度（追踪已分配的任务状态）：
+curl -s --max-time 10 %s/api/internal/tasks/list?secretaryId=%s
+
 规则：
 - 先用 1 查询负载，选择 idle 或负载最低的助手。
 - 用 2 创建任务，任务创建后系统会自动转发给对应助手。
-- 任务完成后助手会汇报，你审核后用 3 回复用户。`,
+- 用 4 追踪任务进度，查看哪些完成、哪些失败。
+- 任务完成后助手会汇报，你审核后用 3 回复用户。
+- 如果助手任务失败，可以重新分配给其他助手。`,
 					convID,
 					memberID,
 					text,
@@ -976,6 +981,7 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 					workspaceID, convID, memberID,
 					baseURL, authHdr,
 					workspaceID, convID, memberID,
+					baseURL, memberID,
 				)
 			} else {
 				fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s

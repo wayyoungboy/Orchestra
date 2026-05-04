@@ -367,6 +367,26 @@ func (h *TaskHandler) GetMyTasks(c *gin.Context) {
 	})
 }
 
+// InternalListTasks returns tasks by secretaryId (for secretary progress tracking)
+func (h *TaskHandler) InternalListTasks(c *gin.Context) {
+	secretaryID := c.Query("secretaryId")
+	if secretaryID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "secretaryId required"})
+		return
+	}
+
+	tasks, err := h.taskRepo.ListBySecretary(c.Request.Context(), secretaryID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"ok":    true,
+		"tasks": tasks,
+	})
+}
+
 // ListWorkloads returns workload statistics for all assistants in a workspace
 func (h *TaskHandler) ListWorkloads(c *gin.Context) {
 	workspaceID := c.Query("workspaceId")

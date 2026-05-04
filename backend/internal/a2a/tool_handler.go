@@ -132,6 +132,8 @@ func (h *ToolHandler) ExecuteTool(msg *ACPMessage, sess *Session) *ToolResult {
 		result = h.handleTaskFail(ctx, toolUse, sess)
 	case ToolWorkloadList:
 		result = h.handleWorkloadList(ctx, toolUse, sess)
+	case ToolTaskList:
+		result = h.handleTaskList(ctx, toolUse, sess)
 	case ToolAgentStatus:
 		result = h.handleAgentStatus(ctx, toolUse, sess)
 	case ToolFileRead:
@@ -229,6 +231,56 @@ func (h *ToolHandler) handleTaskCreate(ctx context.Context, toolUse *ToolUseMess
 		Type:      TypeToolResult,
 		ToolUseID: toolUse.ToolUseID,
 		Content:   fmt.Sprintf(`{"success":true,"taskId":"%s","status":"%s"}`, task.ID, task.Status),
+	}
+}
+
+// notifySecretary sends a task status update to the secretary who created the task.
+func (h *ToolHandler) notifySecretary(task *models.Task, status string, detail string, agentSess *Session) {
+	if h.pool == nil || task.SecretaryID == "" {
+		return
+	}
+
+	secSess := h.pool.SessionForWorkspaceMember(task.WorkspaceID, task.SecretaryID)
+	if secSess == nil {
+		ctx, cancel := context.WithTimeout(h.dispatchCtx, 10*time.Second)
+		defer cancel()
+
+		member, err := h.memberRepo.GetByID(ctx, task.SecretaryID)
+		if err != nil || member == nil {
+			log.Printf("[a2a] notifySecretary: secretary %s not found", task.SecretaryID)
+			return
+		}
+		if !member.ACPEnabled || member.ACPCommand == "" {
+			return
+		}
+		workspaceDir := ""
+		if h.workspaceRepo != nil {
+			ws, err := h.workspaceRepo.GetByID(ctx, task.WorkspaceID)
+			if err == nil && ws != nil {
+				workspaceDir = ws.Path
+			}
+		}
+		secSess, _ = h.pool.Acquire(ctx, SessionConfig{
+			WorkspaceID:  task.WorkspaceID,
+			WorkspaceDir: workspaceDir,
+			MemberID:     member.ID,
+			MemberName:   member.Name,
+			TerminalType: member.TerminalType,
+			Member:       member,
+		})
+	}
+	if secSess == nil {
+		return
+	}
+
+	prompt := fmt.Sprintf(
+		"#conversationId{%s}#taskId{%s}[任务%s] 助手 %s 的任务「%s」已%s：%s",
+		task.ConversationID, task.ID, status, agentSess.MemberName, task.Title, status, detail,
+	)
+	if err := secSess.SendUserMessage(prompt); err != nil {
+		log.Printf("[a2a] Failed to notify secretary %s about task %s: %v", task.SecretaryID, task.ID, err)
+	} else {
+		log.Printf("[a2a] Notified secretary %s: task %s %s", task.SecretaryID, task.ID, status)
 	}
 }
 
@@ -343,10 +395,11 @@ func (h *ToolHandler) handleTaskComplete(ctx context.Context, toolUse *ToolUseMe
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
 	}
 
+	task, _ := h.taskRepo.GetByID(ctx, input.TaskID)
+
 	now := time.Now().UnixMilli()
 	updates := map[string]interface{}{"updated_at": now, "completed_at": now, "result_summary": input.ResultSummary}
 
-	// Retry logic for concurrent updates (max 3 attempts)
 	backoffs := []time.Duration{50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond}
 	for i := 0; i < len(backoffs); i++ {
 		if err := h.taskRepo.UpdateStatus(ctx, input.TaskID, models.TaskStatusCompleted, updates); err != nil {
@@ -358,6 +411,9 @@ func (h *ToolHandler) handleTaskComplete(ctx context.Context, toolUse *ToolUseMe
 				return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to complete task after retries: %v", err)}
 			}
 			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to complete task: %v", err)}
+		}
+		if task != nil && task.SecretaryID != "" {
+			h.notifySecretary(task, "completed", input.ResultSummary, sess)
 		}
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"completed"}`}
 	}
@@ -371,10 +427,11 @@ func (h *ToolHandler) handleTaskFail(ctx context.Context, toolUse *ToolUseMessag
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
 	}
 
+	task, _ := h.taskRepo.GetByID(ctx, input.TaskID)
+
 	now := time.Now().UnixMilli()
 	updates := map[string]interface{}{"updated_at": now, "completed_at": now, "error_message": input.ErrorMessage}
 
-	// Retry logic for concurrent updates (max 3 attempts)
 	backoffs := []time.Duration{50 * time.Millisecond, 100 * time.Millisecond, 200 * time.Millisecond}
 	for i := 0; i < len(backoffs); i++ {
 		if err := h.taskRepo.UpdateStatus(ctx, input.TaskID, models.TaskStatusFailed, updates); err != nil {
@@ -387,10 +444,51 @@ func (h *ToolHandler) handleTaskFail(ctx context.Context, toolUse *ToolUseMessag
 			}
 			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to mark task as failed: %v", err)}
 		}
+		if task != nil && task.SecretaryID != "" {
+			h.notifySecretary(task, "failed", input.ErrorMessage, sess)
+		}
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"failed"}`}
 	}
 
 	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: "Failed to mark task as failed after retries"}
+}
+
+func (h *ToolHandler) handleTaskList(ctx context.Context, toolUse *ToolUseMessage, sess *Session) *ToolResult {
+	var input TaskListInput
+	if err := ParseToolInput(toolUse.Input, &input); err != nil {
+		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
+	}
+
+	var tasks []*models.Task
+	var err error
+	if input.SecretaryID != "" {
+		tasks, err = h.taskRepo.ListBySecretary(ctx, input.SecretaryID)
+	} else {
+		tasks, err = h.taskRepo.ListByWorkspace(ctx, sess.WorkspaceID)
+	}
+	if err != nil {
+		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to list tasks: %v", err)}
+	}
+
+	type taskSummary struct {
+		ID            string `json:"id"`
+		Title         string `json:"title"`
+		Status        string `json:"status"`
+		AssigneeID    string `json:"assigneeId,omitempty"`
+		ResultSummary string `json:"resultSummary,omitempty"`
+		ErrorMessage  string `json:"errorMessage,omitempty"`
+		CreatedAt     int64  `json:"createdAt"`
+	}
+	summaries := make([]taskSummary, 0, len(tasks))
+	for _, t := range tasks {
+		summaries = append(summaries, taskSummary{
+			ID: t.ID, Title: t.Title, Status: string(t.Status),
+			AssigneeID: t.AssigneeID, ResultSummary: t.ResultSummary,
+			ErrorMessage: t.ErrorMessage, CreatedAt: t.CreatedAt,
+		})
+	}
+	data, _ := json.Marshal(summaries)
+	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: string(data)}
 }
 
 func (h *ToolHandler) handleWorkloadList(ctx context.Context, toolUse *ToolUseMessage, sess *Session) *ToolResult {
@@ -534,6 +632,7 @@ const (
 	ToolTaskStart    = "orchestra_task_start"
 	ToolTaskComplete = "orchestra_task_complete"
 	ToolTaskFail     = "orchestra_task_fail"
+	ToolTaskList     = "orchestra_task_list"
 	ToolWorkloadList = "orchestra_workload_list"
 	ToolAgentStatus  = "orchestra_agent_status"
 	ToolFileRead     = "orchestra_file_read"
@@ -568,6 +667,10 @@ type TaskCompleteInput struct {
 type TaskFailInput struct {
 	TaskID       string `json:"taskId"`
 	ErrorMessage string `json:"errorMessage"`
+}
+
+type TaskListInput struct {
+	SecretaryID string `json:"secretaryId"`
 }
 
 type WorkloadListInput struct {

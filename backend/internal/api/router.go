@@ -296,6 +296,7 @@ func registerTaskRoutes(r *gin.Engine, deps *Dependencies) {
 	api.POST("/internal/tasks/complete", deps.TaskHandler.CompleteTask)
 	api.POST("/internal/tasks/fail", deps.TaskHandler.FailTask)
 	api.POST("/internal/tasks/cancel", deps.TaskHandler.CancelTask)
+	api.GET("/internal/tasks/list", deps.TaskHandler.InternalListTasks)
 	api.GET("/internal/workloads/list", deps.TaskHandler.ListWorkloads)
 
 	// Task management (frontend)
