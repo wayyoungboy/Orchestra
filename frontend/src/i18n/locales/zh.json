@@ -110,7 +110,8 @@
       "cliArgs": "命令参数",
       "cliArgsPlaceholder": "空格分隔的参数列表",
       "hintSecretary": "秘书负责协调多个助手的任务分配。",
-      "hintAssistant": "助手通过 CLI 运行时执行任务。"
+      "hintAssistant": "助手通过 CLI 运行时执行任务。",
+      "agentConfig": "智能体配置"
     },
     "editMemberModal": {
       "title": "编辑成员",

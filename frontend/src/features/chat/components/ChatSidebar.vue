@@ -86,8 +86,10 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Conversation } from '@/shared/types/chat'
+import { useChatStore } from '../chatStore'
 
 const { t } = useI18n()
+const chatStore = useChatStore()
 
 const props = defineProps<{
   conversations: Conversation[]
@@ -107,9 +109,7 @@ const channelConversations = computed(() =>
 const dmConversations = computed(() => props.conversations.filter((c) => c.type === 'dm'))
 
 function getConversationTitle(conv: Conversation): string {
-  if (conv.customName) return conv.customName
-  if (conv.nameKey) return conv.nameKey
-  return conv.id
+  return chatStore.getConversationTitle(conv)
 }
 
 function getInitials(name: string): string {

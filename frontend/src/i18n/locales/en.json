@@ -108,7 +108,8 @@
       "cliArgs": "Command Args",
       "cliArgsPlaceholder": "Space-separated arguments",
       "hintSecretary": "Secretaries coordinate tasks across assistants.",
-      "hintAssistant": "Assistants execute tasks via their CLI runtime."
+      "hintAssistant": "Assistants execute tasks via their CLI runtime.",
+      "agentConfig": "Agent Configuration"
     },
     "editMemberModal": {
       "title": "Edit member",

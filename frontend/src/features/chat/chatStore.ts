@@ -388,7 +388,18 @@ export const useChatStore = defineStore('chat', () => {
     disconnectChatWebSocket,
     reconnectChatWebSocket,
     loadOlderMessages,
-    getConversationTitle: (c: any) => c.customName || c.id
+    getConversationTitle: (c: any) => {
+      if (c.customName) return c.customName
+      if (c.type === 'dm' && c.memberIds?.length) {
+        const projectStore = useProjectStore()
+        const otherId = c.memberIds.find((id: string) => id !== currentUserId.value)
+        if (otherId) {
+          const member = projectStore.members.find((m: any) => m.id === otherId)
+          if (member?.name) return member.name
+        }
+      }
+      return c.id
+    }
   }
 })
 

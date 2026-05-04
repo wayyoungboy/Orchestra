@@ -122,7 +122,7 @@ func (r *NotificationRepository) MarkAllRead(ctx context.Context, workspaceID, u
 // BadgeCounts returns total and unread notification counts for a user.
 func (r *NotificationRepository) BadgeCounts(ctx context.Context, workspaceID, userID string) (total int, unread int, err error) {
 	err = r.db.QueryRowContext(ctx, `
-		SELECT COUNT(*), SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END)
+		SELECT COUNT(*), COALESCE(SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END), 0)
 		FROM notifications
 		WHERE workspace_id = ? AND user_id = ?
 	`, workspaceID, userID).Scan(&total, &unread)
