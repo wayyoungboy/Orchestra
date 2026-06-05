@@ -1,8 +1,31 @@
+<div align="center">
+
 # Orchestra
 
-Multi-Agent Collaboration Platform - A web-based system for orchestrating multiple AI agents (Claude Code, Gemini CLI, Aider, etc.) running in parallel with real-time chat and workspace management.
+**A web workspace for coordinating multiple AI coding agents in parallel.**
+
+[![Go](https://img.shields.io/badge/Go-1.21%2B-00ADD8?style=flat-square&logo=go&logoColor=white)](#tech-stack)
+[![Vue](https://img.shields.io/badge/Vue-3-42B883?style=flat-square&logo=vuedotjs&logoColor=white)](#tech-stack)
+[![SQLite](https://img.shields.io/badge/SQLite-persistent-07405E?style=flat-square&logo=sqlite&logoColor=white)](#tech-stack)
+[![tmux](https://img.shields.io/badge/sessions-tmux-111827?style=flat-square)](#features)
+
+Multi-agent collaboration platform for running Claude Code, Gemini CLI, Aider, and other coding agents side by side with chat, tasks, terminal streams, and workspace management.
 
 [中文文档](README_CN.md)
+
+</div>
+
+![Orchestra chat interface](docs/screenshots/02-chat-interface.png)
+
+## Product Shape
+
+| Layer | What it does |
+|---|---|
+| **Workspace** | Create project-scoped workspaces and bind them to server-side paths. |
+| **Members** | Manage human and AI members with roles such as Owner, Admin, Secretary, and Assistant. |
+| **Agents** | Run multiple AI terminals in tmux-backed sessions that survive backend restarts. |
+| **Coordination** | Route chat mentions, forward tasks, track status, and use an outbox for reliable delivery. |
+| **UI** | Vue 3 dashboard with terminal streaming, Kanban-style tasks, settings, theme, and i18n. |
 
 ## Acknowledgments
 
@@ -33,7 +56,13 @@ The design concepts of this project were inspired by [golutra](https://github.co
 
 ## Screenshots
 
-> Screenshots coming soon - see the live demo at `http://localhost:5173` after setup
+| Workspace | Tasks | Terminal |
+|---|---|---|
+| ![Workspace selection](docs/screenshots/01-workspace-selection.png) | ![Tasks page](docs/screenshots/19-tasks-page.png) | ![Terminal workspace](docs/screenshots/03-terminal-workspace.png) |
+
+| Members | Settings | Path browser |
+|---|---|---|
+| ![Members page](docs/screenshots/04-members-page.png) | ![Settings page](docs/screenshots/07-settings-page.png) | ![Path browser](docs/screenshots/12-browse-projects.png) |
 
 ## Tech Stack
 
