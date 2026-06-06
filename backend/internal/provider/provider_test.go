@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -37,11 +39,17 @@ func TestRegistry_List(t *testing.T) {
 }
 
 func TestRegistry_Installed(t *testing.T) {
+	binDir := t.TempDir()
+	claudePath := filepath.Join(binDir, "claude")
+	if err := os.WriteFile(claudePath, []byte("#!/bin/sh\nexit 0\n"), 0755); err != nil {
+		t.Fatalf("write fake claude executable: %v", err)
+	}
+	t.Setenv("PATH", binDir)
+
 	reg := NewRegistry()
 	reg.Register(NewClaudeProvider("claude"))
 	reg.Register(NewGeminiProvider())
 
-	// Claude is installed on this machine
 	installed := reg.Installed()
 	names := make(map[ProviderName]bool)
 	for _, p := range installed {
