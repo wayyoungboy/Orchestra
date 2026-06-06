@@ -273,6 +273,9 @@ cd frontend && pnpm test
 # E2E tests (requires running backend)
 cd frontend && pnpm test:e2e
 
+# Focused agent terminal runtime E2E (requires backend and tmux)
+cd frontend && pnpm test:e2e:terminal
+
 # E2E with custom backend URL
 ORCHESTRA_API_URL=http://your-server:8080 pnpm test:e2e
 ```

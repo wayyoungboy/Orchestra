@@ -19,10 +19,11 @@ Completed hardening passes:
 - Exposed a visible member-card action for configured `assistant` and `secretary` members to start or reuse their backend agent session.
 - Added member-card session probing so existing backend sessions are visible when the Members page loads.
 - Added a workspace Agent Sessions navigation tab that lists active backend sessions, owning members, current tmux pane snapshots, xterm.js stream output, tmux resize propagation, direct keystroke forwarding, controlled single-message terminal input, and stale-session termination.
+- Added tmux runtime coverage for resize and raw input, plus a focused Playwright spec for backend-seeded agent terminal sessions.
 
-The next product gap is broader end-to-end runtime validation with a seeded workspace and real tmux-backed agent process. The member-card session action and Agent Sessions tab make agent startup, ownership, current screen state, xterm.js output, resize propagation, direct keystrokes, light input, and session cleanup usable before a full workflow QA pass.
+The next product gap is stabilizing the local Playwright CLI runner in this `/Volumes` + pnpm environment so the new focused browser E2E can run as part of the regular gate. The member-card session action and Agent Sessions tab make agent startup, ownership, current screen state, xterm.js output, resize propagation, direct keystrokes, light input, session cleanup, and backend tmux runtime validation usable before a full workflow QA pass.
 
-Validation note: backend tests and frontend production builds are passing. Vitest currently hangs in this local `/Volumes` + pnpm environment before reporting even a minimal smoke test; sampling shows Node spending time in ESM/package resolution filesystem calls. Keep Vitest tests as behavioral guardrails, but use build/e2e/manual verification until the runner environment is fixed.
+Validation note: backend tests and frontend production builds are passing. Vitest and the Playwright CLI currently hang in this local `/Volumes` + pnpm environment before reporting even minimal commands; sampling previously showed Node spending time in ESM/package resolution filesystem calls. Keep Vitest and Playwright specs as behavioral guardrails, but use build/backend runtime/manual verification until the runner environment is fixed.
 
 ---
 

@@ -237,6 +237,9 @@ cd frontend && pnpm test
 # E2E 测试（需要运行后端）
 cd frontend && pnpm test:e2e
 
+# 聚焦的 Agent 终端运行时 E2E（需要后端和 tmux）
+cd frontend && pnpm test:e2e:terminal
+
 # E2E 使用自定义后端 URL
 ORCHESTRA_API_URL=http://your-server:8080 pnpm test:e2e
 ```
