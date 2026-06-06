@@ -260,3 +260,181 @@ func TestMentionedAssistantInDefaultChannelCreatesDispatchSession(t *testing.T) 
 	content, _ := snapshot["content"].(string)
 	t.Fatalf("dispatch prompt did not reach assistant terminal; wanted conversation marker and %q in %#v", marker, content)
 }
+
+func TestAssistantResultCompletesTaskAndForwardsToSecretary(t *testing.T) {
+	if !tmuxRuntimeAvailable() {
+		t.Skip("tmux not installed")
+	}
+
+	workspaceDir := t.TempDir()
+	router, deps := newRuntimeRouter(t, workspaceDir)
+
+	workspaceResp := requestJSON(t, router, http.MethodPost, "/api/workspaces", map[string]any{
+		"name":             "Result Loop Workspace",
+		"path":             workspaceDir,
+		"ownerDisplayName": "Loop Owner",
+	})
+	if workspaceResp.Code != http.StatusCreated {
+		t.Fatalf("create workspace status = %d body=%s", workspaceResp.Code, workspaceResp.Body.String())
+	}
+	workspace := decodeJSON[map[string]any](t, workspaceResp)
+	workspaceID := workspace["id"].(string)
+
+	secretaryResp := requestJSON(t, router, http.MethodPost, "/api/workspaces/"+workspaceID+"/members", map[string]any{
+		"name":            "Loop Secretary",
+		"roleType":        "secretary",
+		"terminalType":    "native",
+		"terminalCommand": "/bin/cat",
+		"acpEnabled":      true,
+		"acpCommand":      "/bin/cat",
+	})
+	if secretaryResp.Code != http.StatusCreated {
+		t.Fatalf("create secretary status = %d body=%s", secretaryResp.Code, secretaryResp.Body.String())
+	}
+	secretary := decodeJSON[map[string]any](t, secretaryResp)
+	secretaryID := secretary["id"].(string)
+
+	assistantResp := requestJSON(t, router, http.MethodPost, "/api/workspaces/"+workspaceID+"/members", map[string]any{
+		"name":            "Loop Assistant",
+		"roleType":        "assistant",
+		"terminalType":    "native",
+		"terminalCommand": "/bin/cat",
+		"acpEnabled":      true,
+		"acpCommand":      "/bin/cat",
+	})
+	if assistantResp.Code != http.StatusCreated {
+		t.Fatalf("create assistant status = %d body=%s", assistantResp.Code, assistantResp.Body.String())
+	}
+	assistant := decodeJSON[map[string]any](t, assistantResp)
+	assistantID := assistant["id"].(string)
+
+	conversationsResp := requestJSON(t, router, http.MethodGet, "/api/workspaces/"+workspaceID+"/conversations", nil)
+	if conversationsResp.Code != http.StatusOK {
+		t.Fatalf("list conversations status = %d body=%s", conversationsResp.Code, conversationsResp.Body.String())
+	}
+	conversations := decodeJSON[map[string]any](t, conversationsResp)
+	conversationID := conversations["defaultChannelId"].(string)
+
+	taskResp := requestJSON(t, router, http.MethodPost, "/api/internal/tasks/create", map[string]any{
+		"workspaceId":    workspaceID,
+		"conversationId": conversationID,
+		"secretaryId":    secretaryID,
+		"title":          "Verify result loop",
+		"description":    "Exercise the assistant -> task -> chat -> secretary return path.",
+		"assigneeId":     assistantID,
+	})
+	if taskResp.Code != http.StatusCreated {
+		t.Fatalf("create task status = %d body=%s", taskResp.Code, taskResp.Body.String())
+	}
+	task := decodeJSON[map[string]any](t, taskResp)
+	taskID := task["taskId"].(string)
+
+	startResp := requestJSON(t, router, http.MethodPost, "/api/internal/tasks/start", map[string]any{
+		"taskId": taskID,
+	})
+	if startResp.Code != http.StatusOK {
+		t.Fatalf("start task status = %d body=%s", startResp.Code, startResp.Body.String())
+	}
+
+	resultMarker := "ORCH_RESULT_LOOP"
+	completeResp := requestJSON(t, router, http.MethodPost, "/api/internal/tasks/complete", map[string]any{
+		"taskId":        taskID,
+		"resultSummary": "completed " + resultMarker,
+	})
+	if completeResp.Code != http.StatusOK {
+		t.Fatalf("complete task status = %d body=%s", completeResp.Code, completeResp.Body.String())
+	}
+
+	tasksResp := requestJSON(t, router, http.MethodGet, "/api/workspaces/"+workspaceID+"/tasks", nil)
+	if tasksResp.Code != http.StatusOK {
+		t.Fatalf("list tasks status = %d body=%s", tasksResp.Code, tasksResp.Body.String())
+	}
+	tasksBody := decodeJSON[map[string]any](t, tasksResp)
+	tasks, ok := tasksBody["tasks"].([]any)
+	if !ok || len(tasks) != 1 {
+		t.Fatalf("unexpected tasks response: %#v", tasksBody)
+	}
+	listedTask := tasks[0].(map[string]any)
+	if listedTask["status"] != "completed" || !strings.Contains(listedTask["resultSummary"].(string), resultMarker) {
+		t.Fatalf("task did not retain completed result: %#v", listedTask)
+	}
+
+	reportText := "Assistant finished " + resultMarker
+	chatResp := requestJSON(t, router, http.MethodPost, "/api/internal/chat/send", map[string]any{
+		"workspaceId":      workspaceID,
+		"conversationId":   conversationID,
+		"senderId":         assistantID,
+		"senderName":       "Loop Assistant",
+		"text":             reportText,
+		"depth":            0,
+		"visitedMemberIDs": []string{},
+	})
+	if chatResp.Code != http.StatusOK {
+		t.Fatalf("internal chat send status = %d body=%s", chatResp.Code, chatResp.Body.String())
+	}
+
+	messagesResp := requestJSON(t, router, http.MethodGet, "/api/workspaces/"+workspaceID+"/conversations/"+conversationID+"/messages", nil)
+	if messagesResp.Code != http.StatusOK {
+		t.Fatalf("list messages status = %d body=%s", messagesResp.Code, messagesResp.Body.String())
+	}
+	messages := decodeJSON[[]map[string]any](t, messagesResp)
+	if len(messages) != 1 {
+		t.Fatalf("expected one persisted assistant message, got %#v", messages)
+	}
+	content := messages[0]["content"].(map[string]any)
+	if messages[0]["senderId"] != assistantID || messages[0]["isAi"] != true || content["text"] != reportText {
+		t.Fatalf("assistant report was not persisted as an AI message: %#v", messages[0])
+	}
+
+	conversationsResp = requestJSON(t, router, http.MethodGet, "/api/workspaces/"+workspaceID+"/conversations", nil)
+	if conversationsResp.Code != http.StatusOK {
+		t.Fatalf("reload conversations status = %d body=%s", conversationsResp.Code, conversationsResp.Body.String())
+	}
+	conversations = decodeJSON[map[string]any](t, conversationsResp)
+	timeline := conversations["timeline"].([]any)
+	if len(timeline) != 1 {
+		t.Fatalf("unexpected conversation list: %#v", conversations)
+	}
+	defaultConversation := timeline[0].(map[string]any)
+	if defaultConversation["lastMessagePreview"] != reportText {
+		t.Fatalf("last message preview = %q, want %q", defaultConversation["lastMessagePreview"], reportText)
+	}
+
+	var secretarySessionID string
+	deadline := time.Now().Add(8 * time.Second)
+	for time.Now().Before(deadline) {
+		if session := deps.Registry.GetByMember(workspaceID, secretaryID); session != nil {
+			secretarySessionID = session.ID
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if secretarySessionID == "" {
+		t.Fatalf("expected assistant report to create a secretary session")
+	}
+	defer func() {
+		if s := deps.Registry.GetByID(secretarySessionID); s != nil {
+			_ = s.Kill()
+			deps.Registry.Unregister(secretarySessionID)
+		}
+	}()
+
+	var snapshot map[string]any
+	deadline = time.Now().Add(8 * time.Second)
+	for time.Now().Before(deadline) {
+		snapshotResp := requestJSON(t, router, http.MethodGet, "/api/terminals/"+secretarySessionID+"/snapshot?lines=300", nil)
+		if snapshotResp.Code != http.StatusOK {
+			t.Fatalf("snapshot status = %d body=%s", snapshotResp.Code, snapshotResp.Body.String())
+		}
+		snapshot = decodeJSON[map[string]any](t, snapshotResp)
+		terminalContent, _ := snapshot["content"].(string)
+		if strings.Contains(terminalContent, "#conversationId{"+conversationID+"}") &&
+			strings.Contains(terminalContent, "[助手汇报结果]") &&
+			strings.Contains(terminalContent, reportText) {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	terminalContent, _ := snapshot["content"].(string)
+	t.Fatalf("assistant report did not reach secretary terminal; wanted conversation marker and %q in %#v", reportText, terminalContent)
+}
