@@ -43,6 +43,7 @@
         <ChatInterface v-else-if="activeTab === 'chat' && workspaceStore.currentWorkspace" />
         <MembersPage v-else-if="activeTab === 'members' && workspaceStore.currentWorkspace" />
         <TasksPage v-else-if="activeTab === 'tasks' && workspaceStore.currentWorkspace" />
+        <SessionsPage v-else-if="activeTab === 'sessions' && workspaceStore.currentWorkspace" />
         <Settings v-else-if="activeTab === 'settings'" />
 
         <!-- No Selection Placeholder -->
@@ -70,6 +71,7 @@ import ChatInterface from '@/features/chat/ChatInterface.vue'
 import Settings from '@/features/settings/Settings.vue'
 import MembersPage from '@/features/members/MembersPage.vue'
 import TasksPage from '@/features/tasks/TasksPage.vue'
+import SessionsPage from '@/features/sessions/SessionsPage.vue'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -129,6 +131,7 @@ function handleCreateWorkspace() {
 watch(() => route.path, (path) => {
   if (path.includes('/members')) activeTab.value = 'members'
   else if (path.includes('/tasks')) activeTab.value = 'tasks'
+  else if (path.includes('/sessions')) activeTab.value = 'sessions'
   else if (path.includes('/settings')) activeTab.value = 'settings'
   else if (path.includes('/chat')) activeTab.value = 'chat'
   else if (path.includes('/workspaces') || path === '/') activeTab.value = 'workspaces'

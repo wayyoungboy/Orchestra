@@ -50,6 +50,11 @@ const routes = [
         name: 'tasks',
         component: () => import('@/features/tasks/TasksPage.vue'),
       },
+      {
+        path: 'sessions',
+        name: 'sessions',
+        component: () => import('@/features/sessions/SessionsPage.vue'),
+      },
     ],
   },
 ]
