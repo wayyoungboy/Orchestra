@@ -53,9 +53,18 @@
             <span>Member</span>
             <code>{{ session.memberId }}</code>
           </div>
-          <button class="inspect-btn" @click="connectTerminalStream(session.sessionId)">
-            {{ activeSessionId === session.sessionId ? '重新连接' : '查看输出' }}
-          </button>
+          <div class="session-actions">
+            <button class="inspect-btn" @click="connectTerminalStream(session.sessionId)">
+              {{ activeSessionId === session.sessionId ? '重新连接' : '查看输出' }}
+            </button>
+            <button
+              class="terminate-btn"
+              :disabled="terminatingSessions[session.sessionId]"
+              @click="terminateSession(session.sessionId)"
+            >
+              {{ terminatingSessions[session.sessionId] ? '终止中' : '终止' }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -111,6 +120,7 @@ const members = ref<Member[]>([])
 const activeSessionId = ref('')
 const terminalEvents = ref<string[]>([])
 const terminalInput = ref('')
+const terminatingSessions = ref<Record<string, boolean>>({})
 const streamStatus = ref<'idle' | 'connecting' | 'connected' | 'closed' | 'error'>('idle')
 let terminalWs: WebSocket | null = null
 
@@ -219,6 +229,13 @@ function disconnectTerminalStream() {
   streamStatus.value = activeSessionId.value ? 'closed' : 'idle'
 }
 
+function closeActiveStreamIfSession(sessionId: string) {
+  if (activeSessionId.value !== sessionId) return
+  disconnectTerminalStream()
+  activeSessionId.value = ''
+  terminalEvents.value = []
+}
+
 async function loadTerminalSnapshot(sessionId: string) {
   try {
     const response = await client.get(`/terminals/${sessionId}/snapshot?lines=200`, { skipErrorToast: true })
@@ -265,6 +282,19 @@ function sendTerminalInput() {
   terminalWs.send(JSON.stringify({ type: 'input', content }))
   appendTerminalEvent(`[you]\n${content}`, false)
   terminalInput.value = ''
+}
+
+async function terminateSession(sessionId: string) {
+  terminatingSessions.value = { ...terminatingSessions.value, [sessionId]: true }
+  try {
+    await client.delete(`/terminals/${sessionId}`, { skipErrorToast: true })
+    closeActiveStreamIfSession(sessionId)
+    sessions.value = sessions.value.filter((session) => session.sessionId !== sessionId)
+  } catch (e) {
+    notifyUserError('Failed to terminate agent session', e)
+  } finally {
+    terminatingSessions.value = { ...terminatingSessions.value, [sessionId]: false }
+  }
 }
 
 onMounted(loadSessions)
@@ -331,11 +361,17 @@ onBeforeUnmount(disconnectTerminalStream)
   padding: 8px 10px; border-radius: 10px; background: #f8fafc; color: #334155;
   font-size: 12px; font-weight: 800;
 }
-.inspect-btn {
+.session-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.inspect-btn, .terminate-btn {
   width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #c7d2fe;
   background: white; color: #4338ca; font-size: 13px; font-weight: 900; cursor: pointer;
 }
 .inspect-btn:hover { background: #eef2ff; border-color: #818cf8; }
+.terminate-btn {
+  min-width: 70px; border-color: #fecaca; color: #dc2626;
+}
+.terminate-btn:hover:not(:disabled) { background: #fef2f2; border-color: #fca5a5; }
+.terminate-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 
 .stream-panel {
   margin-top: 20px; background: rgba(15, 23, 42, 0.94); border-radius: 18px;
