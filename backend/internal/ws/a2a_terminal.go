@@ -17,11 +17,11 @@ type ACPTerminalMessage struct {
 	Content string `json:"content,omitempty"`
 
 	// For tool_result
-	ToolUseID string `json:"tool_use_id,omitempty"`
+	ToolUseID  string `json:"tool_use_id,omitempty"`
 	ToolResult string `json:"tool_result,omitempty"`
-	IsError   bool   `json:"is_error,omitempty"`
+	IsError    bool   `json:"is_error,omitempty"`
 
-	// Legacy resize support (not used, kept for UI compatibility)
+	// For resize
 	Cols int `json:"cols,omitempty"`
 	Rows int `json:"rows,omitempty"`
 }
@@ -90,6 +90,10 @@ func (h *A2ATerminalHandler) readLoop(conn *websocket.Conn, session *a2a.Session
 		case "tool_result":
 			if err := session.SendToolResult(msg.ToolUseID, msg.ToolResult, msg.IsError); err != nil {
 				log.Printf("[agent-ws] Failed to send tool result: %v", err)
+			}
+		case "resize":
+			if err := session.Resize(msg.Cols, msg.Rows); err != nil {
+				log.Printf("[agent-ws] Failed to resize terminal: %v", err)
 			}
 		case "close":
 			// Find the AgentSession by its transport ID

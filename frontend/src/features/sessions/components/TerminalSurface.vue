@@ -14,11 +14,16 @@ const props = defineProps<{
   status: 'idle' | 'connecting' | 'connected' | 'closed' | 'error'
 }>()
 
+const emit = defineEmits<{
+  resize: [dimensions: { cols: number; rows: number }]
+}>()
+
 const containerRef = ref<HTMLElement | null>(null)
 let terminal: Terminal | null = null
 let fitAddon: FitAddon | null = null
 let resizeObserver: ResizeObserver | null = null
 let writtenEntries = 0
+let lastDimensions = ''
 
 function normalizeChunk(value: string) {
   return value.replace(/\r?\n/g, '\r\n')
@@ -26,8 +31,14 @@ function normalizeChunk(value: string) {
 
 function fitTerminal() {
   requestAnimationFrame(() => {
+    if (!terminal || !fitAddon) return
     try {
-      fitAddon?.fit()
+      fitAddon.fit()
+      const dimensions = `${terminal.cols}x${terminal.rows}`
+      if (dimensions !== lastDimensions) {
+        lastDimensions = dimensions
+        emit('resize', { cols: terminal.cols, rows: terminal.rows })
+      }
     } catch {
       // The fit addon can throw while the element is being mounted or hidden.
     }

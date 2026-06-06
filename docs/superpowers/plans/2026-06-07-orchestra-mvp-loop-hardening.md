@@ -18,9 +18,9 @@ Completed hardening passes:
 - Reused saved member CLI/ACP configuration when creating member terminal sessions.
 - Exposed a visible member-card action for configured `assistant` and `secretary` members to start or reuse their backend agent session.
 - Added member-card session probing so existing backend sessions are visible when the Members page loads.
-- Added a workspace Agent Sessions navigation tab that lists active backend sessions, owning members, current tmux pane snapshots, xterm.js stream output, controlled single-message terminal input, and stale-session termination.
+- Added a workspace Agent Sessions navigation tab that lists active backend sessions, owning members, current tmux pane snapshots, xterm.js stream output, tmux resize propagation, controlled single-message terminal input, and stale-session termination.
 
-The next product gap is deeper terminal interactivity such as direct keystroke forwarding and resize propagation. The member-card session action and Agent Sessions tab make agent startup, ownership, current screen state, xterm.js output, light input, and session cleanup usable before a complete terminal emulator UI is rebuilt.
+The next product gap is deeper terminal interactivity such as direct keystroke forwarding. The member-card session action and Agent Sessions tab make agent startup, ownership, current screen state, xterm.js output, resize propagation, light input, and session cleanup usable before a complete terminal emulator UI is rebuilt.
 
 Validation note: backend tests and frontend production builds are passing. Vitest currently hangs in this local `/Volumes` + pnpm environment before reporting even a minimal smoke test; sampling shows Node spending time in ESM/package resolution filesystem calls. Keep Vitest tests as behavioral guardrails, but use build/e2e/manual verification until the runner environment is fixed.
 

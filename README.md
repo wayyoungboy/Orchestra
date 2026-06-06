@@ -16,7 +16,7 @@ Reference desktop behavior and Golutra specifications are useful guides, but the
 
 Agent execution is CLI-first for the MVP: PTY + tmux is the baseline for durable local sessions and inspectable terminal state, ACP is used as a structured protocol enhancement where available, skills package agent capabilities, and A2A is deferred until the local CLI loop is stable. Member-level CLI/ACP configuration is the source of truth when creating terminal sessions, so users do not need to re-enter commands after adding an assistant.
 
-The Members page now exposes that source of truth directly: configured assistants and secretaries show existing backend session state, can start or reuse their agent session from the member card, and failed starts surface inline instead of disappearing behind chat dispatch. The Agent Sessions page lists active workspace sessions across members, loads the current tmux pane snapshot into an xterm.js terminal surface, follows live output, can send a controlled input line to the selected agent session, and can terminate stale sessions.
+The Members page now exposes that source of truth directly: configured assistants and secretaries show existing backend session state, can start or reuse their agent session from the member card, and failed starts surface inline instead of disappearing behind chat dispatch. The Agent Sessions page lists active workspace sessions across members, loads the current tmux pane snapshot into an xterm.js terminal surface, follows live output, propagates terminal resize events back to tmux, can send a controlled input line to the selected agent session, and can terminate stale sessions.
 
 ## Acknowledgments
 
@@ -27,7 +27,7 @@ The design concepts of this project were inspired by [golutra](https://github.co
 - **Tmux-Backed Agent Sessions**: AI agent terminals run inside tmux sessions — processes survive backend restarts with automatic session recovery on startup
 - **Multi-Agent Terminal Management**: Run multiple AI agent terminals in parallel, each with independent tmux sessions and PTY streams
 - **Member-Level Agent Launch**: Check, start, or reuse an assistant/secretary backend session from the member card using the saved CLI/ACP command
-- **Agent Session Inspection**: View active workspace agent sessions, owning members, current tmux pane snapshots, xterm.js live output, controlled terminal input, and stale-session termination from a dedicated navigation tab
+- **Agent Session Inspection**: View active workspace agent sessions, owning members, current tmux pane snapshots, xterm.js live output with tmux resize propagation, controlled terminal input, and stale-session termination from a dedicated navigation tab
 - **ACP Support**: Structured JSON communication with AI agents for reliable message exchange
 - **Provider Abstraction**: Pluggable AI provider support (Claude, Gemini) with unified command interface
 - **Native Tool Calling**: AI agents can call Orchestra tools directly (task management, chat, status updates)

@@ -118,6 +118,12 @@ func (m *Manager) CapturePaneRaw(ctx context.Context, name string, lines int) (s
 	return m.exec(ctx, "capture-pane", "-t", name, "-p", "-e", "-S", start)
 }
 
+// ResizePane sets the active pane dimensions for a tmux session.
+func (m *Manager) ResizePane(ctx context.Context, name string, cols, rows int) error {
+	_, err := m.exec(ctx, "resize-pane", "-t", name, "-x", fmt.Sprintf("%d", cols), "-y", fmt.Sprintf("%d", rows))
+	return err
+}
+
 // SessionExists checks if a tmux session exists.
 func (m *Manager) SessionExists(name string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

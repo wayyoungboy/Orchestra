@@ -81,6 +81,7 @@
             v-if="terminalEvents.length"
             :entries="terminalEvents"
             :status="streamStatus"
+            @resize="sendTerminalResize"
           />
           <p v-else class="stream-empty">等待 agent 输出...</p>
         </div>
@@ -287,6 +288,11 @@ function sendTerminalInput() {
   terminalWs.send(JSON.stringify({ type: 'input', content }))
   appendTerminalEvent(`[you]\n${content}`, false)
   terminalInput.value = ''
+}
+
+function sendTerminalResize(dimensions: { cols: number; rows: number }) {
+  if (!terminalWs || terminalWs.readyState !== WebSocket.OPEN) return
+  terminalWs.send(JSON.stringify({ type: 'resize', ...dimensions }))
 }
 
 async function terminateSession(sessionId: string) {

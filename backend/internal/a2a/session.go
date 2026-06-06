@@ -147,6 +147,26 @@ func (s *Session) SendUserMessage(content string) error {
 	return s.tmuxSession.SendInput(content)
 }
 
+// Resize updates the backing terminal dimensions.
+func (s *Session) Resize(cols, rows int) error {
+	if cols <= 0 || rows <= 0 {
+		return fmt.Errorf("invalid terminal size %dx%d", cols, rows)
+	}
+
+	s.mu.Lock()
+	if s.released {
+		s.mu.Unlock()
+		return fmt.Errorf("session already released")
+	}
+	s.lastActive = time.Now()
+	s.mu.Unlock()
+
+	if s.tmuxSession == nil {
+		return fmt.Errorf("no tmux session configured for %s", s.ID)
+	}
+	return s.tmuxSession.Resize(cols, rows)
+}
+
 // SendToolResultToAgent sends a tool result back to the agent.
 func (s *Session) SendToolResultToAgent(toolUseID, content string, isError bool) error {
 	if s.tmuxSession == nil {

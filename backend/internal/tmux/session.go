@@ -150,6 +150,27 @@ func (s *TmuxSession) CaptureScrollback(ctx context.Context, lines int) (string,
 	return mgr.CapturePane(ctx, s.Name, lines)
 }
 
+// Resize updates the tmux pane dimensions for this session.
+func (s *TmuxSession) Resize(cols, rows int) error {
+	if cols <= 0 || rows <= 0 {
+		return fmt.Errorf("invalid terminal size %dx%d", cols, rows)
+	}
+
+	s.mu.Lock()
+	if s.done {
+		s.mu.Unlock()
+		return fmt.Errorf("session is closed")
+	}
+	s.lastActive = time.Now()
+	s.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	mgr := NewManager("")
+	return mgr.ResizePane(ctx, s.Name, cols, rows)
+}
+
 // SetupPipePane configures tmux pipe-pane to append output to a log file.
 // Should be called after the tmux session is created.
 func (s *TmuxSession) SetupPipePane(ctx context.Context) error {
