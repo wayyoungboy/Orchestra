@@ -65,6 +65,25 @@
             <p class="member-id">ID: {{ member.id.slice(0, 8) }}...</p>
           </div>
 
+          <div v-if="isAgentMember(member)" class="agent-session-panel">
+            <div class="session-copy">
+              <span class="session-label">后台会话</span>
+              <span class="session-state" :class="sessionStateClass(member)">
+                {{ sessionDisplayText(member) }}
+              </span>
+            </div>
+            <button
+              v-if="canStartAgentSession(member)"
+              data-test="start-agent-session"
+              class="session-start-btn"
+              :disabled="!!startingSessions[member.id]"
+              @click="startAgentSession(member)"
+            >
+              {{ startingSessions[member.id] ? '启动中...' : '启动会话' }}
+            </button>
+            <button v-else class="session-start-btn is-disabled" disabled>未配置</button>
+          </div>
+
           <div class="member-actions">
             <button @click="handleEdit(member)" class="action-btn">配置</button>
             <button v-if="member.roleType !== 'owner'" @click="handleDelete(member.id)" class="action-btn is-danger">移除</button>
@@ -107,6 +126,8 @@ const addModalMode = ref<'assistant' | 'secretary'>('assistant')
 const editingMember = ref<any>(null)
 const showDeleteConfirm = ref(false)
 const pendingDeleteMemberId = ref<string | null>(null)
+const startingSessions = ref<Record<string, boolean>>({})
+const sessionResults = ref<Record<string, { ok: boolean; text: string }>>({})
 
 function openAddModal(mode: 'assistant' | 'secretary') {
   addModalMode.value = mode
@@ -154,6 +175,53 @@ function roleLabel(role: string) {
 }
 
 function handleEdit(member: any) { editingMember.value = member }
+
+function isAgentMember(member: any) {
+  return member.roleType === 'assistant' || member.roleType === 'secretary'
+}
+
+function canStartAgentSession(member: any) {
+  return isAgentMember(member) && !!member.acpEnabled && !!member.acpCommand
+}
+
+function sessionDisplayText(member: any) {
+  const result = sessionResults.value[member.id]
+  if (result) return result.text
+  if (!member.acpEnabled) return '未启用'
+  if (!member.acpCommand) return '缺少命令'
+  return '未启动'
+}
+
+function sessionStateClass(member: any) {
+  const result = sessionResults.value[member.id]
+  if (result?.ok) return 'is-running'
+  if (result && !result.ok) return 'is-error'
+  if (!canStartAgentSession(member)) return 'is-muted'
+  return ''
+}
+
+async function startAgentSession(member: any) {
+  const wsId = workspaceStore.currentWorkspace?.id
+  if (!wsId || !canStartAgentSession(member)) return
+
+  startingSessions.value = { ...startingSessions.value, [member.id]: true }
+  try {
+    const response = await client.post(
+      `/workspaces/${wsId}/members/${member.id}/terminal-session`,
+      {},
+      { skipErrorToast: true }
+    )
+    const data = response.data || {}
+    const sessionId = data.sessionId || data.id || ''
+    const label = sessionId ? `会话: ${String(sessionId).slice(0, 8)}` : '会话已启动'
+    sessionResults.value = { ...sessionResults.value, [member.id]: { ok: true, text: label } }
+  } catch (e) {
+    sessionResults.value = { ...sessionResults.value, [member.id]: { ok: false, text: '启动失败' } }
+    notifyUserError('Failed to start agent session', e)
+  } finally {
+    startingSessions.value = { ...startingSessions.value, [member.id]: false }
+  }
+}
 
 async function handleSaveMember(id: string, name: string, acpEnabled: boolean, acpCommand: string, acpArgs: string[]) {
   const wsId = workspaceStore.currentWorkspace?.id
@@ -273,6 +341,25 @@ onMounted(loadMembers)
 .member-agent-hint code { background: rgba(15, 23, 42, 0.05); padding: 2px 6px; border-radius: 6px; font-family: monospace; }
 .member-agent-hint.is-disabled { color: #94a3b8; }
 .member-id { font-size: 11px; font-weight: 600; color: #cbd5e1; font-family: monospace; margin-top: 8px; }
+
+.agent-session-panel {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px; border: 1px solid #e2e8f0; border-radius: 14px; background: #f8fafc;
+}
+.session-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.session-label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; }
+.session-state { font-size: 12px; font-weight: 800; color: #475569; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-state.is-running { color: #059669; }
+.session-state.is-error { color: #dc2626; }
+.session-state.is-muted { color: #94a3b8; }
+.session-start-btn {
+  flex: 0 0 auto; min-width: 84px; padding: 8px 10px; border-radius: 10px;
+  border: 1px solid #c7d2fe; background: white; color: #4338ca;
+  font-size: 12px; font-weight: 900; cursor: pointer; transition: all 0.2s;
+}
+.session-start-btn:hover:not(:disabled) { background: #eef2ff; border-color: #818cf8; }
+.session-start-btn:disabled { cursor: not-allowed; opacity: 0.72; }
+.session-start-btn.is-disabled { color: #94a3b8; border-color: #e2e8f0; background: #f8fafc; }
 
 .member-actions { display: flex; gap: 10px; }
 .action-btn {

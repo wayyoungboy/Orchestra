@@ -10,6 +10,18 @@
 
 ---
 
+## Progress Update - 2026-06-07
+
+Completed hardening passes:
+
+- Added backend and frontend diagnostics around the MVP dispatch loop.
+- Reused saved member CLI/ACP configuration when creating member terminal sessions.
+- Exposed a visible member-card action for configured `assistant` and `secretary` members to start or reuse their backend agent session.
+
+The next product gap is a fuller terminal inspection view. The member-card session action is intentionally smaller: it makes agent startup visible before a complete terminal UI is rebuilt.
+
+---
+
 ## File Structure
 
 The first hardening pass is intentionally small and avoids changing the session engine unless a test proves a concrete bug.
