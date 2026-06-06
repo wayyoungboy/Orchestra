@@ -35,22 +35,49 @@ function mountPage() {
   })
 }
 
+const assistantMember = {
+  id: 'assistant-1',
+  workspaceId: 'ws-1',
+  name: 'Claude',
+  roleType: 'assistant',
+  acpEnabled: true,
+  acpCommand: 'claude',
+  acpArgs: [],
+}
+
 describe('MembersPage agent sessions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    clientMock.get.mockResolvedValue({
-      data: [
-        {
-          id: 'assistant-1',
-          workspaceId: 'ws-1',
-          name: 'Claude',
-          roleType: 'assistant',
-          acpEnabled: true,
-          acpCommand: 'claude',
-          acpArgs: [],
-        },
-      ],
+    clientMock.get.mockImplementation((url: string) => {
+      if (url === '/workspaces/ws-1/members') {
+        return Promise.resolve({ data: [assistantMember] })
+      }
+      if (url === '/workspaces/ws-1/members/assistant-1/terminal-session') {
+        return Promise.reject({ response: { status: 404 } })
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`))
     })
+  })
+
+  it('shows an existing assistant terminal session when the member card loads', async () => {
+    clientMock.get.mockImplementation((url: string) => {
+      if (url === '/workspaces/ws-1/members') {
+        return Promise.resolve({ data: [assistantMember] })
+      }
+      if (url === '/workspaces/ws-1/members/assistant-1/terminal-session') {
+        return Promise.resolve({ data: { sessionId: 'existing-987654' } })
+      }
+      return Promise.reject(new Error(`unexpected GET ${url}`))
+    })
+
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(clientMock.get).toHaveBeenCalledWith(
+      '/workspaces/ws-1/members/assistant-1/terminal-session',
+      { skipErrorToast: true }
+    )
+    expect(wrapper.text()).toContain('会话: existing')
   })
 
   it('starts a configured assistant terminal session from the member card', async () => {

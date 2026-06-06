@@ -17,8 +17,11 @@ Completed hardening passes:
 - Added backend and frontend diagnostics around the MVP dispatch loop.
 - Reused saved member CLI/ACP configuration when creating member terminal sessions.
 - Exposed a visible member-card action for configured `assistant` and `secretary` members to start or reuse their backend agent session.
+- Added member-card session probing so existing backend sessions are visible when the Members page loads.
 
 The next product gap is a fuller terminal inspection view. The member-card session action is intentionally smaller: it makes agent startup visible before a complete terminal UI is rebuilt.
+
+Validation note: backend tests and frontend production builds are passing. Vitest currently hangs in this local `/Volumes` + pnpm environment before reporting even a minimal smoke test; sampling shows Node spending time in ESM/package resolution filesystem calls. Keep Vitest tests as behavioral guardrails, but use build/e2e/manual verification until the runner environment is fixed.
 
 ---
 

@@ -143,6 +143,8 @@ async function loadMembers() {
   try {
     const response = await client.get(`/workspaces/${wsId}/members`)
     members.value = response.data || []
+    pruneSessionResults(members.value)
+    await refreshAgentSessionStates(wsId, members.value)
   } catch (e) {
     notifyUserError('Failed to load members', e)
   } finally {
@@ -200,6 +202,51 @@ function sessionStateClass(member: any) {
   return ''
 }
 
+function sessionLabel(data: any) {
+  const sessionId = data?.sessionId || data?.id || ''
+  return sessionId ? `会话: ${String(sessionId).slice(0, 8)}` : '会话已启动'
+}
+
+function isNotFoundError(e: any) {
+  return e?.response?.status === 404
+}
+
+function setSessionResult(memberId: string, result: { ok: boolean; text: string }) {
+  sessionResults.value = { ...sessionResults.value, [memberId]: result }
+}
+
+function clearSessionResult(memberId: string) {
+  const next = { ...sessionResults.value }
+  delete next[memberId]
+  sessionResults.value = next
+}
+
+function pruneSessionResults(loadedMembers: any[]) {
+  const visibleAgentIds = new Set(loadedMembers.filter(canStartAgentSession).map((member) => member.id))
+  sessionResults.value = Object.fromEntries(
+    Object.entries(sessionResults.value).filter(([memberId]) => visibleAgentIds.has(memberId))
+  )
+}
+
+async function refreshAgentSessionStates(wsId: string, loadedMembers: any[]) {
+  const agentMembers = loadedMembers.filter(canStartAgentSession)
+  await Promise.all(agentMembers.map(async (member) => {
+    try {
+      const response = await client.get(
+        `/workspaces/${wsId}/members/${member.id}/terminal-session`,
+        { skipErrorToast: true }
+      )
+      setSessionResult(member.id, { ok: true, text: sessionLabel(response.data) })
+    } catch (e) {
+      if (isNotFoundError(e)) {
+        clearSessionResult(member.id)
+        return
+      }
+      setSessionResult(member.id, { ok: false, text: '检查失败' })
+    }
+  }))
+}
+
 async function startAgentSession(member: any) {
   const wsId = workspaceStore.currentWorkspace?.id
   if (!wsId || !canStartAgentSession(member)) return
@@ -211,12 +258,9 @@ async function startAgentSession(member: any) {
       {},
       { skipErrorToast: true }
     )
-    const data = response.data || {}
-    const sessionId = data.sessionId || data.id || ''
-    const label = sessionId ? `会话: ${String(sessionId).slice(0, 8)}` : '会话已启动'
-    sessionResults.value = { ...sessionResults.value, [member.id]: { ok: true, text: label } }
+    setSessionResult(member.id, { ok: true, text: sessionLabel(response.data) })
   } catch (e) {
-    sessionResults.value = { ...sessionResults.value, [member.id]: { ok: false, text: '启动失败' } }
+    setSessionResult(member.id, { ok: false, text: '启动失败' })
     notifyUserError('Failed to start agent session', e)
   } finally {
     startingSessions.value = { ...startingSessions.value, [member.id]: false }
