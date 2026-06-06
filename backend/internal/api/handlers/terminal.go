@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -10,12 +12,13 @@ import (
 )
 
 type TerminalHandler struct {
-	registry *agent.Registry
-	wsRepo   repository.WorkspaceRepository
+	registry   *agent.Registry
+	wsRepo     repository.WorkspaceRepository
+	memberRepo repository.MemberRepository
 }
 
-func NewTerminalHandler(registry *agent.Registry, wsRepo repository.WorkspaceRepository) *TerminalHandler {
-	return &TerminalHandler{registry: registry, wsRepo: wsRepo}
+func NewTerminalHandler(registry *agent.Registry, wsRepo repository.WorkspaceRepository, memberRepo repository.MemberRepository) *TerminalHandler {
+	return &TerminalHandler{registry: registry, wsRepo: wsRepo, memberRepo: memberRepo}
 }
 
 // CreateSessionRequest represents the request body for creating a terminal session
@@ -31,6 +34,40 @@ type CreateSessionRequest struct {
 // CreateSessionResponse represents the response for creating a terminal session
 type CreateSessionResponse struct {
 	SessionID string `json:"sessionId"`
+}
+
+func mergeSessionMemberConfig(stored *models.Member, req CreateSessionRequest) *models.Member {
+	member := &models.Member{}
+	if stored != nil {
+		*member = *stored
+		if stored.ACPArgs != nil {
+			member.ACPArgs = append([]string{}, stored.ACPArgs...)
+		}
+	}
+
+	if req.WorkspaceID != "" {
+		member.WorkspaceID = req.WorkspaceID
+	}
+	if req.MemberID != "" {
+		member.ID = req.MemberID
+	}
+	if req.MemberName != "" {
+		member.Name = req.MemberName
+	}
+	if req.TerminalType != "" {
+		member.TerminalType = req.TerminalType
+	}
+	if req.Command != "" {
+		member.TerminalCommand = req.Command
+		member.ACPEnabled = true
+		member.ACPCommand = req.Command
+		member.ACPArgs = append([]string{}, req.Args...)
+	}
+	if member.ACPCommand == "" && member.TerminalCommand != "" {
+		member.ACPEnabled = true
+		member.ACPCommand = member.TerminalCommand
+	}
+	return member
 }
 
 // CreateSession creates a new agent session
@@ -61,15 +98,13 @@ func (h *TerminalHandler) CreateSession(c *gin.Context) {
 		}
 	}
 
-	member := &models.Member{
-		WorkspaceID:  req.WorkspaceID,
-		ID:           req.MemberID,
-		Name:         req.MemberName,
-		TerminalType: req.TerminalType,
-		ACPEnabled:   req.Command != "",
-		ACPCommand:   req.Command,
-		ACPArgs:      req.Args,
+	var stored *models.Member
+	if req.MemberID != "" && h.memberRepo != nil {
+		if m, err := h.memberRepo.GetByID(c.Request.Context(), req.MemberID); err == nil {
+			stored = m
+		}
 	}
+	member := mergeSessionMemberConfig(stored, req)
 
 	session, err := h.registry.AcquireOrCreate(c.Request.Context(), member, workspacePath)
 	if err != nil {
@@ -192,15 +227,22 @@ func (h *TerminalHandler) GetOrCreateSessionForMember(c *gin.Context) {
 		workspacePath = ws.Path
 	}
 
-	member := &models.Member{
-		WorkspaceID:  workspaceID,
-		ID:           memberID,
-		Name:         req.MemberName,
-		TerminalType: req.TerminalType,
-		ACPEnabled:   req.Command != "",
-		ACPCommand:   req.Command,
-		ACPArgs:      req.Args,
+	var stored *models.Member
+	if h.memberRepo != nil {
+		m, err := h.memberRepo.GetByID(c.Request.Context(), memberID)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				c.JSON(http.StatusNotFound, gin.H{"error": "member not found"})
+				return
+			}
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		stored = m
 	}
+	req.WorkspaceID = workspaceID
+	req.MemberID = memberID
+	member := mergeSessionMemberConfig(stored, req)
 
 	session, err := h.registry.AcquireOrCreate(c.Request.Context(), member, workspacePath)
 	if err != nil {

@@ -14,7 +14,7 @@ Workspace -> Members -> Chat mention/DM -> Dispatch -> Agent session -> Output -
 
 参考桌面端行为与 Golutra 规格用于约束产品语义，但不作为全量 parity backlog。优先级以是否能强化这个闭环为准，而不是追逐所有可迁移功能。
 
-MVP 阶段的 agent 执行路线以 CLI 为主：PTY + tmux 是可持久、可观察的本地会话底座；ACP 在可用时作为结构化协议增强；skills 用于打包和扩展 agent 能力；A2A 等本地 CLI 闭环稳定后再进入主线。
+MVP 阶段的 agent 执行路线以 CLI 为主：PTY + tmux 是可持久、可观察的本地会话底座；ACP 在可用时作为结构化协议增强；skills 用于打包和扩展 agent 能力；A2A 等本地 CLI 闭环稳定后再进入主线。成员级 CLI/ACP 配置是创建终端会话时的权威来源，用户添加 assistant 后不需要再次输入启动命令。
 
 ## 致谢
 

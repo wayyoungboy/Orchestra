@@ -14,7 +14,7 @@ Workspace -> Members -> Chat mention/DM -> Dispatch -> Agent session -> Output -
 
 Reference desktop behavior and Golutra specifications are useful guides, but they are not treated as full parity backlogs. Work that improves this loop has priority over broad feature porting.
 
-Agent execution is CLI-first for the MVP: PTY + tmux is the baseline for durable local sessions and inspectable terminal state, ACP is used as a structured protocol enhancement where available, skills package agent capabilities, and A2A is deferred until the local CLI loop is stable.
+Agent execution is CLI-first for the MVP: PTY + tmux is the baseline for durable local sessions and inspectable terminal state, ACP is used as a structured protocol enhancement where available, skills package agent capabilities, and A2A is deferred until the local CLI loop is stable. Member-level CLI/ACP configuration is the source of truth when creating terminal sessions, so users do not need to re-enter commands after adding an assistant.
 
 ## Acknowledgments
 
