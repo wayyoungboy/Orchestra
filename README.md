@@ -72,6 +72,7 @@ The design concepts of this project were inspired by [golutra](https://github.co
 ### Prerequisites
 - Go 1.21+
 - Node.js 18+ (pnpm recommended)
+- tmux (required for agent sessions and the MVP verification gate)
 
 ### Backend Setup
 
@@ -200,18 +201,29 @@ Orchestra/
 | `/api/workspaces/:id/members` | POST | Add member to workspace |
 | `/api/workspaces/:id/members/:mid` | PUT | Update member |
 | `/api/workspaces/:id/members/:mid` | DELETE | Remove member |
+| `/api/workspaces/:id/members/:mid/terminal-session` | GET/POST | Check, start, or reuse a member agent session |
+| `/api/workspaces/:id/terminal-sessions` | GET | List workspace agent sessions |
 | `/api/terminals` | POST | Create terminal session |
+| `/api/terminals/:id/snapshot` | GET | Read current terminal pane snapshot |
 | `/api/terminals/:id` | DELETE | Close terminal session |
 | `/api/browse` | GET | Browse server paths |
-| `/api/conversations/:workspaceId` | GET | Get chat history |
-| `/api/conversations/:workspaceId/messages` | POST | Send chat message |
-| `/api/tasks` | POST | Create task |
-| `/api/tasks/:id` | PATCH | Update task status |
-| `/api/tasks/:id/start` | POST | Start task |
-| `/api/tasks/:id/complete` | POST | Complete task |
-| `/api/tasks/:id/fail` | POST | Fail task |
-| `/api/keys` | GET/POST/DELETE | API key management |
-| `/api/keys/:id/test` | POST | Test API key |
+| `/api/workspaces/:id/browse` | GET | Browse paths for a workspace |
+| `/api/workspaces/:id/conversations` | GET/POST | List or create conversations |
+| `/api/workspaces/:id/conversations/direct` | POST | Create or reuse a direct message |
+| `/api/workspaces/:id/conversations/:convId/messages` | GET/POST | List or send conversation messages |
+| `/api/workspaces/:id/conversations/:convId/read` | POST | Mark a conversation read |
+| `/api/internal/chat/send` | POST | Internal AI result message API |
+| `/api/internal/tasks/create` | POST | Create task from an agent |
+| `/api/internal/tasks/start` | POST | Start task from an agent |
+| `/api/internal/tasks/complete` | POST | Complete task from an agent |
+| `/api/internal/tasks/fail` | POST | Fail task from an agent |
+| `/api/internal/tasks/list` | GET | List tasks for a secretary |
+| `/api/workspaces/:id/tasks` | GET | List workspace tasks |
+| `/api/workspaces/:id/tasks/:taskId` | GET | Get task details |
+| `/api/workspaces/:id/tasks/:taskId/cancel` | POST | Cancel task |
+| `/api/api-keys` | GET/POST | List or create API keys |
+| `/api/api-keys/:id` | DELETE | Delete API key |
+| `/api/api-keys/test` | POST | Test API key |
 
 ### WebSocket
 
@@ -278,6 +290,9 @@ cd backend && make test
 
 # Focused backend terminal API runtime smoke (requires tmux)
 cd backend && go test ./internal/api -run TestTerminalRuntimeAPIWorkspaceMemberSessionLifecycle -count=1
+
+# Focused backend result-return loop (requires tmux)
+cd backend && go test ./internal/api -run TestAssistantResultCompletesTaskAndForwardsToSecretary -count=1
 
 # Frontend unit tests
 cd frontend && pnpm test
