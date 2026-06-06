@@ -77,7 +77,11 @@
           <button class="disconnect-btn" @click="disconnectTerminalStream">断开</button>
         </div>
         <div class="stream-body">
-          <pre v-if="terminalEvents.length">{{ terminalEvents.join('\n') }}</pre>
+          <TerminalSurface
+            v-if="terminalEvents.length"
+            :entries="terminalEvents"
+            :status="streamStatus"
+          />
           <p v-else class="stream-empty">等待 agent 输出...</p>
         </div>
         <form class="stream-input-row" @submit.prevent="sendTerminalInput">
@@ -101,6 +105,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import client from '@/shared/api/client'
 import { notifyUserError } from '@/shared/notifyError'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
+import TerminalSurface from '@/features/sessions/components/TerminalSurface.vue'
 
 type WorkspaceSession = {
   memberId: string
@@ -390,13 +395,9 @@ onBeforeUnmount(disconnectTerminalStream)
 }
 .disconnect-btn:hover { background: rgba(255, 255, 255, 0.12); }
 .stream-body {
-  max-height: 320px; min-height: 160px; overflow: auto; padding: 16px 18px;
+  min-height: 220px; overflow: hidden;
 }
-.stream-body pre {
-  margin: 0; white-space: pre-wrap; word-break: break-word; color: #dbeafe;
-  font-size: 12px; line-height: 1.55; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-.stream-empty { color: #94a3b8; font-size: 13px; font-weight: 700; }
+.stream-empty { padding: 18px; color: #94a3b8; font-size: 13px; font-weight: 700; }
 .stream-input-row {
   display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px;
   padding: 14px 18px 16px; border-top: 1px solid rgba(148, 163, 184, 0.2);
