@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.ts,.tsx --fix",
     "test:e2e": "pnpm run build && playwright test",
-    "test:e2e:terminal": "playwright test e2e/agent-terminal-runtime.spec.ts --project=chromium",
+    "test:e2e:terminal": "../scripts/run-terminal-e2e.sh",
     "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {

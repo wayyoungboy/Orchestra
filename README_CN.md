@@ -231,8 +231,14 @@ storage:
 # 当前 MVP 验证入口
 ./scripts/verify-mvp.sh
 
+# 将聚焦的浏览器终端 E2E 纳入验证入口（需要后端和 tmux）
+ORCHESTRA_RUN_TERMINAL_E2E=1 ./scripts/verify-mvp.sh
+
 # 后端单元测试
 cd backend && make test
+
+# 聚焦的后端终端 API 运行时 smoke（需要 tmux）
+cd backend && go test ./internal/api -run TestTerminalRuntimeAPIWorkspaceMemberSessionLifecycle -count=1
 
 # 前端单元测试
 cd frontend && pnpm test
@@ -246,6 +252,8 @@ cd frontend && pnpm test:e2e:terminal
 # E2E 使用自定义后端 URL
 ORCHESTRA_API_URL=http://your-server:8080 pnpm test:e2e
 ```
+
+聚焦的终端 E2E runner 会为本地浏览器/API 流量清理继承到的 HTTP/SOCKS 代理变量，并把 `127.0.0.1`、`localhost`、`::1` 追加到 `NO_PROXY`，避免全局开发代理影响 localhost 验证。
 
 ### Make 命令
 

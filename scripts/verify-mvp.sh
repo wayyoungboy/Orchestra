@@ -28,4 +28,12 @@ echo "==> Agent terminal Playwright spec typecheck"
     e2e/agent-terminal-runtime.spec.ts
 )
 
+echo "==> Agent terminal E2E runner environment"
+"$ROOT_DIR/scripts/test-terminal-e2e-runner-env.sh"
+
+if [[ "${ORCHESTRA_RUN_TERMINAL_E2E:-}" == "1" ]]; then
+  echo "==> Agent terminal runtime E2E"
+  ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-terminal-e2e.sh"
+fi
+
 echo "==> MVP verification passed"

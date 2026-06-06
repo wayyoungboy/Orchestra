@@ -21,11 +21,12 @@ Completed hardening passes:
 - Added a workspace Agent Sessions navigation tab that lists active backend sessions, owning members, current tmux pane snapshots, xterm.js stream output, tmux resize propagation, direct keystroke forwarding, controlled single-message terminal input, and stale-session termination.
 - Added tmux runtime coverage for resize and raw input, plus a focused Playwright spec for backend-seeded agent terminal sessions.
 - Added an API-level terminal runtime smoke test that creates a workspace/member, starts a real tmux-backed bash session, verifies a raw-input marker through the snapshot endpoint, and confirms session deletion unregisters the runtime.
+- Added a focused terminal E2E runner that clears inherited local proxy variables, preserves/extends `NO_PROXY` for localhost, and can run the browser terminal path from `pnpm test:e2e:terminal` or `ORCHESTRA_RUN_TERMINAL_E2E=1 ./scripts/verify-mvp.sh`.
 - Added `scripts/verify-mvp.sh` as the stable local verification gate for backend tests, frontend production build, and focused Playwright spec typechecking.
 
-The next product gap is stabilizing the local Playwright CLI runner in this `/Volumes` + pnpm environment so the new focused browser E2E can run as part of the regular gate. The member-card session action and Agent Sessions tab make agent startup, ownership, current screen state, xterm.js output, resize propagation, direct keystrokes, light input, session cleanup, and backend tmux/API runtime validation usable before a full workflow QA pass.
+The next product gap is expanding regular browser E2E coverage beyond the focused terminal path. The member-card session action and Agent Sessions tab make agent startup, ownership, current screen state, xterm.js output, resize propagation, direct keystrokes, light input, session cleanup, and backend tmux/API/browser runtime validation usable before a full workflow QA pass.
 
-Validation note: `scripts/verify-mvp.sh`, backend tests, and frontend production builds are passing. Vitest and the Playwright CLI currently hang in this local `/Volumes` + pnpm environment before reporting even minimal commands; sampling previously showed Node spending time in ESM/package resolution/filesystem-heavy package loading paths. Keep Vitest and Playwright specs as behavioral guardrails, but use the MVP verification script plus backend runtime/manual verification until the runner environment is fixed.
+Validation note: `scripts/verify-mvp.sh`, backend tests, frontend production builds, and the focused terminal browser E2E are passing. Playwright cold-starts slowly in this local `/Volumes` + pnpm environment, and inherited SOCKS proxy variables can break localhost API requests; use the checked-in terminal E2E runner so local proxy variables are sanitized before Playwright starts.
 
 ---
 

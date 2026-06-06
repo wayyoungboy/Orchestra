@@ -267,6 +267,9 @@ storage:
 # Current MVP verification gate
 ./scripts/verify-mvp.sh
 
+# Include the focused browser terminal E2E in the gate (requires backend and tmux)
+ORCHESTRA_RUN_TERMINAL_E2E=1 ./scripts/verify-mvp.sh
+
 # Backend unit tests
 cd backend && make test
 
@@ -285,6 +288,8 @@ cd frontend && pnpm test:e2e:terminal
 # E2E with custom backend URL
 ORCHESTRA_API_URL=http://your-server:8080 pnpm test:e2e
 ```
+
+The focused terminal E2E runner clears inherited HTTP/SOCKS proxy variables for local browser/API traffic and appends `127.0.0.1`, `localhost`, and `::1` to `NO_PROXY`, so localhost verification is not affected by a global development proxy.
 
 ### Make Commands
 
