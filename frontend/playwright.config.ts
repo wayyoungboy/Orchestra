@@ -14,11 +14,13 @@ export default defineConfig({
     baseURL: process.env.ORCHESTRA_E2E_BASE_URL ?? 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
   },
-  webServer: {
-    command: 'pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: true,
-    timeout: 60_000,
-  },
+  webServer: process.env.ORCHESTRA_E2E_NO_WEBSERVER
+    ? undefined
+    : {
+        command: 'pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort',
+        url: 'http://127.0.0.1:5173',
+        reuseExistingServer: true,
+        timeout: 60_000,
+      },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 })

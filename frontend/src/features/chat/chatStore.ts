@@ -5,6 +5,7 @@ import { notifyUserError } from '@/shared/notifyError'
 import { useAuthStore } from '@/features/auth/authStore'
 import { useProjectStore } from '@/features/workspace/projectStore'
 import type { Conversation } from '@/shared/types/chat'
+import { fetchConversationDispatchDiagnostics, type OutboxDiagnosticItem } from './dispatchDiagnostics'
 
 export interface AgentStatus {
   memberId: string
@@ -45,6 +46,7 @@ export const useChatStore = defineStore('chat', () => {
   const workspaceId = ref<string | null>(null)
   const agentStatuses = ref<Record<string, AgentStatus>>({})
   const connectionStatus = ref<'connected' | 'disconnected' | 'reconnecting'>('disconnected')
+  const dispatchDiagnostics = ref<Record<string, OutboxDiagnosticItem[]>>({})
 
   // Pagination state for active conversation
   const oldestMessageId = ref<string | null>(null)
@@ -85,6 +87,7 @@ export const useChatStore = defineStore('chat', () => {
       await loadConversationsList(wsId)
       if (activeConversationId.value) {
         await loadMessages(wsId, activeConversationId.value)
+        await loadDispatchDiagnostics(activeConversationId.value)
       }
       // 2. Connect WebSocket for real-time updates
       connectChatWebSocket(wsId)
@@ -304,7 +307,18 @@ export const useChatStore = defineStore('chat', () => {
     hasMoreMessages.value = true
     if (workspaceId.value) {
       await loadMessages(workspaceId.value, id)
+      await loadDispatchDiagnostics(id)
       await markAsRead(workspaceId.value, id)
+    }
+  }
+
+  async function loadDispatchDiagnostics(convId: string) {
+    if (!workspaceId.value) return
+    try {
+      const items = await fetchConversationDispatchDiagnostics(workspaceId.value, convId)
+      dispatchDiagnostics.value[convId] = items.filter(item => item.status === 'failed' || item.status === 'dead')
+    } catch {
+      dispatchDiagnostics.value[convId] = []
     }
   }
 
@@ -334,6 +348,7 @@ export const useChatStore = defineStore('chat', () => {
       })
       // Immediate pull after send for optimistic consistency
       await loadMessages(workspaceId.value, payload.conversationId)
+      await loadDispatchDiagnostics(payload.conversationId)
     } catch (e) {
       notifyUserError('Failed to send message', e)
     }
@@ -389,6 +404,7 @@ export const useChatStore = defineStore('chat', () => {
     activeConversation,
     sortedConversations,
     agentStatuses,
+    dispatchDiagnostics,
     loading,
     loadingMessages,
     hasMoreMessages,
@@ -404,6 +420,7 @@ export const useChatStore = defineStore('chat', () => {
     disconnectChatWebSocket,
     reconnectChatWebSocket,
     loadOlderMessages,
+    loadDispatchDiagnostics,
     getConversationTitle: (c: any) => {
       if (c.customName) return c.customName
       if (c.type === 'dm' && c.memberIds?.length) {

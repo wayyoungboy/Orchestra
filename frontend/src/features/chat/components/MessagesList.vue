@@ -13,6 +13,11 @@
     <!-- Load More Trigger (at top of list) -->
     <div ref="loadMoreTrigger" class="load-more-trigger"></div>
 
+    <div v-if="failedDispatches.length" class="dispatch-warning">
+      <span class="dispatch-warning-title">Delivery issue</span>
+      <span>{{ failedDispatches.length }} agent dispatch{{ failedDispatches.length === 1 ? '' : 'es' }} need attention.</span>
+    </div>
+
     <!-- Empty State -->
     <div v-if="messages.length === 0 && !loading" class="empty-messages">
       <div class="empty-bubble">{{ t('messagesList.empty') }}</div>
@@ -120,6 +125,12 @@ function formatTime(timestamp?: number) {
 
 const groupedMessages = computed(() => {
   return props.messages.map(m => ({ type: 'message', message: m }))
+})
+
+const failedDispatches = computed(() => {
+  const conversationId = chatStore.activeConversationId
+  if (!conversationId) return []
+  return chatStore.dispatchDiagnostics[conversationId] || []
 })
 
 function scrollToBottom(behavior: ScrollBehavior = 'auto') {
@@ -233,6 +244,25 @@ defineExpose({ jumpToLatest: () => scrollToBottom('smooth') })
   height: 1px;
   visibility: hidden;
   pointer-events: none;
+}
+
+.dispatch-warning {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: -8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.dispatch-warning-title {
+  flex-shrink: 0;
+  font-weight: 800;
 }
 
 .empty-messages {

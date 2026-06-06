@@ -4,6 +4,18 @@ Multi-Agent Collaboration Platform - A web-based system for orchestrating multip
 
 [中文文档](README_CN.md)
 
+## Product Direction
+
+Orchestra's near-term roadmap is anchored on one MVP loop:
+
+```text
+Workspace -> Members -> Chat mention/DM -> Dispatch -> Agent session -> Output -> Chat/Task state
+```
+
+Reference desktop behavior and Golutra specifications are useful guides, but they are not treated as full parity backlogs. Work that improves this loop has priority over broad feature porting.
+
+Agent execution is CLI-first for the MVP: PTY + tmux is the baseline for durable local sessions and inspectable terminal state, ACP is used as a structured protocol enhancement where available, skills package agent capabilities, and A2A is deferred until the local CLI loop is stable.
+
 ## Acknowledgments
 
 The design concepts of this project were inspired by [golutra](https://github.com/golutra/golutra). Special thanks to the project and its author [seeksky](https://github.com/seekskyworld) for the inspiration. All code in this project is independently implemented.

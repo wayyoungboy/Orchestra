@@ -37,16 +37,16 @@ type Dependencies struct {
 	JWTConfig  *security.JWTConfig
 
 	// Repositories
-	WorkspaceRepo  repository.WorkspaceRepository
-	MemberRepo     repository.MemberRepository
-	ConvRepo       *repository.ConversationRepository
-	MsgRepo        *repository.MessageRepository
-	ReadRepo       *repository.ConversationReadRepository
-	UserRepo       repository.UserRepository
-	AttachRepo     *repository.AttachmentRepository
-	TaskRepo       *repository.TaskRepo
-	APIKeyRepo     repository.APIKeyRepository
-	NotifRepo      *repository.NotificationRepository
+	WorkspaceRepo repository.WorkspaceRepository
+	MemberRepo    repository.MemberRepository
+	ConvRepo      *repository.ConversationRepository
+	MsgRepo       *repository.MessageRepository
+	ReadRepo      *repository.ConversationReadRepository
+	UserRepo      repository.UserRepository
+	AttachRepo    *repository.AttachmentRepository
+	TaskRepo      *repository.TaskRepo
+	APIKeyRepo    repository.APIKeyRepository
+	NotifRepo     *repository.NotificationRepository
 
 	// Outbox worker
 	OutboxWorker *outbox.Worker
@@ -61,6 +61,7 @@ type Dependencies struct {
 	APIKeyHandler     *handlers.APIKeyHandler
 	AuthHandler       *handlers.AuthHandler
 	NotifHandler      *handlers.NotificationHandler
+	OutboxHandler     *handlers.OutboxHandler
 }
 
 // Stop gracefully stops background workers.
@@ -86,6 +87,7 @@ func SetupRouter(registry *agent.Registry, gateway *ws.Gateway, db *storage.Data
 	registerAttachmentRoutes(r, deps)
 	registerAPIKeyRoutes(r, deps)
 	registerNotificationRoutes(r, deps)
+	registerOutboxRoutes(r, deps)
 	registerWebSocketRoutes(r, deps)
 	wireUpIntegrations(deps)
 
@@ -159,7 +161,7 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 	}
 	authHandler := handlers.NewAuthHandler(userRepo, jwtConfig, cfg.Auth.Enabled)
 	notifHandler := handlers.NewNotificationHandler(notifRepo, ws.GlobalChatHub)
-
+	outboxHandler := handlers.NewOutboxHandler(outboxWorker)
 
 	authConfig := middleware.DefaultAuthConfig(cfg.Auth.JWTSecret)
 
@@ -199,6 +201,7 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 		APIKeyHandler:     apiKeyHandler,
 		AuthHandler:       authHandler,
 		NotifHandler:      notifHandler,
+		OutboxHandler:     outboxHandler,
 	}
 }
 
@@ -336,6 +339,13 @@ func registerNotificationRoutes(r *gin.Engine, deps *Dependencies) {
 	api.GET("/workspaces/:id/notifications/badge", deps.NotifHandler.BadgeCounts)
 	api.POST("/workspaces/:id/notifications/:notifId/read", deps.NotifHandler.MarkRead)
 	api.POST("/workspaces/:id/notifications/read-all", deps.NotifHandler.MarkAllRead)
+}
+
+func registerOutboxRoutes(r *gin.Engine, deps *Dependencies) {
+	api := r.Group("/api")
+	api.Use(middleware.Auth(deps.AuthConfig))
+
+	api.GET("/workspaces/:id/outbox", deps.OutboxHandler.ListWorkspace)
 }
 
 func registerWebSocketRoutes(r *gin.Engine, deps *Dependencies) {

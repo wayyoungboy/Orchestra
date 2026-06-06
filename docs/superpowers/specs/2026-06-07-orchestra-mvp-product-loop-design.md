@@ -79,6 +79,13 @@ The MVP does not include:
 
 The current Go + Gin backend and Vue + Pinia frontend remain appropriate.
 
+Agent invocation direction:
+
+- **PTY + tmux is the MVP execution baseline.** It is the most feasible foundation for local CLI agents because it preserves sessions, exposes raw terminal state, and lets users inspect what happened.
+- **ACP is a structured protocol enhancement.** Use it when an agent/provider supports structured exchange, but do not make the MVP depend on ACP-only behavior.
+- **Skills are capability packaging, not the transport layer.** Keep skills for installing and extending agent behavior; do not use the skills system to replace process/session management.
+- **A2A is postponed.** It is useful for remote or service-to-service agents, but it adds a second distributed-agent model before the local CLI loop is stable.
+
 Backend responsibilities:
 
 - Own workspace path validation and server-side file/path browsing.

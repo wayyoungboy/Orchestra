@@ -13,26 +13,33 @@ import (
 type ItemStatus string
 
 const (
-	StatusPending  ItemStatus = "pending"
-	StatusSending  ItemStatus = "sending"
-	StatusSent     ItemStatus = "sent"
-	StatusFailed   ItemStatus = "failed"
-	StatusDead     ItemStatus = "dead"
+	StatusPending ItemStatus = "pending"
+	StatusSending ItemStatus = "sending"
+	StatusSent    ItemStatus = "sent"
+	StatusFailed  ItemStatus = "failed"
+	StatusDead    ItemStatus = "dead"
 )
 
 // Item represents a single outbox entry.
 type Item struct {
-	ID              string     `json:"id"`
-	ConversationID  string     `json:"conversation_id"`
-	SenderID        string     `json:"sender_id"`
-	Content         string     `json:"content"`
-	Status          ItemStatus `json:"status"`
-	AttemptCount    int        `json:"attempt_count"`
-	LastError       string     `json:"last_error"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
-	WorkspaceID     string     `json:"workspace_id"`
-	TargetMemberID  string     `json:"target_member_id"`
+	ID             string     `json:"id"`
+	ConversationID string     `json:"conversation_id"`
+	SenderID       string     `json:"sender_id"`
+	Content        string     `json:"content"`
+	Status         ItemStatus `json:"status"`
+	AttemptCount   int        `json:"attempt_count"`
+	LastError      string     `json:"last_error"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+	WorkspaceID    string     `json:"workspace_id"`
+	TargetMemberID string     `json:"target_member_id"`
+}
+
+// ListFilter scopes workspace outbox diagnostic queries.
+type ListFilter struct {
+	Status         string
+	ConversationID string
+	Limit          int
 }
 
 // SenderFunc is the function that actually sends a message.
@@ -251,7 +258,7 @@ func (w *Worker) sendOne(ctx context.Context, item *Item) error {
 	if err := w.sender(ctx, item); err != nil {
 		item.UpdatedAt = time.Now()
 		_ = w.markFailed(item.ID, err) // record failure in DB
-		return err                      // return original sender error
+		return err                     // return original sender error
 	}
 	return nil
 }
@@ -296,6 +303,54 @@ func (w *Worker) Enqueue(ctx context.Context, workspaceID, conversationID, targe
 	`, id, conversationID, senderID, content, now, now, workspaceID, targetMemberID)
 
 	return id, err
+}
+
+// ListWorkspace returns recent outbox items for a workspace, optionally scoped
+// by status or conversation, for user-visible dispatch diagnostics.
+func (w *Worker) ListWorkspace(ctx context.Context, workspaceID string, filter ListFilter) ([]*Item, error) {
+	if filter.Limit <= 0 || filter.Limit > 100 {
+		filter.Limit = 50
+	}
+
+	query := `
+		SELECT id, conversation_id, sender_id, content, status, attempt_count,
+		       COALESCE(last_error, ''), created_at, updated_at,
+		       COALESCE(workspace_id, ''), COALESCE(target_member_id, '')
+		FROM outbox
+		WHERE workspace_id = ?
+	`
+	args := []interface{}{workspaceID}
+	if filter.Status != "" {
+		query += " AND status = ?"
+		args = append(args, filter.Status)
+	}
+	if filter.ConversationID != "" {
+		query += " AND conversation_id = ?"
+		args = append(args, filter.ConversationID)
+	}
+	query += " ORDER BY created_at DESC LIMIT ?"
+	args = append(args, filter.Limit)
+
+	rows, err := w.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list workspace outbox: %w", err)
+	}
+	defer rows.Close()
+
+	var items []*Item
+	for rows.Next() {
+		var it Item
+		var createdAt, updatedAt int64
+		if err := rows.Scan(&it.ID, &it.ConversationID, &it.SenderID, &it.Content,
+			&it.Status, &it.AttemptCount, &it.LastError, &createdAt, &updatedAt,
+			&it.WorkspaceID, &it.TargetMemberID); err != nil {
+			return nil, fmt.Errorf("scan workspace outbox item: %w", err)
+		}
+		it.CreatedAt = time.Unix(createdAt, 0)
+		it.UpdatedAt = time.Unix(updatedAt, 0)
+		items = append(items, &it)
+	}
+	return items, rows.Err()
 }
 
 // Stats returns counts by status.
