@@ -34,22 +34,24 @@ echo "==> Agent terminal Playwright spec typecheck"
 echo "==> Focused Playwright E2E runner environment"
 "$ROOT_DIR/scripts/test-terminal-e2e-runner-env.sh"
 
-if [[ "${ORCHESTRA_RUN_MVP_CHAT_E2E:-}" == "1" ]]; then
+run_all_focused_e2e="${ORCHESTRA_RUN_ALL_FOCUSED_E2E:-}"
+
+if [[ "$run_all_focused_e2e" == "1" || "${ORCHESTRA_RUN_MVP_CHAT_E2E:-}" == "1" ]]; then
   echo "==> MVP chat flow E2E"
   ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-mvp-chat-e2e.sh"
 fi
 
-if [[ "${ORCHESTRA_RUN_MVP_MEMBER_SESSION_E2E:-}" == "1" ]]; then
+if [[ "$run_all_focused_e2e" == "1" || "${ORCHESTRA_RUN_MVP_MEMBER_SESSION_E2E:-}" == "1" ]]; then
   echo "==> MVP member session flow E2E"
   ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-mvp-member-session-e2e.sh"
 fi
 
-if [[ "${ORCHESTRA_RUN_MVP_TASK_E2E:-}" == "1" ]]; then
+if [[ "$run_all_focused_e2e" == "1" || "${ORCHESTRA_RUN_MVP_TASK_E2E:-}" == "1" ]]; then
   echo "==> MVP task flow E2E"
   ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-mvp-task-e2e.sh"
 fi
 
-if [[ "${ORCHESTRA_RUN_TERMINAL_E2E:-}" == "1" ]]; then
+if [[ "$run_all_focused_e2e" == "1" || "${ORCHESTRA_RUN_TERMINAL_E2E:-}" == "1" ]]; then
   echo "==> Agent terminal runtime E2E"
   ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-terminal-e2e.sh"
 fi

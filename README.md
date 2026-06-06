@@ -279,6 +279,9 @@ storage:
 # Current MVP verification gate
 ./scripts/verify-mvp.sh
 
+# Include every focused browser MVP E2E in one gate (requires backend and tmux)
+ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh
+
 # Include the focused browser terminal E2E in the gate (requires backend and tmux)
 ORCHESTRA_RUN_TERMINAL_E2E=1 ./scripts/verify-mvp.sh
 
