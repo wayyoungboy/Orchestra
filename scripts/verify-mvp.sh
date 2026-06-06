@@ -25,11 +25,17 @@ echo "==> Agent terminal Playwright spec typecheck"
     --module ESNext \
     --target ES2020 \
     --lib ES2020,DOM \
-    e2e/agent-terminal-runtime.spec.ts
+    e2e/agent-terminal-runtime.spec.ts \
+    e2e/mvp-chat-flow.spec.ts
 )
 
-echo "==> Agent terminal E2E runner environment"
+echo "==> Focused Playwright E2E runner environment"
 "$ROOT_DIR/scripts/test-terminal-e2e-runner-env.sh"
+
+if [[ "${ORCHESTRA_RUN_MVP_CHAT_E2E:-}" == "1" ]]; then
+  echo "==> MVP chat flow E2E"
+  ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-mvp-chat-e2e.sh"
+fi
 
 if [[ "${ORCHESTRA_RUN_TERMINAL_E2E:-}" == "1" ]]; then
   echo "==> Agent terminal runtime E2E"

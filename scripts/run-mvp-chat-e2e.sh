@@ -3,4 +3,4 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-"$ROOT_DIR/scripts/run-playwright-local.sh" e2e/agent-terminal-runtime.spec.ts
+"$ROOT_DIR/scripts/run-playwright-local.sh" e2e/mvp-chat-flow.spec.ts

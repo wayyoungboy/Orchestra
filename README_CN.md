@@ -234,6 +234,9 @@ storage:
 # 将聚焦的浏览器终端 E2E 纳入验证入口（需要后端和 tmux）
 ORCHESTRA_RUN_TERMINAL_E2E=1 ./scripts/verify-mvp.sh
 
+# 将聚焦的浏览器 MVP 聊天流程纳入验证入口（需要后端）
+ORCHESTRA_RUN_MVP_CHAT_E2E=1 ./scripts/verify-mvp.sh
+
 # 后端单元测试
 cd backend && make test
 
@@ -246,6 +249,9 @@ cd frontend && pnpm test
 # E2E 测试（需要运行后端）
 cd frontend && pnpm test:e2e
 
+# 聚焦的 MVP 聊天浏览器流程（需要运行后端）
+cd frontend && pnpm test:e2e:mvp-chat
+
 # 聚焦的 Agent 终端运行时 E2E（需要后端和 tmux）
 cd frontend && pnpm test:e2e:terminal
 
@@ -253,7 +259,7 @@ cd frontend && pnpm test:e2e:terminal
 ORCHESTRA_API_URL=http://your-server:8080 pnpm test:e2e
 ```
 
-聚焦的终端 E2E runner 会为本地浏览器/API 流量清理继承到的 HTTP/SOCKS 代理变量，并把 `127.0.0.1`、`localhost`、`::1` 追加到 `NO_PROXY`，避免全局开发代理影响 localhost 验证。
+聚焦的 E2E runner 会为本地浏览器/API 流量清理继承到的 HTTP/SOCKS 代理变量，并把 `127.0.0.1`、`localhost`、`::1` 追加到 `NO_PROXY`，避免全局开发代理影响 localhost 验证。
 
 ### Make 命令
 

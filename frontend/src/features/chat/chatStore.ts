@@ -108,7 +108,8 @@ export const useChatStore = defineStore('chat', () => {
         messages: local?.messages || []
       }
     })
-    if (!activeConversationId.value && convResponse.data.defaultChannelId) {
+    const activeStillExists = conversations.value.some(c => c.id === activeConversationId.value)
+    if ((!activeConversationId.value || !activeStillExists) && convResponse.data.defaultChannelId) {
       activeConversationId.value = convResponse.data.defaultChannelId
     }
   }

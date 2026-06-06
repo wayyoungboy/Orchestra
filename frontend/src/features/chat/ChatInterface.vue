@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
+import { ref, watch, onBeforeUnmount, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from './chatStore'
@@ -231,12 +231,15 @@ async function jumpToResult(res: any) {
   }
 }
 
-onMounted(async () => {
-  if (currentWorkspace.value) {
-    await chatStore.loadConversations(currentWorkspace.value.id)
-    await projectStore.loadMembers(currentWorkspace.value.id)
-  }
-})
+watch(
+  () => currentWorkspace.value?.id,
+  async (workspaceId) => {
+    if (!workspaceId) return
+    await chatStore.loadConversations(workspaceId)
+    await projectStore.loadMembers(workspaceId)
+  },
+  { immediate: true }
+)
 
 onBeforeUnmount(() => {
   // Don't disconnect here — the store handles reconnection.

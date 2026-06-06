@@ -270,6 +270,9 @@ storage:
 # Include the focused browser terminal E2E in the gate (requires backend and tmux)
 ORCHESTRA_RUN_TERMINAL_E2E=1 ./scripts/verify-mvp.sh
 
+# Include the focused browser MVP chat flow in the gate (requires backend)
+ORCHESTRA_RUN_MVP_CHAT_E2E=1 ./scripts/verify-mvp.sh
+
 # Backend unit tests
 cd backend && make test
 
@@ -282,6 +285,9 @@ cd frontend && pnpm test
 # E2E tests (requires running backend)
 cd frontend && pnpm test:e2e
 
+# Focused MVP chat browser flow (requires running backend)
+cd frontend && pnpm test:e2e:mvp-chat
+
 # Focused agent terminal runtime E2E (requires backend and tmux)
 cd frontend && pnpm test:e2e:terminal
 
@@ -289,7 +295,7 @@ cd frontend && pnpm test:e2e:terminal
 ORCHESTRA_API_URL=http://your-server:8080 pnpm test:e2e
 ```
 
-The focused terminal E2E runner clears inherited HTTP/SOCKS proxy variables for local browser/API traffic and appends `127.0.0.1`, `localhost`, and `::1` to `NO_PROXY`, so localhost verification is not affected by a global development proxy.
+The focused E2E runners clear inherited HTTP/SOCKS proxy variables for local browser/API traffic and append `127.0.0.1`, `localhost`, and `::1` to `NO_PROXY`, so localhost verification is not affected by a global development proxy.
 
 ### Make Commands
 
