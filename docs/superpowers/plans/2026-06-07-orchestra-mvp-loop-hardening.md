@@ -22,6 +22,7 @@ Completed hardening passes:
 - Added tmux runtime coverage for resize and raw input, plus a focused Playwright spec for backend-seeded agent terminal sessions.
 - Added an API-level terminal runtime smoke test that creates a workspace/member, starts a real tmux-backed bash session, verifies a raw-input marker through the snapshot endpoint, and confirms session deletion unregisters the runtime.
 - Added a focused terminal E2E runner that clears inherited local proxy variables, preserves/extends `NO_PROXY` for localhost, and can run the browser terminal path from `pnpm test:e2e:terminal` or `ORCHESTRA_RUN_TERMINAL_E2E=1 ./scripts/verify-mvp.sh`.
+- Added a focused member-session browser E2E that creates a configured assistant, opens the Members page, starts the agent session from the member card, verifies the backend session, and confirms the session appears in the Agent Sessions page.
 - Added a focused MVP chat browser E2E that creates an isolated workspace/member, opens the chat route directly, verifies the general channel and member list load, sends a page message with an @mention, checks persistence through the API, and confirms no failed dispatch diagnostics.
 - Added a focused MVP task browser E2E that creates an isolated workspace, secretary, assistant, and assigned task through the API, opens the Tasks page, starts and completes the task through the UI, and verifies the completed task/result through the API.
 - Fixed the default-channel mention dispatch path so explicit `@assistant` / `@secretary` mentions target valid agent members even when the channel has no stored member list, and covered the runtime path from message send to tmux prompt delivery.
@@ -31,7 +32,7 @@ Completed hardening passes:
 
 The next product gap is expanding regular browser E2E coverage from these focused paths toward a full user-visible workflow QA pass. The member-card session action, Agent Sessions tab, Tasks page, and direct chat-route loading make agent startup, ownership, current screen state, xterm.js output, resize propagation, direct keystrokes, light input, session cleanup, message persistence, explicit mention dispatch, task list rendering, task completion, result reporting, secretary summarization handoff, and backend tmux/API/browser runtime validation usable before that pass.
 
-Validation note: `scripts/verify-mvp.sh`, backend tests, frontend production builds, the focused MVP chat browser E2E, the focused MVP task browser E2E, and the focused terminal browser E2E are passing. Playwright cold-starts slowly in this local `/Volumes` + pnpm environment, and inherited SOCKS proxy variables can break localhost API requests; use the checked-in focused E2E runners so local proxy variables are sanitized before Playwright starts.
+Validation note: `scripts/verify-mvp.sh`, backend tests, frontend production builds, the focused member-session browser E2E, the focused MVP chat browser E2E, the focused MVP task browser E2E, and the focused terminal browser E2E are passing. Playwright cold-starts slowly in this local `/Volumes` + pnpm environment, and inherited SOCKS proxy variables can break localhost API requests; use the checked-in focused E2E runners so local proxy variables are sanitized before Playwright starts.
 
 ---
 

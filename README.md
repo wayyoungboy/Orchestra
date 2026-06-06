@@ -285,6 +285,9 @@ ORCHESTRA_RUN_TERMINAL_E2E=1 ./scripts/verify-mvp.sh
 # Include the focused browser MVP chat flow in the gate (requires backend)
 ORCHESTRA_RUN_MVP_CHAT_E2E=1 ./scripts/verify-mvp.sh
 
+# Include the focused browser member session flow in the gate (requires backend and tmux)
+ORCHESTRA_RUN_MVP_MEMBER_SESSION_E2E=1 ./scripts/verify-mvp.sh
+
 # Include the focused browser MVP task flow in the gate (requires backend)
 ORCHESTRA_RUN_MVP_TASK_E2E=1 ./scripts/verify-mvp.sh
 
@@ -305,6 +308,9 @@ cd frontend && pnpm test:e2e
 
 # Focused MVP chat browser flow (requires running backend)
 cd frontend && pnpm test:e2e:mvp-chat
+
+# Focused member-card agent session browser flow (requires backend and tmux)
+cd frontend && pnpm test:e2e:mvp-member-session
 
 # Focused MVP task browser flow (requires running backend)
 cd frontend && pnpm test:e2e:mvp-task

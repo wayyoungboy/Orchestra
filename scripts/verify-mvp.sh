@@ -27,6 +27,7 @@ echo "==> Agent terminal Playwright spec typecheck"
     --lib ES2020,DOM \
     e2e/agent-terminal-runtime.spec.ts \
     e2e/mvp-chat-flow.spec.ts \
+    e2e/mvp-member-session-flow.spec.ts \
     e2e/mvp-task-flow.spec.ts
 )
 
@@ -36,6 +37,11 @@ echo "==> Focused Playwright E2E runner environment"
 if [[ "${ORCHESTRA_RUN_MVP_CHAT_E2E:-}" == "1" ]]; then
   echo "==> MVP chat flow E2E"
   ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-mvp-chat-e2e.sh"
+fi
+
+if [[ "${ORCHESTRA_RUN_MVP_MEMBER_SESSION_E2E:-}" == "1" ]]; then
+  echo "==> MVP member session flow E2E"
+  ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-mvp-member-session-e2e.sh"
 fi
 
 if [[ "${ORCHESTRA_RUN_MVP_TASK_E2E:-}" == "1" ]]; then
