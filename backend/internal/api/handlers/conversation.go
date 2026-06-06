@@ -18,17 +18,17 @@ import (
 )
 
 type ConversationHandler struct {
-	convRepo         *repository.ConversationRepository
-	msgRepo          *repository.MessageRepository
-	readRepo         *repository.ConversationReadRepository
-	memberRepo       repository.MemberRepository
-	wsRepo           repository.WorkspaceRepository
-	registry         *agent.Registry
-	chatHub          *ws.ChatHub
-	serverAddr       string
-	authEnabled      bool
+	convRepo          *repository.ConversationRepository
+	msgRepo           *repository.MessageRepository
+	readRepo          *repository.ConversationReadRepository
+	memberRepo        repository.MemberRepository
+	wsRepo            repository.WorkspaceRepository
+	registry          *agent.Registry
+	chatHub           *ws.ChatHub
+	serverAddr        string
+	authEnabled       bool
 	configuredBaseURL string
-	outbox           *outbox.Worker
+	outbox            *outbox.Worker
 }
 
 func NewConversationHandler(
@@ -81,10 +81,10 @@ func (h *ConversationHandler) authHeader() string {
 }
 
 type ConversationListResponse struct {
-	Pinned          []ConversationDTO `json:"pinned"`
-	Timeline        []ConversationDTO `json:"timeline"`
-	DefaultChannelID string           `json:"defaultChannelId,omitempty"`
-	TotalUnreadCount int              `json:"totalUnreadCount"`
+	Pinned           []ConversationDTO `json:"pinned"`
+	Timeline         []ConversationDTO `json:"timeline"`
+	DefaultChannelID string            `json:"defaultChannelId,omitempty"`
+	TotalUnreadCount int               `json:"totalUnreadCount"`
 }
 
 type ConversationDTO struct {
@@ -121,12 +121,12 @@ type CreateConversationRequest struct {
 // Extra fields (conversationType, mentions, timestamp) may be sent by the web client for forward compatibility; only the fields below are persisted today.
 // ClientTraceID is optional idempotency / correlation (e.g. UUID); not stored in DB until a migration adds a column.
 type SendMessageRequest struct {
-	Text           string   `json:"text"`
-	SenderID       string   `json:"senderId"`
-	SenderName     string   `json:"senderName"`
-	ClientTraceID  string   `json:"clientTraceId,omitempty"`
-	MentionIDs     []string `json:"mentionIds,omitempty"`
-	MentionAll     bool     `json:"mentionAll,omitempty"`
+	Text          string   `json:"text"`
+	SenderID      string   `json:"senderId"`
+	SenderName    string   `json:"senderName"`
+	ClientTraceID string   `json:"clientTraceId,omitempty"`
+	MentionIDs    []string `json:"mentionIds,omitempty"`
+	MentionAll    bool     `json:"mentionAll,omitempty"`
 }
 
 // List lists all conversations in a workspace
@@ -270,13 +270,13 @@ func (h *ConversationHandler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, ConversationDTO{
-		ID:        conv.ID,
-		Type:      string(conv.Type),
-		TargetID:  conv.TargetID,
-		MemberIDs: conv.MemberIDs,
+		ID:         conv.ID,
+		Type:       string(conv.Type),
+		TargetID:   conv.TargetID,
+		MemberIDs:  conv.MemberIDs,
 		CustomName: conv.Name,
-		Pinned:    conv.Pinned,
-		Muted:     conv.Muted,
+		Pinned:     conv.Pinned,
+		Muted:      conv.Muted,
 	})
 }
 
@@ -315,13 +315,13 @@ func (h *ConversationHandler) GetOrCreateDM(c *gin.Context) {
 		status = http.StatusCreated
 	}
 	c.JSON(status, ConversationDTO{
-		ID:        conv.ID,
-		Type:      string(conv.Type),
-		TargetID:  conv.TargetID,
-		MemberIDs: conv.MemberIDs,
+		ID:         conv.ID,
+		Type:       string(conv.Type),
+		TargetID:   conv.TargetID,
+		MemberIDs:  conv.MemberIDs,
 		CustomName: conv.Name,
-		Pinned:    conv.Pinned,
-		Muted:     conv.Muted,
+		Pinned:     conv.Pinned,
+		Muted:      conv.Muted,
 	})
 }
 
@@ -866,14 +866,8 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 				add(mid)
 			}
 		} else if len(mentionIDs) > 0 {
-			mentionSet := make(map[string]struct{}, len(mentionIDs))
 			for _, id := range mentionIDs {
-				mentionSet[id] = struct{}{}
-			}
-			for _, mid := range conv.MemberIDs {
-				if _, ok := mentionSet[mid]; ok {
-					add(mid)
-				}
+				add(id)
 			}
 		} else {
 			// No explicit mentions: forward to secretaries only
@@ -940,7 +934,7 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 		authHdr := h.authHeader()
 
 		if member != nil && member.RoleType == models.RoleSecretary {
-				fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
+			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
 
 你是团队的协调者（秘书）。你的职责：
 1. 分析用户需求，拆解为可执行的任务
@@ -972,19 +966,22 @@ curl -s --max-time 10 %s/api/internal/tasks/list?secretaryId=%s
 - 用 2 创建任务，任务创建后系统会自动转发给对应助手。
 - 用 4 追踪任务进度，查看哪些完成、哪些失败。
 - 任务完成后助手会汇报，你审核后用 3 回复用户。
-- 如果助手任务失败，可以重新分配给其他助手。`,
-					convID,
-					memberID,
-					text,
-					baseURL, workspaceID,
-					baseURL, authHdr,
-					workspaceID, convID, memberID,
-					baseURL, authHdr,
-					workspaceID, convID, memberID,
-					baseURL, memberID,
-				)
-			} else {
-				fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
+- 如果助手任务失败，可以重新分配给其他助手。
+
+用户原始请求：%s`,
+				convID,
+				memberID,
+				text,
+				baseURL, workspaceID,
+				baseURL, authHdr,
+				workspaceID, convID, memberID,
+				baseURL, authHdr,
+				workspaceID, convID, memberID,
+				baseURL, memberID,
+				text,
+			)
+		} else {
+			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
 
 【可用工具 - 使用 curl 命令调用】
 
@@ -1014,17 +1011,20 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 
 规则：
 - 收到秘书分配的任务(taskId)后，先调用 1 开始，完成后调用 2，失败调用 3。
-- 完成任务后直接通过 4 回复汇报结果。`,
-					convID,
-					memberID,
-					text,
-					baseURL, authHdr,
-					baseURL, authHdr,
-					baseURL, authHdr,
-					baseURL, authHdr,
-					workspaceID, convID, memberID, memberName,
-				)
-			}
+- 完成任务后直接通过 4 回复汇报结果。
+
+用户原始请求：%s`,
+				convID,
+				memberID,
+				text,
+				baseURL, authHdr,
+				baseURL, authHdr,
+				baseURL, authHdr,
+				baseURL, authHdr,
+				workspaceID, convID, memberID, memberName,
+				text,
+			)
+		}
 
 		if err := sess.Dispatch(fullPrompt, "user"); err != nil && h.outbox != nil {
 			if _, enqueueErr := h.outbox.Enqueue(c.Request.Context(), workspaceID, convID, memberID, memberID, fullPrompt); enqueueErr != nil {
@@ -1245,6 +1245,7 @@ func (h *ConversationHandler) DeleteMessage(c *gin.Context) {
 
 	c.JSON(http.StatusNoContent, nil)
 }
+
 // UpdateAgentStatus updates an AI agent's activity status
 // @Summary Update agent status
 // @Description Update an AI agent's current activity status (thinking, reading file, etc.)

@@ -40,7 +40,7 @@ func newRuntimeRouter(t *testing.T, workspaceDir string) (*gin.Engine, *Dependen
 	cfg := config.Default()
 	cfg.Auth.Enabled = false
 	cfg.Security.AllowedPaths = []string{workspaceDir}
-	cfg.Security.AllowedCommands = []string{"/bin/bash"}
+	cfg.Security.AllowedCommands = []string{"/bin/bash", "/bin/cat"}
 
 	registry := agent.NewRegistry()
 	gateway := ws.NewGateway(nil, cfg.Security.AllowedOrigins)
@@ -171,4 +171,92 @@ func TestTerminalRuntimeAPIWorkspaceMemberSessionLifecycle(t *testing.T) {
 	if got := deps.Registry.GetByID(sessionID); got != nil {
 		t.Fatalf("expected session to be unregistered after delete, got %#v", got)
 	}
+}
+
+func TestMentionedAssistantInDefaultChannelCreatesDispatchSession(t *testing.T) {
+	if !tmuxRuntimeAvailable() {
+		t.Skip("tmux not installed")
+	}
+
+	workspaceDir := t.TempDir()
+	router, deps := newRuntimeRouter(t, workspaceDir)
+
+	workspaceResp := requestJSON(t, router, http.MethodPost, "/api/workspaces", map[string]any{
+		"name":             "Dispatch Workspace",
+		"path":             workspaceDir,
+		"ownerDisplayName": "Dispatch Owner",
+	})
+	if workspaceResp.Code != http.StatusCreated {
+		t.Fatalf("create workspace status = %d body=%s", workspaceResp.Code, workspaceResp.Body.String())
+	}
+	workspace := decodeJSON[map[string]any](t, workspaceResp)
+	workspaceID := workspace["id"].(string)
+
+	memberResp := requestJSON(t, router, http.MethodPost, "/api/workspaces/"+workspaceID+"/members", map[string]any{
+		"name":            "Dispatch Shell",
+		"roleType":        "assistant",
+		"terminalType":    "native",
+		"terminalCommand": "/bin/cat",
+		"acpEnabled":      true,
+		"acpCommand":      "/bin/cat",
+	})
+	if memberResp.Code != http.StatusCreated {
+		t.Fatalf("create member status = %d body=%s", memberResp.Code, memberResp.Body.String())
+	}
+	member := decodeJSON[map[string]any](t, memberResp)
+	memberID := member["id"].(string)
+
+	conversationsResp := requestJSON(t, router, http.MethodGet, "/api/workspaces/"+workspaceID+"/conversations", nil)
+	if conversationsResp.Code != http.StatusOK {
+		t.Fatalf("list conversations status = %d body=%s", conversationsResp.Code, conversationsResp.Body.String())
+	}
+	conversations := decodeJSON[map[string]any](t, conversationsResp)
+	conversationID := conversations["defaultChannelId"].(string)
+
+	marker := "ORCH_DISPATCH_RUNTIME"
+	messageResp := requestJSON(t, router, http.MethodPost, "/api/workspaces/"+workspaceID+"/conversations/"+conversationID+"/messages", map[string]any{
+		"text":       "Please inspect " + marker,
+		"senderId":   "owner",
+		"senderName": "Dispatch Owner",
+		"mentionIds": []string{memberID},
+	})
+	if messageResp.Code != http.StatusCreated {
+		t.Fatalf("send message status = %d body=%s", messageResp.Code, messageResp.Body.String())
+	}
+
+	var sessionID string
+	deadline := time.Now().Add(8 * time.Second)
+	for time.Now().Before(deadline) {
+		if session := deps.Registry.GetByMember(workspaceID, memberID); session != nil {
+			sessionID = session.ID
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if sessionID == "" {
+		t.Fatalf("expected mentioned assistant %s to get a dispatch session", memberID)
+	}
+	defer func() {
+		if s := deps.Registry.GetByID(sessionID); s != nil {
+			_ = s.Kill()
+			deps.Registry.Unregister(sessionID)
+		}
+	}()
+
+	var snapshot map[string]any
+	deadline = time.Now().Add(8 * time.Second)
+	for time.Now().Before(deadline) {
+		snapshotResp := requestJSON(t, router, http.MethodGet, "/api/terminals/"+sessionID+"/snapshot?lines=120", nil)
+		if snapshotResp.Code != http.StatusOK {
+			t.Fatalf("snapshot status = %d body=%s", snapshotResp.Code, snapshotResp.Body.String())
+		}
+		snapshot = decodeJSON[map[string]any](t, snapshotResp)
+		content, _ := snapshot["content"].(string)
+		if strings.Contains(content, "#conversationId{"+conversationID+"}") && strings.Contains(content, marker) {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	content, _ := snapshot["content"].(string)
+	t.Fatalf("dispatch prompt did not reach assistant terminal; wanted conversation marker and %q in %#v", marker, content)
 }

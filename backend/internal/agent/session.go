@@ -65,6 +65,9 @@ func NewAgentSession(id, workspaceID, memberID, memberName string) *AgentSession
 	})
 
 	// When transitioning to Online, flush any queued messages
+	s.sm.OnEnter(StateConnecting, StateOnline, func() {
+		s.flushQueue()
+	})
 	s.sm.OnEnter(StateWorking, StateOnline, func() {
 		s.flushQueue()
 	})

@@ -3,6 +3,7 @@ package agent
 import (
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestNewStateMachine_StartsOffline(t *testing.T) {
@@ -88,6 +89,42 @@ func TestOnEnter_HandlerCalled(t *testing.T) {
 
 	if called.Load() != 1 {
 		t.Errorf("expected handler called once, got %d", called.Load())
+	}
+}
+
+func TestOnEnter_HandlerCanReadCurrentState(t *testing.T) {
+	sm := NewStateMachine()
+	done := make(chan AgentState, 1)
+
+	sm.OnEnter(StateConnecting, StateOnline, func() {
+		done <- sm.Current()
+	})
+
+	if err := sm.Transition(StateConnecting); err != nil {
+		t.Fatalf("transition to connecting: %v", err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- sm.Transition(StateOnline)
+	}()
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("transition to online: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("transition deadlocked while handler read current state")
+	}
+
+	select {
+	case got := <-done:
+		if got != StateOnline {
+			t.Fatalf("handler saw state %s, want %s", got, StateOnline)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("handler was not called")
 	}
 }
 

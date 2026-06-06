@@ -60,9 +60,9 @@ func (sm *StateMachine) Current() AgentState {
 // for the (old→new) transition are called synchronously.
 func (sm *StateMachine) Transition(to AgentState) error {
 	sm.mu.Lock()
-	defer sm.mu.Unlock()
 
 	if to == sm.current {
+		sm.mu.Unlock()
 		return nil // no-op
 	}
 
@@ -75,16 +75,19 @@ func (sm *StateMachine) Transition(to AgentState) error {
 		}
 	}
 	if !valid {
-		return fmt.Errorf("invalid state transition: %s → %s", sm.current, to)
+		current := sm.current
+		sm.mu.Unlock()
+		return fmt.Errorf("invalid state transition: %s → %s", current, to)
 	}
 
 	from := sm.current
 	sm.current = to
 
-	// Fire handlers outside the lock? No — callers expect synchronous
-	// notification so they can react before the next event is processed.
 	key := TransitionKey{From: from, To: to}
-	for _, fn := range sm.handlers[key] {
+	handlers := append([]func(){}, sm.handlers[key]...)
+	sm.mu.Unlock()
+
+	for _, fn := range handlers {
 		fn()
 	}
 
