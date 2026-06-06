@@ -130,6 +130,17 @@ func (s *AgentSession) IsAlive() bool {
 	return s.tmuxMgr.SessionExists(s.tmuxName)
 }
 
+// CaptureScrollback returns recent visible tmux pane output for inspection.
+func (s *AgentSession) CaptureScrollback(ctx context.Context, lines int) (string, error) {
+	if s.transport != nil {
+		return s.transport.CaptureScrollback(ctx, lines)
+	}
+	if s.tmuxMgr == nil || s.tmuxName == "" {
+		return "", fmt.Errorf("tmux session not configured")
+	}
+	return s.tmuxMgr.CapturePane(ctx, s.tmuxName, lines)
+}
+
 // Dispatch enqueues a message for the agent. If the agent is Online,
 // the queue is flushed immediately.
 func (s *AgentSession) Dispatch(content string, senderID string) error {

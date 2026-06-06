@@ -70,3 +70,25 @@ func TestMergeSessionMemberConfigAllowsRequestOverride(t *testing.T) {
 		t.Fatalf("TerminalType = %q, want gemini", merged.TerminalType)
 	}
 }
+
+func TestTerminalSnapshotLineCount(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want int
+	}{
+		{name: "default", raw: "", want: 200},
+		{name: "invalid", raw: "many", want: 200},
+		{name: "negative", raw: "-5", want: 200},
+		{name: "valid", raw: "80", want: 80},
+		{name: "capped", raw: "5000", want: 1000},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := terminalSnapshotLineCount(tt.raw); got != tt.want {
+				t.Fatalf("terminalSnapshotLineCount(%q) = %d, want %d", tt.raw, got, tt.want)
+			}
+		})
+	}
+}

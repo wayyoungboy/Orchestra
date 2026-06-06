@@ -262,6 +262,7 @@ func registerTerminalRoutes(r *gin.Engine, deps *Dependencies) {
 	api.POST("/workspaces/:id/members/:memberId/terminal-session", deps.TerminalHandler.GetOrCreateSessionForMember)
 	api.GET("/workspaces/:id/terminal-sessions", deps.TerminalHandler.ListWorkspaceTerminalSessions)
 	api.POST("/terminals", deps.TerminalHandler.CreateSession)
+	api.GET("/terminals/:sessionId/snapshot", deps.TerminalHandler.GetSessionSnapshot)
 	api.DELETE("/terminals/:sessionId", deps.TerminalHandler.DeleteSession)
 }
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/orchestra/backend/internal/agent"
@@ -34,6 +35,27 @@ type CreateSessionRequest struct {
 // CreateSessionResponse represents the response for creating a terminal session
 type CreateSessionResponse struct {
 	SessionID string `json:"sessionId"`
+}
+
+// TerminalSnapshotResponse represents recent read-only terminal output.
+type TerminalSnapshotResponse struct {
+	SessionID string `json:"sessionId"`
+	Lines     int    `json:"lines"`
+	Content   string `json:"content"`
+}
+
+func terminalSnapshotLineCount(raw string) int {
+	if raw == "" {
+		return 200
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n <= 0 {
+		return 200
+	}
+	if n > 1000 {
+		return 1000
+	}
+	return n
 }
 
 func mergeSessionMemberConfig(stored *models.Member, req CreateSessionRequest) *models.Member {
@@ -136,6 +158,40 @@ func (h *TerminalHandler) DeleteSession(c *gin.Context) {
 		h.registry.Unregister(sess.ID)
 	}
 	c.JSON(http.StatusNoContent, nil)
+}
+
+// GetSessionSnapshot returns recent tmux pane output for a session.
+// @Summary Get terminal session snapshot
+// @Description Get recent read-only terminal output for inspection
+// @Tags terminals
+// @Produce json
+// @Security BearerAuth
+// @Param sessionId path string true "Session ID"
+// @Param lines query int false "Number of scrollback lines"
+// @Success 200 {object} TerminalSnapshotResponse
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/terminals/{sessionId}/snapshot [get]
+func (h *TerminalHandler) GetSessionSnapshot(c *gin.Context) {
+	sessionID := c.Param("sessionId")
+	sess := h.registry.GetByID(sessionID)
+	if sess == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "session not found"})
+		return
+	}
+
+	lines := terminalSnapshotLineCount(c.Query("lines"))
+	content, err := sess.CaptureScrollback(c.Request.Context(), lines)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, TerminalSnapshotResponse{
+		SessionID: sessionID,
+		Lines:     lines,
+		Content:   content,
+	})
 }
 
 // ListWorkspaceTerminalSessions lists active sessions for a workspace

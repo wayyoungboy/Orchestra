@@ -185,8 +185,9 @@ function formatTerminalEvent(raw: string) {
   }
 }
 
-function appendTerminalEvent(raw: string) {
-  terminalEvents.value = [...terminalEvents.value.slice(-199), formatTerminalEvent(raw)]
+function appendTerminalEvent(raw: string, formatted = true) {
+  const text = formatted ? formatTerminalEvent(raw) : raw
+  terminalEvents.value = [...terminalEvents.value.slice(-199), text]
 }
 
 function disconnectTerminalStream() {
@@ -201,11 +202,24 @@ function disconnectTerminalStream() {
   streamStatus.value = activeSessionId.value ? 'closed' : 'idle'
 }
 
-function connectTerminalStream(sessionId: string) {
+async function loadTerminalSnapshot(sessionId: string) {
+  try {
+    const response = await client.get(`/terminals/${sessionId}/snapshot?lines=200`, { skipErrorToast: true })
+    const content = String(response.data?.content || '').trimEnd()
+    if (content) {
+      appendTerminalEvent(`[snapshot]\n${content}`, false)
+    }
+  } catch (e) {
+    appendTerminalEvent('[snapshot] 暂时无法读取当前终端屏幕', false)
+  }
+}
+
+async function connectTerminalStream(sessionId: string) {
   disconnectTerminalStream()
   activeSessionId.value = sessionId
   terminalEvents.value = []
   streamStatus.value = 'connecting'
+  await loadTerminalSnapshot(sessionId)
 
   const ws = new WebSocket(terminalWsUrl(sessionId))
   terminalWs = ws
