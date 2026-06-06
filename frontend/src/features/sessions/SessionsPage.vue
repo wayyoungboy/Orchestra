@@ -71,6 +71,17 @@
           <pre v-if="terminalEvents.length">{{ terminalEvents.join('\n') }}</pre>
           <p v-else class="stream-empty">等待 agent 输出...</p>
         </div>
+        <form class="stream-input-row" @submit.prevent="sendTerminalInput">
+          <textarea
+            v-model="terminalInput"
+            class="stream-input"
+            rows="2"
+            placeholder="发送到当前 Agent 会话"
+            :disabled="!canSendTerminalInput"
+            @keydown.enter.exact.prevent="sendTerminalInput"
+          ></textarea>
+          <button class="send-btn" type="submit" :disabled="!canSendTerminalInput">发送</button>
+        </form>
       </div>
     </div>
   </div>
@@ -99,6 +110,7 @@ const sessions = ref<WorkspaceSession[]>([])
 const members = ref<Member[]>([])
 const activeSessionId = ref('')
 const terminalEvents = ref<string[]>([])
+const terminalInput = ref('')
 const streamStatus = ref<'idle' | 'connecting' | 'connected' | 'closed' | 'error'>('idle')
 let terminalWs: WebSocket | null = null
 
@@ -131,6 +143,10 @@ const streamStatusText = computed(() => {
     error: '连接错误',
   }
   return map[streamStatus.value]
+})
+
+const canSendTerminalInput = computed(() => {
+  return !!terminalInput.value.trim() && streamStatus.value === 'connected' && terminalWs?.readyState === WebSocket.OPEN
 })
 
 function roleLabel(role: string) {
@@ -199,6 +215,7 @@ function disconnectTerminalStream() {
     terminalWs.close()
     terminalWs = null
   }
+  terminalInput.value = ''
   streamStatus.value = activeSessionId.value ? 'closed' : 'idle'
 }
 
@@ -239,6 +256,15 @@ async function connectTerminalStream(sessionId: string) {
       terminalWs = null
     }
   }
+}
+
+function sendTerminalInput() {
+  const content = terminalInput.value.trim()
+  if (!content || !terminalWs || terminalWs.readyState !== WebSocket.OPEN) return
+
+  terminalWs.send(JSON.stringify({ type: 'input', content }))
+  appendTerminalEvent(`[you]\n${content}`, false)
+  terminalInput.value = ''
 }
 
 onMounted(loadSessions)
@@ -335,6 +361,23 @@ onBeforeUnmount(disconnectTerminalStream)
   font-size: 12px; line-height: 1.55; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 .stream-empty { color: #94a3b8; font-size: 13px; font-weight: 700; }
+.stream-input-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px;
+  padding: 14px 18px 16px; border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+.stream-input {
+  min-width: 0; resize: vertical; max-height: 120px; border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.28); background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc; padding: 10px 12px; font-size: 13px; line-height: 1.4; outline: none;
+}
+.stream-input::placeholder { color: #64748b; }
+.stream-input:focus { border-color: rgba(129, 140, 248, 0.75); }
+.stream-input:disabled { opacity: 0.65; cursor: not-allowed; }
+.send-btn {
+  align-self: stretch; min-width: 72px; border-radius: 12px; border: 1px solid rgba(129, 140, 248, 0.45);
+  background: #4f46e5; color: white; font-size: 13px; font-weight: 950; cursor: pointer;
+}
+.send-btn:disabled { opacity: 0.5; cursor: not-allowed; background: rgba(148, 163, 184, 0.35); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
