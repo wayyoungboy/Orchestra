@@ -270,6 +270,9 @@ storage:
 # Backend unit tests
 cd backend && make test
 
+# Focused backend terminal API runtime smoke (requires tmux)
+cd backend && go test ./internal/api -run TestTerminalRuntimeAPIWorkspaceMemberSessionLifecycle -count=1
+
 # Frontend unit tests
 cd frontend && pnpm test
 
