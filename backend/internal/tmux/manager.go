@@ -100,6 +100,12 @@ func (m *Manager) SendKeys(ctx context.Context, name, text string) error {
 	return err
 }
 
+// SendRawInput sends literal terminal input without appending Enter.
+func (m *Manager) SendRawInput(ctx context.Context, name, input string) error {
+	_, err := m.exec(ctx, "send-keys", "-t", name, "-l", input)
+	return err
+}
+
 // SendEnter sends an Enter key to the session.
 func (m *Manager) SendEnter(ctx context.Context, name string) error {
 	_, err := m.exec(ctx, "send-keys", "-t", name, "Enter")

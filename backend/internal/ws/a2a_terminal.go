@@ -87,6 +87,10 @@ func (h *A2ATerminalHandler) readLoop(conn *websocket.Conn, session *a2a.Session
 			if err := session.SendUserMessage(msg.Content); err != nil {
 				log.Printf("[agent-ws] Failed to send user message: %v", err)
 			}
+		case "raw_input":
+			if err := session.SendRawInput(msg.Content); err != nil {
+				log.Printf("[agent-ws] Failed to send raw input: %v", err)
+			}
 		case "tool_result":
 			if err := session.SendToolResult(msg.ToolUseID, msg.ToolResult, msg.IsError); err != nil {
 				log.Printf("[agent-ws] Failed to send tool result: %v", err)

@@ -144,6 +144,30 @@ func (s *TmuxSession) SendInput(text string) error {
 	return nil
 }
 
+// SendRawInput sends literal terminal input without appending Enter.
+func (s *TmuxSession) SendRawInput(input string) error {
+	if input == "" {
+		return fmt.Errorf("raw input is empty")
+	}
+
+	s.mu.Lock()
+	if s.done {
+		s.mu.Unlock()
+		return fmt.Errorf("session is closed")
+	}
+	s.lastActive = time.Now()
+	s.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	mgr := NewManager("")
+	if err := mgr.SendRawInput(ctx, s.Name, input); err != nil {
+		return fmt.Errorf("tmux send-keys raw input: %w", err)
+	}
+	return nil
+}
+
 // CaptureScrollback captures the last N lines of pane output.
 func (s *TmuxSession) CaptureScrollback(ctx context.Context, lines int) (string, error) {
 	mgr := NewManager("")

@@ -12,3 +12,11 @@ func TestSessionResizeRejectsInvalidDimensions(t *testing.T) {
 		t.Fatal("Resize accepted zero rows")
 	}
 }
+
+func TestSessionSendRawInputRejectsEmptyInput(t *testing.T) {
+	sess := NewSession("sess-1", "ws-1", "member-1", "Agent", "codex", nil)
+
+	if err := sess.SendRawInput(""); err == nil {
+		t.Fatal("SendRawInput accepted empty input")
+	}
+}

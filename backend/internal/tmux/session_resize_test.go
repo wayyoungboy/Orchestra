@@ -15,3 +15,11 @@ func TestTmuxSessionResizeRejectsInvalidDimensions(t *testing.T) {
 		t.Fatal("Resize accepted negative columns")
 	}
 }
+
+func TestTmuxSessionSendRawInputRejectsEmptyInput(t *testing.T) {
+	sess := NewTmuxSession("sess-1", "ws-1", "member-1", "Agent", "codex", "orchestra-test", "/tmp", "bash", nil)
+
+	if err := sess.SendRawInput(""); err == nil {
+		t.Fatal("SendRawInput accepted empty input")
+	}
+}

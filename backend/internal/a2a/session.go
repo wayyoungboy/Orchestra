@@ -147,6 +147,26 @@ func (s *Session) SendUserMessage(content string) error {
 	return s.tmuxSession.SendInput(content)
 }
 
+// SendRawInput sends literal terminal input without appending Enter.
+func (s *Session) SendRawInput(input string) error {
+	if input == "" {
+		return fmt.Errorf("raw input is empty")
+	}
+
+	s.mu.Lock()
+	if s.released {
+		s.mu.Unlock()
+		return fmt.Errorf("session already released")
+	}
+	s.lastActive = time.Now()
+	s.mu.Unlock()
+
+	if s.tmuxSession == nil {
+		return fmt.Errorf("no tmux session configured for %s", s.ID)
+	}
+	return s.tmuxSession.SendRawInput(input)
+}
+
 // Resize updates the backing terminal dimensions.
 func (s *Session) Resize(cols, rows int) error {
 	if cols <= 0 || rows <= 0 {

@@ -16,6 +16,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   resize: [dimensions: { cols: number; rows: number }]
+  data: [input: string]
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -65,7 +66,7 @@ onMounted(async () => {
   const term = new Terminal({
     convertEol: true,
     cursorBlink: props.status === 'connected',
-    disableStdin: true,
+    disableStdin: props.status !== 'connected',
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
     fontSize: 13,
     lineHeight: 1.35,
@@ -97,6 +98,11 @@ onMounted(async () => {
 
   term.loadAddon(fit)
   term.loadAddon(new WebLinksAddon())
+  term.onData((input) => {
+    if (props.status === 'connected') {
+      emit('data', input)
+    }
+  })
   term.open(containerRef.value)
 
   terminal = term
@@ -122,6 +128,7 @@ watch(
   (status) => {
     if (terminal) {
       terminal.options.cursorBlink = status === 'connected'
+      terminal.options.disableStdin = status !== 'connected'
     }
   }
 )
