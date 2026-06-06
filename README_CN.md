@@ -228,6 +228,9 @@ storage:
 ### 运行测试
 
 ```bash
+# 当前 MVP 验证入口
+./scripts/verify-mvp.sh
+
 # 后端单元测试
 cd backend && make test
 

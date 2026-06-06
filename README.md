@@ -264,6 +264,9 @@ storage:
 ### Running Tests
 
 ```bash
+# Current MVP verification gate
+./scripts/verify-mvp.sh
+
 # Backend unit tests
 cd backend && make test
 
