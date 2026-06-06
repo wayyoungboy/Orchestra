@@ -9,8 +9,8 @@ import (
 
 // PostReadyStep defines a step to execute after agent becomes ready.
 type PostReadyStep struct {
-	Type    string        // "send", "wait_pattern", "mark_ready"
-	Content string        // text to send, or pattern to wait for
+	Type    string // "send", "wait_pattern", "mark_ready"
+	Content string // text to send, or pattern to wait for
 	Timeout time.Duration
 }
 
@@ -35,6 +35,11 @@ func DefaultPostReadySteps(terminalType string) []PostReadyStep {
 		return []PostReadyStep{
 			{Type: "send", Content: "/status", Timeout: 5 * time.Second},
 			{Type: "wait_pattern", Content: "ready", Timeout: 10 * time.Second},
+			{Type: "mark_ready"},
+		}
+	case "codex":
+		return []PostReadyStep{
+			{Type: "wait_pattern", Content: "", Timeout: 10 * time.Second},
 			{Type: "mark_ready"},
 		}
 	default:

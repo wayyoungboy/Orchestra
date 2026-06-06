@@ -20,6 +20,7 @@ func newProvidersCmd() *cobra.Command {
 				fmt.Println()
 				fmt.Println("Supported providers:")
 				fmt.Println("  Claude Code  — install from https://claude.ai/code")
+				fmt.Println("  OpenAI Codex — install from https://developers.openai.com/codex/")
 				fmt.Println("  Gemini CLI   — install with 'npm install -g @anthropic-ai/gemini-cli' (or equivalent)")
 				return nil
 			}

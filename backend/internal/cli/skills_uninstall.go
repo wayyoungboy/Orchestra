@@ -29,7 +29,7 @@ The skill must have been previously installed via 'orchestra skills install'.`,
 					continue
 				}
 
-				if err := provider.ClaudeUninstallSkill(skillName); err != nil {
+				if err := uninstallProviderSkill(p.Name, skillName); err != nil {
 					fmt.Printf("  ✗ %s: %v\n", p.Name, err)
 				} else {
 					fmt.Printf("  ✓ %s: uninstalled\n", p.Name)
@@ -46,4 +46,15 @@ The skill must have been previously installed via 'orchestra skills install'.`,
 	}
 
 	return cmd
+}
+
+func uninstallProviderSkill(providerName, skillName string) error {
+	switch providerName {
+	case "claude":
+		return provider.ClaudeUninstallSkill(skillName)
+	case "codex":
+		return provider.CodexUninstallSkill(skillName)
+	default:
+		return fmt.Errorf("%s skill uninstall is not implemented", providerName)
+	}
 }

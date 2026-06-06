@@ -9,7 +9,7 @@
 [![SQLite](https://img.shields.io/badge/SQLite-persistent-07405E?style=flat-square&logo=sqlite&logoColor=white)](#tech-stack)
 [![tmux](https://img.shields.io/badge/sessions-tmux-111827?style=flat-square)](#features)
 
-Multi-agent collaboration platform for running Claude Code, Gemini CLI, Aider, and other coding agents side by side with chat, tasks, terminal streams, and workspace management.
+Multi-agent collaboration platform for running Claude Code, Codex, Gemini CLI, Aider, and other coding agents side by side with chat, tasks, terminal streams, and workspace management.
 
 [中文文档](README_CN.md)
 
@@ -36,7 +36,7 @@ The design concepts of this project were inspired by [golutra](https://github.co
 - **Tmux-Backed Agent Sessions**: AI agent terminals run inside tmux sessions — processes survive backend restarts with automatic session recovery on startup
 - **Multi-Agent Terminal Management**: Run multiple AI agent terminals in parallel, each with independent tmux sessions and PTY streams
 - **ACP Support**: Structured JSON communication with AI agents for reliable message exchange
-- **Provider Abstraction**: Pluggable AI provider support (Claude, Gemini) with unified command interface
+- **Provider Abstraction**: Pluggable AI provider support (Claude Code, Codex, Gemini) with unified command interface
 - **Native Tool Calling**: AI agents can call Orchestra tools directly (task management, chat, status updates)
 - **Task Management**: Full task lifecycle (create/start/complete/fail) with optimistic locking and Kanban view
 - **Internal Chat Routing**: Secretary-to-assistant task forwarding, @mentions, and auto-forwarding of results
@@ -256,6 +256,7 @@ security:
     - /bin/bash
     - /bin/zsh
     - claude        # Claude Code CLI
+    - codex         # OpenAI Codex CLI
     - gemini        # Gemini CLI
     - aider         # Aider
   allowed_paths:
@@ -265,6 +266,23 @@ security:
 
 storage:
   database: "./data/orchestra.db"
+```
+
+### Claude Code and Codex Integration
+
+Orchestra can run both Claude Code and Codex as tmux-backed agent terminals.
+
+| Agent | Command | Notes |
+|---|---|---|
+| Claude Code | `claude` | Uses stream-json startup flags for structured terminal output. |
+| Codex | `codex` | Runs in the workspace directory and can use Codex user/project configuration. |
+
+Make sure each command appears in `security.allowed_commands`, then create an Assistant member with ACP enabled and set `acpCommand` to `claude` or `codex`. The local skills helper also detects `~/.claude/skills` and `~/.codex/skills` and can symlink Orchestra skills into both:
+
+```bash
+cd backend
+go run ./cmd/cli providers
+go run ./cmd/cli skills install --all
 ```
 
 ## Development

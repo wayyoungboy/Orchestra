@@ -32,6 +32,11 @@ func DetectProviders() []*Provider {
 		providers = append(providers, gemini)
 	}
 
+	// Detect OpenAI Codex
+	if codex := detectCodex(); codex != nil {
+		providers = append(providers, codex)
+	}
+
 	return providers
 }
 

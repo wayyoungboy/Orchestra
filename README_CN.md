@@ -1,6 +1,6 @@
 # Orchestra
 
-多智能体协作平台 - 一个基于 Web 的系统，用于编排多个 AI 智能体（Claude Code、Gemini CLI、Aider 等）并行运行，支持实时聊天和工作区管理。
+多智能体协作平台 - 一个基于 Web 的系统，用于编排多个 AI 智能体（Claude Code、Codex、Gemini CLI、Aider 等）并行运行，支持实时聊天和工作区管理。
 
 [English](README.md)
 
@@ -191,6 +191,7 @@ security:
     - /bin/bash
     - /bin/zsh
     - claude        # Claude Code CLI
+    - codex         # OpenAI Codex CLI
     - gemini        # Gemini CLI
     - aider         # Aider
   allowed_paths:
@@ -200,6 +201,23 @@ security:
 
 storage:
   database: "./data/orchestra.db"
+```
+
+### Claude Code 与 Codex 集成
+
+Orchestra 可以把 Claude Code 和 Codex 都作为 tmux 托管的智能体终端运行。
+
+| 智能体 | 命令 | 说明 |
+|---|---|---|
+| Claude Code | `claude` | 启动时会补充 stream-json 参数，便于结构化终端输出。 |
+| Codex | `codex` | 在工作区目录中运行，可使用 Codex 用户级/项目级配置。 |
+
+确保命令已加入 `security.allowed_commands`，然后创建 Assistant 成员，开启 ACP，并把 `acpCommand` 设置为 `claude` 或 `codex`。本地 skills 助手也会检测 `~/.claude/skills` 和 `~/.codex/skills`，可把 Orchestra skills 链接到两边：
+
+```bash
+cd backend
+go run ./cmd/cli providers
+go run ./cmd/cli skills install --all
 ```
 
 ## 开发

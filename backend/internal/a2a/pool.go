@@ -24,13 +24,13 @@ type Pool struct {
 
 // SessionConfig contains parameters for creating a session.
 type SessionConfig struct {
-	ID            string
-	WorkspaceID   string
-	WorkspaceDir  string
-	MemberID      string
-	MemberName    string
-	TerminalType  string
-	Member        *models.Member
+	ID           string
+	WorkspaceID  string
+	WorkspaceDir string
+	MemberID     string
+	MemberName   string
+	TerminalType string
+	Member       *models.Member
 }
 
 // NewPool creates a new tmux-based session pool.

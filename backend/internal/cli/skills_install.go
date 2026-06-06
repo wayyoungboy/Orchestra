@@ -95,7 +95,7 @@ func installSingleSkill(skillPath, skillName string) error {
 			continue
 		}
 
-		if err := provider.ClaudeInstallSkill(skillPath, skillName); err != nil {
+		if err := installProviderSkill(p.Name, skillPath, skillName); err != nil {
 			fmt.Printf("  ✗ %s: %v\n", p.Name, err)
 		} else {
 			fmt.Printf("  ✓ %s: installed\n", p.Name)
@@ -103,4 +103,15 @@ func installSingleSkill(skillPath, skillName string) error {
 	}
 
 	return nil
+}
+
+func installProviderSkill(providerName, skillPath, skillName string) error {
+	switch providerName {
+	case "claude":
+		return provider.ClaudeInstallSkill(skillPath, skillName)
+	case "codex":
+		return provider.CodexInstallSkill(skillPath, skillName)
+	default:
+		return fmt.Errorf("%s skill install is not implemented", providerName)
+	}
 }

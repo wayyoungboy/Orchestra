@@ -54,7 +54,7 @@ func newSkillsListCmd() *cobra.Command {
 				for _, p := range providers {
 					installed := false
 					if p.SupportsSkills {
-						installed = provider.ClaudeIsSkillInstalled(skillName)
+						installed = isProviderSkillInstalled(p.Name, skillName)
 					}
 
 					status := "not installed"
@@ -71,4 +71,15 @@ func newSkillsListCmd() *cobra.Command {
 	}
 
 	return cmd
+}
+
+func isProviderSkillInstalled(providerName, skillName string) bool {
+	switch providerName {
+	case "claude":
+		return provider.ClaudeIsSkillInstalled(skillName)
+	case "codex":
+		return provider.CodexIsSkillInstalled(skillName)
+	default:
+		return false
+	}
 }

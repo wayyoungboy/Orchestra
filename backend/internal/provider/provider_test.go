@@ -28,10 +28,11 @@ func TestRegistry_List(t *testing.T) {
 	reg := NewRegistry()
 	reg.Register(NewClaudeProvider("claude"))
 	reg.Register(NewGeminiProvider())
+	reg.Register(NewCodexProvider(""))
 
 	all := reg.List()
-	if len(all) != 2 {
-		t.Errorf("expected 2 providers, got %d", len(all))
+	if len(all) != 3 {
+		t.Errorf("expected 3 providers, got %d", len(all))
 	}
 }
 
@@ -80,6 +81,20 @@ func TestGeminiProvider_Name(t *testing.T) {
 	}
 }
 
+func TestCodexProvider_Name(t *testing.T) {
+	p := NewCodexProvider("")
+	if p.Name() != ProviderCodex {
+		t.Errorf("expected %q, got %q", ProviderCodex, p.Name())
+	}
+}
+
+func TestCodexProvider_DisplayName(t *testing.T) {
+	p := NewCodexProvider("")
+	if p.DisplayName() != "OpenAI Codex" {
+		t.Errorf("expected %q, got %q", "OpenAI Codex", p.DisplayName())
+	}
+}
+
 func TestGeminiProvider_SupportsPermissionMode(t *testing.T) {
 	p := NewGeminiProvider()
 	if p.SupportsPermissionMode() {
@@ -100,6 +115,16 @@ func TestClaudeProvider_CustomCommand(t *testing.T) {
 		t.Errorf("expected %q, got %q", ProviderClaude, p.Name())
 	}
 	// Custom command should not be installed
+	if p.IsInstalled() {
+		t.Error("custom command should not be installed")
+	}
+}
+
+func TestCodexProvider_CustomCommand(t *testing.T) {
+	p := NewCodexProvider("/custom/path/codex")
+	if p.Name() != ProviderCodex {
+		t.Errorf("expected %q, got %q", ProviderCodex, p.Name())
+	}
 	if p.IsInstalled() {
 		t.Error("custom command should not be installed")
 	}

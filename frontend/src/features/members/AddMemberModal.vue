@@ -20,7 +20,14 @@
             </div>
             <div class="input-group">
               <label>{{ t('members.addMemberModal.cliCommand') }}</label>
-              <input v-model="selectedCli" :placeholder="t('members.addMemberModal.placeholderAssistantCli')" />
+              <input v-model="selectedCli" :placeholder="t('members.addMemberModal.placeholderAssistantCli')" list="agent-cli-options" />
+              <datalist id="agent-cli-options">
+                <option value="claude">{{ t('members.assistantModels.claude') }}</option>
+                <option value="codex">{{ t('members.assistantModels.codex') }}</option>
+                <option value="gemini">{{ t('members.assistantModels.gemini') }}</option>
+                <option value="aider">{{ t('members.assistantModels.aider') }}</option>
+                <option value="cursor-agent">{{ t('members.assistantModels.cursor') }}</option>
+              </datalist>
             </div>
             <div class="input-group">
               <label>{{ t('members.addMemberModal.cliArgs') }}</label>

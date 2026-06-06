@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Orchestra is a web-based multi-agent collaboration system, supporting multiple AI agents (Claude Code, Gemini CLI, etc.) running in parallel with orchestration capabilities. Product behavior is aligned with a **reference Tauri desktop app** used internally for parity checks.
+Orchestra is a web-based multi-agent collaboration system, supporting multiple AI agents (Claude Code, Codex, Gemini CLI, etc.) running in parallel with orchestration capabilities. Product behavior is aligned with a **reference Tauri desktop app** used internally for parity checks.
 
 ## Project Charter（设计定位）
 
@@ -101,6 +101,14 @@ Config file: `backend/configs/config.yaml`
 Environment variables:
 - `ORCHESTRA_ENCRYPTION_KEY` - API key encryption key (32+ bytes)
 - `ORCHESTRA_CONFIG` - Custom config file path
+
+## Claude Code / Codex Integration
+
+- Claude Code command: `claude`; Orchestra adds stream-json flags for ACP-style sessions.
+- Codex command: `codex`; Orchestra starts it from the selected workspace path and leaves Codex-specific model/provider config to `~/.codex/config.toml` or project `.codex/` layers.
+- Provider detection now checks `~/.claude`, `~/.gemini`, and `~/.codex`.
+- `orchestra skills install` symlinks valid `~/.orchestra/skills/<name>/SKILL.md` folders into both `~/.claude/skills` and `~/.codex/skills` when those providers are detected.
+- Keep `security.allowed_commands` synced with any new agent CLI command.
 
 ## Reference Resources
 
