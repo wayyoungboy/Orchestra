@@ -18,9 +18,9 @@ Completed hardening passes:
 - Reused saved member CLI/ACP configuration when creating member terminal sessions.
 - Exposed a visible member-card action for configured `assistant` and `secretary` members to start or reuse their backend agent session.
 - Added member-card session probing so existing backend sessions are visible when the Members page loads.
-- Added a workspace Agent Sessions navigation tab that lists active backend sessions and their owning members.
+- Added a workspace Agent Sessions navigation tab that lists active backend sessions, owning members, and read-only terminal stream output.
 
-The next product gap is a fuller terminal stream inspection view. The member-card session action and Agent Sessions tab are intentionally smaller: they make agent startup and ownership visible before a complete terminal UI is rebuilt.
+The next product gap is interactive terminal inspection. The member-card session action and Agent Sessions tab make agent startup, ownership, and output visible before a complete terminal input UI is rebuilt.
 
 Validation note: backend tests and frontend production builds are passing. Vitest currently hangs in this local `/Volumes` + pnpm environment before reporting even a minimal smoke test; sampling shows Node spending time in ESM/package resolution filesystem calls. Keep Vitest tests as behavioral guardrails, but use build/e2e/manual verification until the runner environment is fixed.
 

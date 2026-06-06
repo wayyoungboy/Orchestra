@@ -53,6 +53,23 @@
             <span>Member</span>
             <code>{{ session.memberId }}</code>
           </div>
+          <button class="inspect-btn" @click="connectTerminalStream(session.sessionId)">
+            {{ activeSessionId === session.sessionId ? '重新连接' : '查看输出' }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="activeSessionId" class="stream-panel">
+        <div class="stream-header">
+          <div>
+            <p class="stream-title">终端输出</p>
+            <p class="stream-subtitle">{{ activeSessionLabel }} · {{ streamStatusText }}</p>
+          </div>
+          <button class="disconnect-btn" @click="disconnectTerminalStream">断开</button>
+        </div>
+        <div class="stream-body">
+          <pre v-if="terminalEvents.length">{{ terminalEvents.join('\n') }}</pre>
+          <p v-else class="stream-empty">等待 agent 输出...</p>
         </div>
       </div>
     </div>
@@ -60,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import client from '@/shared/api/client'
 import { notifyUserError } from '@/shared/notifyError'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
@@ -80,6 +97,10 @@ const workspaceStore = useWorkspaceStore()
 const loading = ref(false)
 const sessions = ref<WorkspaceSession[]>([])
 const members = ref<Member[]>([])
+const activeSessionId = ref('')
+const terminalEvents = ref<string[]>([])
+const streamStatus = ref<'idle' | 'connecting' | 'connected' | 'closed' | 'error'>('idle')
+let terminalWs: WebSocket | null = null
 
 const memberById = computed(() => {
   return new Map(members.value.map((member) => [member.id, member]))
@@ -94,6 +115,22 @@ const enrichedSessions = computed(() => {
       roleType: member?.roleType || 'assistant',
     }
   })
+})
+
+const activeSessionLabel = computed(() => {
+  const session = enrichedSessions.value.find((item) => item.sessionId === activeSessionId.value)
+  return session ? `${session.memberName} / ${session.sessionId.slice(0, 8)}` : activeSessionId.value.slice(0, 8)
+})
+
+const streamStatusText = computed(() => {
+  const map: Record<typeof streamStatus.value, string> = {
+    idle: '未连接',
+    connecting: '连接中',
+    connected: '已连接',
+    closed: '已断开',
+    error: '连接错误',
+  }
+  return map[streamStatus.value]
 })
 
 function roleLabel(role: string) {
@@ -126,7 +163,72 @@ async function loadSessions() {
   }
 }
 
+function terminalWsUrl(sessionId: string) {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const host = window.location.host === 'localhost:5175' ? 'localhost:8080' : window.location.host
+  const token = localStorage.getItem('orchestra.auth.token') || ''
+  return `${protocol}//${host}/ws/terminal/${sessionId}?token=${encodeURIComponent(token)}`
+}
+
+function formatTerminalEvent(raw: string) {
+  try {
+    const data = JSON.parse(raw)
+    const type = data.type || 'message'
+    if (data.content) return `[${type}] ${data.content}`
+    if (data.message) return `[${type}] ${data.message}`
+    if (data.error) return `[${type}] ${data.error}`
+    if (data.tool_name) return `[tool_use] ${data.tool_name}`
+    if (data.sessionId) return `[${type}] ${data.sessionId}`
+    return `[${type}] ${JSON.stringify(data)}`
+  } catch {
+    return raw
+  }
+}
+
+function appendTerminalEvent(raw: string) {
+  terminalEvents.value = [...terminalEvents.value.slice(-199), formatTerminalEvent(raw)]
+}
+
+function disconnectTerminalStream() {
+  if (terminalWs) {
+    terminalWs.onopen = null
+    terminalWs.onmessage = null
+    terminalWs.onerror = null
+    terminalWs.onclose = null
+    terminalWs.close()
+    terminalWs = null
+  }
+  streamStatus.value = activeSessionId.value ? 'closed' : 'idle'
+}
+
+function connectTerminalStream(sessionId: string) {
+  disconnectTerminalStream()
+  activeSessionId.value = sessionId
+  terminalEvents.value = []
+  streamStatus.value = 'connecting'
+
+  const ws = new WebSocket(terminalWsUrl(sessionId))
+  terminalWs = ws
+
+  ws.onopen = () => {
+    streamStatus.value = 'connected'
+  }
+  ws.onmessage = (event: MessageEvent) => {
+    appendTerminalEvent(String(event.data))
+  }
+  ws.onerror = () => {
+    streamStatus.value = 'error'
+  }
+  ws.onclose = () => {
+    if (terminalWs === ws) {
+      streamStatus.value = streamStatus.value === 'error' ? 'error' : 'closed'
+      terminalWs = null
+    }
+  }
+}
+
 onMounted(loadSessions)
+onBeforeUnmount(disconnectTerminalStream)
 </script>
 
 <style scoped>
@@ -189,6 +291,36 @@ onMounted(loadSessions)
   padding: 8px 10px; border-radius: 10px; background: #f8fafc; color: #334155;
   font-size: 12px; font-weight: 800;
 }
+.inspect-btn {
+  width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid #c7d2fe;
+  background: white; color: #4338ca; font-size: 13px; font-weight: 900; cursor: pointer;
+}
+.inspect-btn:hover { background: #eef2ff; border-color: #818cf8; }
+
+.stream-panel {
+  margin-top: 20px; background: rgba(15, 23, 42, 0.94); border-radius: 18px;
+  overflow: hidden; border: 1px solid rgba(15, 23, 42, 0.2);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+}
+.stream-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 16px 18px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+.stream-title { font-size: 14px; font-weight: 950; color: #f8fafc; }
+.stream-subtitle { font-size: 12px; font-weight: 700; color: #94a3b8; margin-top: 3px; }
+.disconnect-btn {
+  flex: 0 0 auto; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.06); color: #e2e8f0; font-size: 12px; font-weight: 900; cursor: pointer;
+}
+.disconnect-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.stream-body {
+  max-height: 320px; min-height: 160px; overflow: auto; padding: 16px 18px;
+}
+.stream-body pre {
+  margin: 0; white-space: pre-wrap; word-break: break-word; color: #dbeafe;
+  font-size: 12px; line-height: 1.55; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+.stream-empty { color: #94a3b8; font-size: 13px; font-weight: 700; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
