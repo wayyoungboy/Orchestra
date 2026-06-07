@@ -279,6 +279,9 @@ storage:
 # Current MVP verification gate
 ./scripts/verify-mvp.sh
 
+# Start a temporary backend and run every focused browser MVP E2E locally
+./scripts/run-focused-e2e-local.sh
+
 # Include every focused browser MVP E2E in one gate (requires backend and tmux)
 ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh
 

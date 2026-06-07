@@ -250,6 +250,9 @@ storage:
 # 当前 MVP 验证入口
 ./scripts/verify-mvp.sh
 
+# 自动启动临时后端并运行全部 focused browser MVP E2E
+./scripts/run-focused-e2e-local.sh
+
 # 一次性纳入全部 focused browser MVP E2E（需要后端和 tmux）
 ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh
 
