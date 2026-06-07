@@ -3,8 +3,10 @@ package handlers
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/orchestra/backend/internal/agent"
@@ -13,13 +15,19 @@ import (
 )
 
 type TerminalHandler struct {
-	registry   *agent.Registry
-	wsRepo     repository.WorkspaceRepository
-	memberRepo repository.MemberRepository
+	registry        *agent.Registry
+	wsRepo          repository.WorkspaceRepository
+	memberRepo      repository.MemberRepository
+	allowedCommands []string
 }
 
-func NewTerminalHandler(registry *agent.Registry, wsRepo repository.WorkspaceRepository, memberRepo repository.MemberRepository) *TerminalHandler {
-	return &TerminalHandler{registry: registry, wsRepo: wsRepo, memberRepo: memberRepo}
+func NewTerminalHandler(registry *agent.Registry, wsRepo repository.WorkspaceRepository, memberRepo repository.MemberRepository, allowedCommands []string) *TerminalHandler {
+	return &TerminalHandler{
+		registry:        registry,
+		wsRepo:          wsRepo,
+		memberRepo:      memberRepo,
+		allowedCommands: append([]string{}, allowedCommands...),
+	}
 }
 
 // CreateSessionRequest represents the request body for creating a terminal session
@@ -92,6 +100,30 @@ func mergeSessionMemberConfig(stored *models.Member, req CreateSessionRequest) *
 	return member
 }
 
+func validateAgentCommand(command string, allowedCommands []string) error {
+	command = strings.TrimSpace(command)
+	if command == "" || len(allowedCommands) == 0 {
+		return nil
+	}
+	for _, allowed := range allowedCommands {
+		if command == strings.TrimSpace(allowed) {
+			return nil
+		}
+	}
+	return fmt.Errorf("command %q is not allowed", command)
+}
+
+func (h *TerminalHandler) validateMemberCommand(member *models.Member) error {
+	if member == nil {
+		return nil
+	}
+	command := member.ACPCommand
+	if command == "" {
+		command = member.TerminalCommand
+	}
+	return validateAgentCommand(command, h.allowedCommands)
+}
+
 // CreateSession creates a new agent session
 // @Summary Create terminal session
 // @Description Create a new agent session for an AI assistant
@@ -127,6 +159,10 @@ func (h *TerminalHandler) CreateSession(c *gin.Context) {
 		}
 	}
 	member := mergeSessionMemberConfig(stored, req)
+	if err := h.validateMemberCommand(member); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "allowedCommands": h.allowedCommands})
+		return
+	}
 
 	session, err := h.registry.AcquireOrCreate(c.Request.Context(), member, workspacePath)
 	if err != nil {
@@ -299,6 +335,10 @@ func (h *TerminalHandler) GetOrCreateSessionForMember(c *gin.Context) {
 	req.WorkspaceID = workspaceID
 	req.MemberID = memberID
 	member := mergeSessionMemberConfig(stored, req)
+	if err := h.validateMemberCommand(member); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error(), "allowedCommands": h.allowedCommands})
+		return
+	}
 
 	session, err := h.registry.AcquireOrCreate(c.Request.Context(), member, workspacePath)
 	if err != nil {

@@ -178,6 +178,44 @@ func TestTerminalRuntimeAPIWorkspaceMemberSessionLifecycle(t *testing.T) {
 	}
 }
 
+func TestTerminalRuntimeRejectsDisallowedMemberCommand(t *testing.T) {
+	workspaceDir := t.TempDir()
+	router, _ := newRuntimeRouter(t, workspaceDir)
+
+	workspaceResp := requestJSON(t, router, http.MethodPost, "/api/workspaces", map[string]any{
+		"name": "Command Guard Workspace",
+		"path": workspaceDir,
+	})
+	if workspaceResp.Code != http.StatusCreated {
+		t.Fatalf("create workspace status = %d body=%s", workspaceResp.Code, workspaceResp.Body.String())
+	}
+	workspace := decodeJSON[map[string]any](t, workspaceResp)
+	workspaceID := workspace["id"].(string)
+
+	memberResp := requestJSON(t, router, http.MethodPost, "/api/workspaces/"+workspaceID+"/members", map[string]any{
+		"name":            "Bad Command Assistant",
+		"roleType":        "assistant",
+		"terminalType":    "native",
+		"terminalCommand": "/bin/definitely-not-allowed",
+		"acpEnabled":      true,
+		"acpCommand":      "/bin/definitely-not-allowed",
+	})
+	if memberResp.Code != http.StatusCreated {
+		t.Fatalf("create member status = %d body=%s", memberResp.Code, memberResp.Body.String())
+	}
+	member := decodeJSON[map[string]any](t, memberResp)
+	memberID := member["id"].(string)
+
+	sessionResp := requestJSON(t, router, http.MethodPost, "/api/workspaces/"+workspaceID+"/members/"+memberID+"/terminal-session", map[string]any{})
+	if sessionResp.Code != http.StatusBadRequest {
+		t.Fatalf("create session status = %d body=%s", sessionResp.Code, sessionResp.Body.String())
+	}
+	body := decodeJSON[map[string]any](t, sessionResp)
+	if !strings.Contains(body["error"].(string), "not allowed") {
+		t.Fatalf("unexpected error body: %#v", body)
+	}
+}
+
 func TestMentionedAssistantInDefaultChannelCreatesDispatchSession(t *testing.T) {
 	if !tmuxRuntimeAvailable() {
 		t.Skip("tmux not installed")

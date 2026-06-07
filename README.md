@@ -291,6 +291,7 @@ security:
   allowed_commands:
     - /bin/bash
     - /bin/zsh
+    - /bin/cat       # Local smoke-test agent
     - claude        # Claude Code CLI
     - gemini        # Gemini CLI
     - aider         # Aider
@@ -302,6 +303,8 @@ security:
 storage:
   database: "./data/orchestra.db"
 ```
+
+`security.allowed_commands` is enforced when a member agent session is started from `/api/terminals` or `/api/workspaces/:id/members/:memberId/terminal-session`. Saved member configuration can still be edited, but disallowed commands are rejected before tmux startup and the Members page shows the backend error inline on the member card.
 
 ## Development
 

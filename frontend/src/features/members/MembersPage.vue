@@ -207,6 +207,10 @@ function sessionLabel(data: any) {
   return sessionId ? `会话: ${String(sessionId).slice(0, 12)}` : '会话已启动'
 }
 
+function apiErrorText(e: any, fallback: string) {
+  return e?.response?.data?.error || e?.message || fallback
+}
+
 function isNotFoundError(e: any) {
   return e?.response?.status === 404
 }
@@ -260,7 +264,7 @@ async function startAgentSession(member: any) {
     )
     setSessionResult(member.id, { ok: true, text: sessionLabel(response.data) })
   } catch (e) {
-    setSessionResult(member.id, { ok: false, text: '启动失败' })
+    setSessionResult(member.id, { ok: false, text: apiErrorText(e, '启动失败') })
     notifyUserError('Failed to start agent session', e)
   } finally {
     startingSessions.value = { ...startingSessions.value, [member.id]: false }

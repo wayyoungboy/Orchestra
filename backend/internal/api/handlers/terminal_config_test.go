@@ -71,6 +71,15 @@ func TestMergeSessionMemberConfigAllowsRequestOverride(t *testing.T) {
 	}
 }
 
+func TestValidateAgentCommandRejectsCommandsOutsideAllowlist(t *testing.T) {
+	if err := validateAgentCommand("/bin/cat", []string{"/bin/cat", "claude"}); err != nil {
+		t.Fatalf("allowed command rejected: %v", err)
+	}
+	if err := validateAgentCommand("/bin/missing-agent", []string{"/bin/cat", "claude"}); err == nil {
+		t.Fatal("expected command outside allowlist to be rejected")
+	}
+}
+
 func TestTerminalSnapshotLineCount(t *testing.T) {
 	tests := []struct {
 		name string

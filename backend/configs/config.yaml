@@ -10,6 +10,7 @@ security:
   allowed_commands:
     - /bin/bash
     - /bin/zsh
+    - /bin/cat
     - /usr/bin/env
     - claude
     - gemini

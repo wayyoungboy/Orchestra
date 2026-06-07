@@ -262,6 +262,7 @@ security:
   allowed_commands:
     - /bin/bash
     - /bin/zsh
+    - /bin/cat       # 本地 smoke-test agent
     - claude        # Claude Code CLI
     - gemini        # Gemini CLI
     - aider         # Aider
@@ -273,6 +274,8 @@ security:
 storage:
   database: "./data/orchestra.db"
 ```
+
+`security.allowed_commands` 会在 `/api/terminals` 和 `/api/workspaces/:id/members/:memberId/terminal-session` 启动成员 agent 会话时生效。成员配置仍可保存和编辑，但未允许的命令会在启动 tmux 前被拒绝，成员页会把后端错误直接显示在对应成员卡片内。
 
 ## 开发
 

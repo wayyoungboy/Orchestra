@@ -101,4 +101,22 @@ describe('MembersPage agent sessions', () => {
     )
     expect(wrapper.text()).toContain('会话: session-1')
   })
+
+  it('shows the backend command error when agent session startup is rejected', async () => {
+    clientMock.post.mockRejectedValue({
+      response: {
+        data: {
+          error: 'command "/bin/nope" is not allowed',
+        },
+      },
+    })
+
+    const wrapper = mountPage()
+    await flushPromises()
+
+    await wrapper.get('[data-test="start-agent-session"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('command "/bin/nope" is not allowed')
+  })
 })

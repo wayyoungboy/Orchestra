@@ -151,7 +151,7 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 
 	wsHandler := handlers.NewWorkspaceHandler(wsRepo, memberRepo, msgRepo, browser)
 	memberHandler := handlers.NewMemberHandler(memberRepo, wsRepo, ws.GlobalChatHub)
-	terminalHandler := handlers.NewTerminalHandler(registry, wsRepo, memberRepo)
+	terminalHandler := handlers.NewTerminalHandler(registry, wsRepo, memberRepo, cfg.Security.AllowedCommands)
 	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, wsRepo, registry, ws.GlobalChatHub, cfg.Server.HTTPAddr, cfg.Auth.Enabled, baseURL, outboxWorker, notifRepo)
 	attachmentHandler := handlers.NewAttachmentHandler(msgRepo, convRepo, attachRepo, cfg.Server.UploadDir)
 	taskHandler := handlers.NewTaskHandler(taskRepo, memberRepo, ws.GlobalChatHub)

@@ -16,6 +16,7 @@ Completed hardening passes:
 
 - Added backend and frontend diagnostics around the MVP dispatch loop.
 - Reused saved member CLI/ACP configuration when creating member terminal sessions.
+- Enforced `security.allowed_commands` before starting member agent sessions and surfaced rejected command errors inline on member cards.
 - Exposed a visible member-card action for configured `assistant` and `secretary` members to start or reuse their backend agent session.
 - Added member-card session probing so existing backend sessions are visible when the Members page loads.
 - Added a workspace Agent Sessions navigation tab that lists active backend sessions, owning members, current tmux pane snapshots, xterm.js stream output, tmux resize propagation, direct keystroke forwarding, controlled single-message terminal input, and stale-session termination.
