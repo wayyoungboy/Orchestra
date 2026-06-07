@@ -35,7 +35,7 @@ test.describe.serial('workspace onboarding flow', () => {
 
     await page.goto('/')
     await expect(page.getByRole('heading', { name: /ready to/i })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText('RECENT WORKSPACES')).toBeVisible()
+    await expect(page.getByText('RECENT WORKSPACES', { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: /create new workspace/i }).click()
     await expect(page.getByRole('heading', { name: '选择工作目录' })).toBeVisible({ timeout: 15_000 })
