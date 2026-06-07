@@ -77,6 +77,8 @@ make run
 
 ```bash
 make backend-run
+# 或
+make run
 ```
 
 ### 前端设置
@@ -100,8 +102,10 @@ pnpm build
 
 ```bash
 # 先停止后端（Ctrl+C）
-cd backend
-make reset-data  # 删除数据库和 WAL 文件
+make reset-data  # 在仓库根目录执行；删除数据库和 WAL 文件
+
+# 等价的后端子目录命令：
+# cd backend && make reset-data
 
 # 可选：清除浏览器 localStorage
 # DevTools → Application → Clear site data
@@ -112,8 +116,8 @@ make reset-data  # 删除数据库和 WAL 文件
 
 拉取代码变更后重启两个开发进程：
 
-1. **后端**：停止（`Ctrl+C`）→ `make run`
-2. **前端**：停止（`Ctrl+C`）→ `pnpm dev`
+1. **后端**：停止（`Ctrl+C`）→ 在仓库根目录运行 `make run`，或 `cd backend && make run`
+2. **前端**：停止（`Ctrl+C`）→ 在仓库根目录运行 `make frontend-dev`，或 `cd frontend && pnpm dev`
 
 > 注意：Go 无热重载；Vite HMR 可能遗漏某些边缘情况。
 
@@ -317,6 +321,10 @@ ORCHESTRA_API_URL=http://your-server:8080 pnpm test:e2e
 # 根目录 Makefile 目标
 make verify           # 后端测试、前端构建/单测、focused spec typecheck
 make verify-focused   # 临时后端 + 全部 focused browser MVP E2E
+make run              # 启动后端 API 服务（根目录别名）
+make test             # 运行后端测试（根目录别名）
+make build            # 构建后端服务二进制（根目录别名）
+make reset-data       # 清理后端 SQLite 数据（根目录别名）
 make backend-run      # 启动后端 API 服务
 make backend-test     # 运行后端测试
 make backend-reset    # 清理后端 SQLite 数据
@@ -325,7 +333,7 @@ make frontend-dev     # 启动前端开发服务器
 make frontend-build   # 构建前端
 make frontend-test    # 运行前端单测
 
-# ./backend 下的后端 Makefile 目标
+# ./backend 下的后端 Makefile 目标（也可通过上方根目录别名访问）
 make build            # 构建二进制
 make run              # 运行服务器
 make test             # 运行测试

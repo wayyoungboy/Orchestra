@@ -93,6 +93,8 @@ From the repository root, the same backend server can be started with:
 
 ```bash
 make backend-run
+# or
+make run
 ```
 
 ### Frontend Setup
@@ -116,8 +118,10 @@ If you need to start fresh without old data:
 
 ```bash
 # Stop backend first (Ctrl+C)
-cd backend
-make reset-data  # Deletes database and WAL files
+make reset-data  # From the repository root; deletes database and WAL files
+
+# Equivalent backend-only command:
+# cd backend && make reset-data
 
 # Optional: clear browser localStorage
 # DevTools → Application → Clear site data
@@ -128,8 +132,8 @@ make reset-data  # Deletes database and WAL files
 
 Restart both dev processes after pulling changes:
 
-1. **Backend**: Stop (`Ctrl+C`) → `make run`
-2. **Frontend**: Stop (`Ctrl+C`) → `pnpm dev`
+1. **Backend**: Stop (`Ctrl+C`) → `make run` from the repository root, or `cd backend && make run`
+2. **Frontend**: Stop (`Ctrl+C`) → `make frontend-dev` from the repository root, or `cd frontend && pnpm dev`
 
 > Note: Go has no hot reload; Vite HMR may miss some edge cases.
 
@@ -346,6 +350,10 @@ The focused E2E runners clear inherited HTTP/SOCKS proxy variables for local bro
 # Root Makefile targets
 make verify           # Backend tests, frontend build/unit tests, focused spec typecheck
 make verify-focused   # Temporary backend + all focused browser MVP E2E
+make run              # Start backend API server (root alias)
+make test             # Run backend tests (root alias)
+make build            # Build backend server binary (root alias)
+make reset-data       # Reset backend SQLite data (root alias)
 make backend-run      # Start backend API server
 make backend-test     # Run backend tests
 make backend-reset    # Reset backend SQLite data
@@ -354,7 +362,7 @@ make frontend-dev     # Start frontend dev server
 make frontend-build   # Build frontend
 make frontend-test    # Run frontend unit tests
 
-# Backend-only Makefile targets from ./backend
+# Backend-only Makefile targets from ./backend (also reachable through the root aliases above)
 make build            # Build binary
 make run              # Run server
 make test             # Run tests

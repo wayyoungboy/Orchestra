@@ -28,6 +28,7 @@ Completed hardening passes:
 - Added `ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh` as the one-switch local gate for all focused browser MVP flows.
 - Added `scripts/run-focused-e2e-local.sh` to start a temporary local backend, run the all-focused browser MVP gate, and clean up the backend process after verification.
 - Added root-level Makefile shortcuts (`make verify`, `make verify-focused`, backend/frontend helper targets) so local validation and common dev entry points are discoverable from the repository root.
+- Added root-level backend command aliases (`make run`, `make test`, `make build`, `make reset-data`) and aligned README command wording so root and backend-directory workflows no longer diverge.
 - Added a real frontend unit-test script (`pnpm test`) to the default MVP verification gate and fixed the member-session label truncation so existing Vitest coverage passes.
 - Updated README Make command docs and root Makefile help so public command descriptions match the current validation gate.
 - Added a GitHub Actions CI workflow that installs Go, pnpm, tmux, frontend dependencies, and runs the same `make verify` MVP gate used locally.
