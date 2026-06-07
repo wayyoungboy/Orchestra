@@ -27,6 +27,7 @@ Completed hardening passes:
 - Added a focused MVP task browser E2E that creates an isolated workspace, secretary, assistant, and assigned task through the API, opens the Tasks page, starts and completes the task through the UI, and verifies the completed task/result through the API.
 - Added `ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh` as the one-switch local gate for all focused browser MVP flows.
 - Added `scripts/run-focused-e2e-local.sh` to start a temporary local backend, run the all-focused browser MVP gate, and clean up the backend process after verification.
+- Expanded the default MVP verification gate's Playwright typecheck from a hand-picked focused-spec list to every `frontend/e2e/*.spec.ts`, including Node globals used by API-oriented specs.
 - Added root-level Makefile shortcuts (`make verify`, `make verify-focused`, backend/frontend helper targets) so local validation and common dev entry points are discoverable from the repository root.
 - Added root-level backend command aliases (`make run`, `make test`, `make build`, `make reset-data`) and aligned README command wording so root and backend-directory workflows no longer diverge.
 - Added a real frontend unit-test script (`pnpm test`) to the default MVP verification gate and fixed the member-session label truncation so existing Vitest coverage passes.

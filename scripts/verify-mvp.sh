@@ -31,10 +31,8 @@ echo "==> Agent terminal Playwright spec typecheck"
     --module ESNext \
     --target ES2020 \
     --lib ES2020,DOM \
-    e2e/agent-terminal-runtime.spec.ts \
-    e2e/mvp-chat-flow.spec.ts \
-    e2e/mvp-member-session-flow.spec.ts \
-    e2e/mvp-task-flow.spec.ts
+    e2e/env.d.ts \
+    e2e/*.spec.ts
 )
 
 echo "==> Focused Playwright E2E runner environment"
