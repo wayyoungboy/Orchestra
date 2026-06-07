@@ -15,3 +15,14 @@ if [[ -n "$unformatted" ]]; then
   echo "Run: gofmt -w <files>" >&2
   exit 1
 fi
+
+unimported="$(
+  cd "$ROOT_DIR/backend"
+  printf '%s\n' "$files" | xargs go run golang.org/x/tools/cmd/goimports -l
+)"
+if [[ -n "$unimported" ]]; then
+  echo "Go files need goimports:" >&2
+  echo "$unimported" >&2
+  echo "Run: cd backend && go run golang.org/x/tools/cmd/goimports -w <files>" >&2
+  exit 1
+fi
