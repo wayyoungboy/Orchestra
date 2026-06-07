@@ -12,6 +12,12 @@ echo "==> Backend tests, including tmux runtime smoke"
 echo "==> Backend gofmt check"
 "$ROOT_DIR/scripts/check-go-format.sh"
 
+echo "==> Backend vet"
+(
+  cd "$ROOT_DIR/backend"
+  go vet ./...
+)
+
 echo "==> Frontend production build"
 (
   cd "$ROOT_DIR/frontend"

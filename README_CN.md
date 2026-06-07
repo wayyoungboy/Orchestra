@@ -288,6 +288,9 @@ cd backend && make test
 # 后端 Go 格式检查
 make backend-format-check
 
+# 后端静态分析
+make backend-vet
+
 # 聚焦的后端终端 API 运行时 smoke（需要 tmux）
 cd backend && go test ./internal/api -run TestTerminalRuntimeAPIWorkspaceMemberSessionLifecycle -count=1
 
@@ -335,6 +338,7 @@ make backend-run      # 启动后端 API 服务
 make backend-test     # 运行后端测试
 make backend-reset    # 清理后端 SQLite 数据
 make backend-format-check # 检查后端 Go 格式
+make backend-vet      # 运行后端 go vet
 make frontend-install # 安装前端依赖
 make frontend-dev     # 启动前端开发服务器
 make frontend-build   # 构建前端

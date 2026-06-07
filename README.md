@@ -317,6 +317,9 @@ cd backend && make test
 # Backend Go formatting check
 make backend-format-check
 
+# Backend static analysis
+make backend-vet
+
 # Focused backend terminal API runtime smoke (requires tmux)
 cd backend && go test ./internal/api -run TestTerminalRuntimeAPIWorkspaceMemberSessionLifecycle -count=1
 
@@ -364,6 +367,7 @@ make backend-run      # Start backend API server
 make backend-test     # Run backend tests
 make backend-reset    # Reset backend SQLite data
 make backend-format-check # Check backend Go formatting
+make backend-vet      # Run go vet for the backend
 make frontend-install # Install frontend dependencies
 make frontend-dev     # Start frontend dev server
 make frontend-build   # Build frontend
