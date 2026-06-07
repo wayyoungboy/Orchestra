@@ -24,6 +24,7 @@ Completed hardening passes:
 - Added a focused terminal E2E runner that clears inherited local proxy variables, preserves/extends `NO_PROXY` for localhost, and can run the browser terminal path from `pnpm test:e2e:terminal` or `ORCHESTRA_RUN_TERMINAL_E2E=1 ./scripts/verify-mvp.sh`.
 - Added a focused member-session browser E2E that creates a configured assistant, opens the Members page, starts the agent session from the member card, verifies the backend session, and confirms the session appears in the Agent Sessions page.
 - Added a focused MVP chat browser E2E that creates an isolated workspace/member, opens the chat route directly, verifies the general channel and member list load, sends a page message with an @mention, checks persistence through the API, and confirms no failed dispatch diagnostics.
+- Added a focused workspace onboarding browser E2E that starts from `/`, opens the first-screen workspace creation UI, binds a server path, lands in chat, and verifies the workspace persisted through the API.
 - Added a focused MVP task browser E2E that creates an isolated workspace, secretary, assistant, and assigned task through the API, opens the Tasks page, starts and completes the task through the UI, and verifies the completed task/result through the API.
 - Added `ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh` as the one-switch local gate for all focused browser MVP flows.
 - Added `scripts/run-focused-e2e-local.sh` to start a temporary local backend, run the all-focused browser MVP gate, and clean up the backend process after verification.
