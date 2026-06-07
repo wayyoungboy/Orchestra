@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -31,6 +32,14 @@ func (h *TaskHandler) broadcastTaskStatus(task *models.Task, newStatus models.Ta
 		return
 	}
 	h.chatHub.BroadcastRawToWorkspace(task.WorkspaceID, payload)
+}
+
+func (h *TaskHandler) broadcastLatestTaskStatus(ctx context.Context, task *models.Task, newStatus models.TaskStatus) {
+	latest, err := h.taskRepo.GetByID(ctx, task.ID)
+	if err == nil {
+		task = latest
+	}
+	h.broadcastTaskStatus(task, newStatus)
 }
 
 func taskStatusEventPayload(task *models.Task, newStatus models.TaskStatus) ([]byte, error) {
@@ -117,7 +126,7 @@ func (h *TaskHandler) StartTask(c *gin.Context) {
 		return
 	}
 
-	h.broadcastTaskStatus(task, models.TaskStatusInProgress)
+	h.broadcastLatestTaskStatus(c.Request.Context(), task, models.TaskStatusInProgress)
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":             true,
@@ -160,7 +169,7 @@ func (h *TaskHandler) CompleteTask(c *gin.Context) {
 		return
 	}
 
-	h.broadcastTaskStatus(task, models.TaskStatusCompleted)
+	h.broadcastLatestTaskStatus(c.Request.Context(), task, models.TaskStatusCompleted)
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":             true,
@@ -202,7 +211,7 @@ func (h *TaskHandler) FailTask(c *gin.Context) {
 		return
 	}
 
-	h.broadcastTaskStatus(task, models.TaskStatusFailed)
+	h.broadcastLatestTaskStatus(c.Request.Context(), task, models.TaskStatusFailed)
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":             true,
@@ -250,7 +259,7 @@ func (h *TaskHandler) AssignTask(c *gin.Context) {
 		return
 	}
 
-	h.broadcastTaskStatus(task, models.TaskStatusAssigned)
+	h.broadcastLatestTaskStatus(c.Request.Context(), task, models.TaskStatusAssigned)
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":             true,
@@ -304,7 +313,7 @@ func (h *TaskHandler) CancelTask(c *gin.Context) {
 		return
 	}
 
-	h.broadcastTaskStatus(task, models.TaskStatusCancelled)
+	h.broadcastLatestTaskStatus(c.Request.Context(), task, models.TaskStatusCancelled)
 
 	c.JSON(http.StatusOK, gin.H{
 		"ok":             true,

@@ -13,6 +13,10 @@ type TaskRepo struct {
 	db *sql.DB
 }
 
+type taskScanner interface {
+	Scan(dest ...interface{}) error
+}
+
 func NewTaskRepository(db *sql.DB) *TaskRepo {
 	return &TaskRepo{db: db}
 }
@@ -49,17 +53,7 @@ func (r *TaskRepo) GetByID(ctx context.Context, id string) (*models.Task, error)
 			result_summary, error_message, version, created_at, updated_at
 		FROM tasks WHERE id = ?
 	`
-	task := &models.Task{}
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
-		&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
-		&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-		&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return task, nil
+	return scanTask(r.db.QueryRowContext(ctx, query, id))
 }
 
 func (r *TaskRepo) ListByWorkspace(ctx context.Context, workspaceID string, status ...models.TaskStatus) ([]*models.Task, error) {
@@ -91,13 +85,7 @@ func (r *TaskRepo) ListByWorkspace(ctx context.Context, workspaceID string, stat
 
 	var tasks []*models.Task
 	for rows.Next() {
-		task := &models.Task{}
-		err := rows.Scan(
-			&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
-			&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
-			&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-			&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
-		)
+		task, err := scanTask(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -123,13 +111,7 @@ func (r *TaskRepo) ListByAssignee(ctx context.Context, assigneeID string) ([]*mo
 
 	var tasks []*models.Task
 	for rows.Next() {
-		task := &models.Task{}
-		err := rows.Scan(
-			&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
-			&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
-			&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-			&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
-		)
+		task, err := scanTask(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -155,13 +137,7 @@ func (r *TaskRepo) ListBySecretary(ctx context.Context, secretaryID string) ([]*
 
 	var tasks []*models.Task
 	for rows.Next() {
-		task := &models.Task{}
-		err := rows.Scan(
-			&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
-			&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
-			&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-			&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
-		)
+		task, err := scanTask(rows)
 		if err != nil {
 			return nil, err
 		}
@@ -237,6 +213,54 @@ func (r *TaskRepo) UpdateStatus(ctx context.Context, id string, status models.Ta
 func (r *TaskRepo) Delete(ctx context.Context, id string) error {
 	_, err := r.db.ExecContext(ctx, "DELETE FROM tasks WHERE id = ?", id)
 	return err
+}
+
+func scanTask(scanner taskScanner) (*models.Task, error) {
+	task := &models.Task{}
+	var description sql.NullString
+	var assigneeID sql.NullString
+	var deadlineAt sql.NullInt64
+	var assignedAt sql.NullInt64
+	var startedAt sql.NullInt64
+	var completedAt sql.NullInt64
+	var resultSummary sql.NullString
+	var errorMessage sql.NullString
+
+	if err := scanner.Scan(
+		&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
+		&task.Title, &description, &task.Status, &assigneeID, &task.Priority,
+		&deadlineAt, &assignedAt, &startedAt, &completedAt,
+		&resultSummary, &errorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
+	); err != nil {
+		return nil, err
+	}
+
+	if description.Valid {
+		task.Description = description.String
+	}
+	if assigneeID.Valid {
+		task.AssigneeID = assigneeID.String
+	}
+	if deadlineAt.Valid {
+		task.DeadlineAt = deadlineAt.Int64
+	}
+	if assignedAt.Valid {
+		task.AssignedAt = assignedAt.Int64
+	}
+	if startedAt.Valid {
+		task.StartedAt = startedAt.Int64
+	}
+	if completedAt.Valid {
+		task.CompletedAt = completedAt.Int64
+	}
+	if resultSummary.Valid {
+		task.ResultSummary = resultSummary.String
+	}
+	if errorMessage.Valid {
+		task.ErrorMessage = errorMessage.String
+	}
+
+	return task, nil
 }
 
 // GetWorkloadStats returns workload statistics for a workspace

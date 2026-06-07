@@ -202,6 +202,12 @@ export const useTaskStore = defineStore('task', () => {
     const task = tasks.value.find(t => t.id === event.taskId)
     if (task) {
       task.status = event.status
+      if (event.assigneeId !== undefined) {
+        task.assigneeId = event.assigneeId
+      }
+      if (event.title !== undefined) {
+        task.title = event.title
+      }
     } else {
       // Task not in local cache — refetch from server
       if (currentWorkspaceId.value) {
