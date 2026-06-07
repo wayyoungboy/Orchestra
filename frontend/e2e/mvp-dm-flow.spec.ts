@@ -63,8 +63,10 @@ test.describe.serial('mvp direct message flow', () => {
     await expect(page.getByText(`DM Assistant ${RUN_ID}`)).toBeVisible({ timeout: 15_000 })
 
     await page.locator('button.add-btn').click()
+    const modal = page.locator('.fixed.inset-0')
+    await expect(modal.getByRole('heading', { name: 'Create Conversation' })).toBeVisible({ timeout: 15_000 })
     await page.getByRole('button', { name: /direct message/i }).click()
-    await page.getByRole('button', { name: new RegExp(`DM Assistant ${RUN_ID}`) }).click()
+    await modal.getByRole('button', { name: new RegExp(`DM Assistant ${RUN_ID}`) }).click()
 
     const directResponse = page.waitForResponse(
       (response) => response.url().includes('/api/workspaces/') &&
@@ -81,7 +83,7 @@ test.describe.serial('mvp direct message flow', () => {
     const conversationId = dm.id!
 
     await expect(page.getByRole('heading', { name: `DM Assistant ${RUN_ID}` })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByRole('button', { name: new RegExp(`DM Assistant ${RUN_ID}`) })).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('.dm-item', { hasText: `DM Assistant ${RUN_ID}` })).toBeVisible({ timeout: 15_000 })
 
     const userText = `DM dispatch browser flow ${RUN_ID}`
     const input = page.locator('textarea.chat-textarea')
