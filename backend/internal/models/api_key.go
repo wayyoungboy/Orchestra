@@ -23,12 +23,12 @@ type APIKey struct {
 
 // APIKeyResponse is the response format for API keys (key is partially hidden)
 type APIKeyResponse struct {
-	ID           string         `json:"id"`
-	Provider     APIKeyProvider `json:"provider"`
-	KeyPreview   string         `json:"keyPreview"` // First 8 chars + "..." + last 4 chars
-	IsValid      bool           `json:"isValid"`
-	CreatedAt    time.Time      `json:"createdAt"`
-	UpdatedAt    time.Time      `json:"updatedAt"`
+	ID         string         `json:"id"`
+	Provider   APIKeyProvider `json:"provider"`
+	KeyPreview string         `json:"keyPreview"` // First 8 chars + "..." + last 4 chars
+	IsValid    bool           `json:"isValid"`
+	CreatedAt  time.Time      `json:"createdAt"`
+	UpdatedAt  time.Time      `json:"updatedAt"`
 }
 
 // APIKeyCreate is the request body for creating/updating an API key

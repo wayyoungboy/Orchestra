@@ -102,4 +102,3 @@ func joinPlaceholders(n int) string {
 	}
 	return string(s)
 }
-

@@ -16,25 +16,25 @@ const (
 )
 
 type Conversation struct {
-	ID          string          `json:"id"`
-	WorkspaceID string          `json:"workspaceId"`
-	Type        ConversationType `json:"type"`
-	Name        string          `json:"name,omitempty"`
-	TargetID    string          `json:"targetId,omitempty"`
-	MemberIDs   []string        `json:"memberIds"`
-	Pinned             bool            `json:"pinned"`
-	Muted              bool            `json:"muted"`
-	LastMessagePreview string          `json:"lastMessagePreview,omitempty"`
-	LastMessageAt      int64           `json:"lastMessageAt,omitempty"`
-	CreatedAt          int64           `json:"createdAt"`
-	UpdatedAt          int64           `json:"updatedAt"`
+	ID                 string           `json:"id"`
+	WorkspaceID        string           `json:"workspaceId"`
+	Type               ConversationType `json:"type"`
+	Name               string           `json:"name,omitempty"`
+	TargetID           string           `json:"targetId,omitempty"`
+	MemberIDs          []string         `json:"memberIds"`
+	Pinned             bool             `json:"pinned"`
+	Muted              bool             `json:"muted"`
+	LastMessagePreview string           `json:"lastMessagePreview,omitempty"`
+	LastMessageAt      int64            `json:"lastMessageAt,omitempty"`
+	CreatedAt          int64            `json:"createdAt"`
+	UpdatedAt          int64            `json:"updatedAt"`
 }
 
 type ConversationCreate struct {
-	Type       ConversationType `json:"type"`
-	MemberIDs  []string         `json:"memberIds"`
-	Name       string           `json:"name,omitempty"`
-	TargetID   string           `json:"targetId,omitempty"`
+	Type      ConversationType `json:"type"`
+	MemberIDs []string         `json:"memberIds"`
+	Name      string           `json:"name,omitempty"`
+	TargetID  string           `json:"targetId,omitempty"`
 }
 
 type ConversationRepository struct {

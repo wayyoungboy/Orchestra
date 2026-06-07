@@ -21,10 +21,10 @@ type TerminalConfig struct {
 }
 
 type SecurityConfig struct {
-	EncryptionKey    string   `yaml:"encryption_key"`
-	AllowedCommands  []string `yaml:"allowed_commands"`
-	AllowedPaths     []string `yaml:"allowed_paths"`
-	AllowedOrigins   []string `yaml:"allowed_origins"`
+	EncryptionKey   string   `yaml:"encryption_key"`
+	AllowedCommands []string `yaml:"allowed_commands"`
+	AllowedPaths    []string `yaml:"allowed_paths"`
+	AllowedOrigins  []string `yaml:"allowed_origins"`
 }
 
 type StorageConfig struct {

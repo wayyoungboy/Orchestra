@@ -11,9 +11,9 @@ import (
 type MessageStatus string
 
 const (
-	MessageStatusSent   MessageStatus = "sent"
+	MessageStatusSent      MessageStatus = "sent"
 	MessageStatusDelivered MessageStatus = "delivered"
-	MessageStatusRead    MessageStatus = "read"
+	MessageStatusRead      MessageStatus = "read"
 )
 
 type MessageContent struct {
@@ -22,21 +22,21 @@ type MessageContent struct {
 }
 
 type Message struct {
-	ID             string        `json:"id"`
-	ConversationID string        `json:"conversationId"`
-	SenderID       string        `json:"senderId"`
+	ID             string         `json:"id"`
+	ConversationID string         `json:"conversationId"`
+	SenderID       string         `json:"senderId"`
 	Content        MessageContent `json:"content"`
-	IsAI           bool          `json:"isAi"`
-	Attachment     string        `json:"attachment,omitempty"`
-	Status         MessageStatus `json:"status"`
-	CreatedAt      int64         `json:"createdAt"`
+	IsAI           bool           `json:"isAi"`
+	Attachment     string         `json:"attachment,omitempty"`
+	Status         MessageStatus  `json:"status"`
+	CreatedAt      int64          `json:"createdAt"`
 }
 
 type MessageCreate struct {
-	ConversationID string        `json:"conversationId"`
-	SenderID       string        `json:"senderId"`
+	ConversationID string         `json:"conversationId"`
+	SenderID       string         `json:"senderId"`
 	Content        MessageContent `json:"content"`
-	IsAI           bool          `json:"isAi"`
+	IsAI           bool           `json:"isAi"`
 }
 
 type MessageRepository struct {
@@ -176,10 +176,10 @@ func (r *MessageRepository) LatestMessageTime(conversationID string) (int64, err
 
 // SearchResult represents a search result item
 type SearchResult struct {
-	Message       Message `json:"message"`
-	ConversationID string `json:"conversationId"`
-	WorkspaceID   string `json:"workspaceId"`
-	Snippet       string `json:"snippet"`
+	Message        Message `json:"message"`
+	ConversationID string  `json:"conversationId"`
+	WorkspaceID    string  `json:"workspaceId"`
+	Snippet        string  `json:"snippet"`
 }
 
 // SearchInWorkspace searches messages across all conversations in a workspace
@@ -287,6 +287,7 @@ func generateSnippet(text, query string, maxLen int) string {
 
 	return snippet
 }
+
 // Delete deletes a single message by ID
 func (r *MessageRepository) Delete(id string) error {
 	_, err := r.db.Exec(`DELETE FROM messages WHERE id = ?`, id)

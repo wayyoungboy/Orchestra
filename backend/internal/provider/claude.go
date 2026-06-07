@@ -66,8 +66,8 @@ func (p *ClaudeProvider) StartSession(ctx context.Context, opts SessionOptions) 
 	}
 
 	return &claudeSession{
-		cmd:  cmd,
-		pipe: pipe,
+		cmd:   cmd,
+		pipe:  pipe,
 		msgCh: make(chan AgentMessage, 64),
 		done:  make(chan struct{}),
 	}, nil

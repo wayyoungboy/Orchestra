@@ -59,13 +59,13 @@ func (r *RingBuffer) Push(key string) {
 
 // DispatchQueue buffers messages when an agent is busy, with merge and dedup.
 type DispatchQueue struct {
-	mu          sync.Mutex
-	items       []DispatchItem
-	maxSize     int
-	dedupRing   *RingBuffer
-	inflight    *DispatchItem
-	forceTimer  *time.Timer
-	forceFlush  func([]DispatchItem)
+	mu         sync.Mutex
+	items      []DispatchItem
+	maxSize    int
+	dedupRing  *RingBuffer
+	inflight   *DispatchItem
+	forceTimer *time.Timer
+	forceFlush func([]DispatchItem)
 }
 
 // NewDispatchQueue creates a queue with the given maximum size.

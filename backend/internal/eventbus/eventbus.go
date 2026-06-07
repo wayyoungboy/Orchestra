@@ -10,15 +10,15 @@ import (
 type EventType string
 
 const (
-	EventProcessStateChanged EventType = "process-state-changed"
-	EventFileChanged         EventType = "file-changed"
-	EventWorkerActivity      EventType = "worker-activity-changed"
-	EventQueueRequestAdded   EventType = "queue-request-added"
-	EventQueueRequestRemoved EventType = "queue-request-removed"
+	EventProcessStateChanged  EventType = "process-state-changed"
+	EventFileChanged          EventType = "file-changed"
+	EventWorkerActivity       EventType = "worker-activity-changed"
+	EventQueueRequestAdded    EventType = "queue-request-added"
+	EventQueueRequestRemoved  EventType = "queue-request-removed"
 	EventQueuePositionChanged EventType = "queue-position-changed"
-	EventMemberStatusChanged EventType = "member-status-changed"
-	EventSessionCreated      EventType = "session-created"
-	EventMessageReceived     EventType = "message-received"
+	EventMemberStatusChanged  EventType = "member-status-changed"
+	EventSessionCreated       EventType = "session-created"
+	EventMessageReceived      EventType = "message-received"
 )
 
 // Event is the base interface for all events.
@@ -120,4 +120,3 @@ func (eb *EventBus) HandlerCount(eventType EventType) int {
 	defer eb.mu.RUnlock()
 	return len(eb.subscribers[eventType])
 }
-

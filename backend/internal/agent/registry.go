@@ -16,8 +16,8 @@ import (
 type Registry struct {
 	mu             sync.RWMutex
 	sessions       map[string]*AgentSession            // sessionID → session
-	memberIndex    map[string]map[string]*AgentSession  // workspaceID → memberID → session
-	workspaceIndex map[string][]string                  // workspaceID → sessionIDs
+	memberIndex    map[string]map[string]*AgentSession // workspaceID → memberID → session
+	workspaceIndex map[string][]string                 // workspaceID → sessionIDs
 
 	tmuxMgr     *tmux.Manager
 	toolHandler *a2a.ToolHandler

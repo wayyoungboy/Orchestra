@@ -15,18 +15,18 @@ import (
 // - Signals pause when buffered bytes exceed FlowHighWaterMark
 // - Signals resume when buffered bytes drop below FlowLowWaterMark
 type FlowController struct {
-	mu          sync.Mutex
-	buffer      []byte
-	buffered    int
-	paused      bool
-	ctx         context.Context
-	cancel      context.CancelFunc
-	running     bool
-	emitChan    chan []byte // channel for emitted data
-	OnPause     func()      // callback when high water mark exceeded
-	OnResume    func()      // callback when low water mark crossed
-	totalQueued int64       // total bytes queued (for stats)
-	totalEmitted int64      // total bytes emitted (for stats)
+	mu           sync.Mutex
+	buffer       []byte
+	buffered     int
+	paused       bool
+	ctx          context.Context
+	cancel       context.CancelFunc
+	running      bool
+	emitChan     chan []byte // channel for emitted data
+	OnPause      func()      // callback when high water mark exceeded
+	OnResume     func()      // callback when low water mark crossed
+	totalQueued  int64       // total bytes queued (for stats)
+	totalEmitted int64       // total bytes emitted (for stats)
 }
 
 // NewFlowController creates a new flow controller.

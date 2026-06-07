@@ -1,4 +1,4 @@
-.PHONY: help verify verify-focused build run test reset-data clean backend-run backend-test backend-reset frontend-install frontend-dev frontend-build frontend-test frontend-lint
+.PHONY: help verify verify-focused build run test reset-data clean backend-run backend-test backend-reset backend-format-check frontend-install frontend-dev frontend-build frontend-test frontend-lint
 
 help:
 	@echo "Orchestra development commands"
@@ -12,6 +12,7 @@ help:
 	@echo "  make backend-run    Start the backend API server"
 	@echo "  make backend-test   Run backend tests"
 	@echo "  make backend-reset  Reset backend SQLite data"
+	@echo "  make backend-format-check Check backend Go formatting"
 	@echo "  make frontend-dev   Start the frontend dev server"
 	@echo "  make frontend-build Build the frontend"
 	@echo "  make frontend-test  Run frontend unit tests"
@@ -43,6 +44,9 @@ backend-test:
 
 backend-reset:
 	cd backend && $(MAKE) reset-data
+
+backend-format-check:
+	./scripts/check-go-format.sh
 
 frontend-install:
 	cd frontend && pnpm install

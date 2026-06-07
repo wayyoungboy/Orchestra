@@ -67,22 +67,22 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 		decrypted, err := h.encryptor.Decrypt(key.EncryptedKey)
 		if err != nil {
 			responses[i] = models.APIKeyResponse{
-				ID:        key.ID,
-				Provider:  key.Provider,
+				ID:         key.ID,
+				Provider:   key.Provider,
 				KeyPreview: "****",
-				IsValid:   false,
-				CreatedAt: key.CreatedAt,
-				UpdatedAt: key.UpdatedAt,
+				IsValid:    false,
+				CreatedAt:  key.CreatedAt,
+				UpdatedAt:  key.UpdatedAt,
 			}
 			continue
 		}
 		responses[i] = models.APIKeyResponse{
-			ID:        key.ID,
-			Provider:  key.Provider,
+			ID:         key.ID,
+			Provider:   key.Provider,
 			KeyPreview: maskKey(decrypted),
-			IsValid:   true,
-			CreatedAt: key.CreatedAt,
-			UpdatedAt: key.UpdatedAt,
+			IsValid:    true,
+			CreatedAt:  key.CreatedAt,
+			UpdatedAt:  key.UpdatedAt,
 		}
 	}
 
@@ -359,22 +359,22 @@ func (h *APIKeyHandler) GetByProvider(c *gin.Context) {
 	decrypted, err := h.encryptor.Decrypt(key.EncryptedKey)
 	if err != nil {
 		c.JSON(http.StatusOK, models.APIKeyResponse{
-			ID:        key.ID,
-			Provider:  key.Provider,
+			ID:         key.ID,
+			Provider:   key.Provider,
 			KeyPreview: "****",
-			IsValid:   false,
-			CreatedAt: key.CreatedAt,
-			UpdatedAt: key.UpdatedAt,
+			IsValid:    false,
+			CreatedAt:  key.CreatedAt,
+			UpdatedAt:  key.UpdatedAt,
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, models.APIKeyResponse{
-		ID:        key.ID,
-		Provider:  key.Provider,
+		ID:         key.ID,
+		Provider:   key.Provider,
 		KeyPreview: maskKey(decrypted),
-		IsValid:   true,
-		CreatedAt: key.CreatedAt,
-		UpdatedAt: key.UpdatedAt,
+		IsValid:    true,
+		CreatedAt:  key.CreatedAt,
+		UpdatedAt:  key.UpdatedAt,
 	})
 }

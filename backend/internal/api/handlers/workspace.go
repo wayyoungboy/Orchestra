@@ -345,6 +345,7 @@ func (h *WorkspaceHandler) Search(c *gin.Context) {
 		"results": results,
 	})
 }
+
 // ValidatePath validates a path for workspace creation
 // @Summary Validate workspace path
 // @Description Validate if a path is suitable for a workspace (exists, readable, writable)

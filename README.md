@@ -314,6 +314,9 @@ ORCHESTRA_RUN_MVP_TASK_E2E=1 ./scripts/verify-mvp.sh
 # Backend unit tests
 cd backend && make test
 
+# Backend Go formatting check
+make backend-format-check
+
 # Focused backend terminal API runtime smoke (requires tmux)
 cd backend && go test ./internal/api -run TestTerminalRuntimeAPIWorkspaceMemberSessionLifecycle -count=1
 
@@ -360,6 +363,7 @@ make reset-data       # Reset backend SQLite data (root alias)
 make backend-run      # Start backend API server
 make backend-test     # Run backend tests
 make backend-reset    # Reset backend SQLite data
+make backend-format-check # Check backend Go formatting
 make frontend-install # Install frontend dependencies
 make frontend-dev     # Start frontend dev server
 make frontend-build   # Build frontend

@@ -32,6 +32,7 @@ Completed hardening passes:
 - Added root-level backend command aliases (`make run`, `make test`, `make build`, `make reset-data`) and aligned README command wording so root and backend-directory workflows no longer diverge.
 - Added a real frontend unit-test script (`pnpm test`) to the default MVP verification gate and fixed the member-session label truncation so existing Vitest coverage passes.
 - Added a concrete frontend ESLint configuration, a non-mutating `pnpm lint:check` script, and wired it into the default MVP verification gate so the documented lint standard is executable.
+- Normalized backend Go formatting and added a default-gate `gofmt` check plus a root `make backend-format-check` helper so the documented Go formatting standard is executable.
 - Updated README Make command docs and root Makefile help so public command descriptions match the current validation gate.
 - Added a GitHub Actions CI workflow that installs Go, pnpm, tmux, frontend dependencies, and runs the same `make verify` MVP gate used locally.
 - Upgraded CI actions and the CI Node runtime to Node 24-compatible versions so the verification gate stays ahead of the GitHub Actions Node 20 deprecation.

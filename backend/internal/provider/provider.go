@@ -9,29 +9,29 @@ import (
 type ProviderName string
 
 const (
-	ProviderClaude  ProviderName = "claude"
-	ProviderGemini  ProviderName = "gemini"
-	ProviderCodex   ProviderName = "codex"
+	ProviderClaude   ProviderName = "claude"
+	ProviderGemini   ProviderName = "gemini"
+	ProviderCodex    ProviderName = "codex"
 	ProviderOpenCode ProviderName = "opencode"
-	ProviderAider   ProviderName = "aider"
-	ProviderCustom  ProviderName = "custom"
+	ProviderAider    ProviderName = "aider"
+	ProviderCustom   ProviderName = "custom"
 )
 
 // SessionOptions contains parameters for starting a new agent session.
 type SessionOptions struct {
-	WorkspacePath string
-	MemberID      string
-	SessionID     string
+	WorkspacePath  string
+	MemberID       string
+	SessionID      string
 	PermissionMode string // e.g., "default", "acceptEdits", "bypassPermissions"
 	ModelSettings  *ModelSettings
 }
 
 // ModelSettings holds optional model configuration.
 type ModelSettings struct {
-	Model         string
-	MaxTokens     int
-	Temperature   float64
-	MaxThinking   int
+	Model       string
+	MaxTokens   int
+	Temperature float64
+	MaxThinking int
 }
 
 // AgentProvider is the abstraction interface for AI CLI runtimes.

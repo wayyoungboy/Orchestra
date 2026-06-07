@@ -281,6 +281,7 @@ func (h *MemberHandler) Delete(c *gin.Context) {
 	}
 	c.JSON(http.StatusNoContent, nil)
 }
+
 // UpdatePresence updates a member's real-time presence status
 // @Summary Update member presence
 // @Description Update a member's real-time activity status (typing, viewing, etc.)

@@ -24,13 +24,13 @@ type ChatBroadcaster interface {
 
 // SessionConfig contains parameters for creating a session.
 type SessionConfig struct {
-	ID            string
-	WorkspaceID   string
-	WorkspaceDir  string
-	MemberID      string
-	MemberName    string
-	TerminalType  string
-	Member        *models.Member
+	ID           string
+	WorkspaceID  string
+	WorkspaceDir string
+	MemberID     string
+	MemberName   string
+	TerminalType string
+	Member       *models.Member
 }
 
 // SessionLookup finds an active session for a workspace member.
@@ -42,15 +42,15 @@ type SessionLookup interface {
 
 // ToolHandler executes Orchestra tools on behalf of A2A sessions.
 type ToolHandler struct {
-	msgRepo      *repository.MessageRepository
-	taskRepo     *repository.TaskRepo
-	memberRepo   repository.MemberRepository
-	convRepo     *repository.ConversationRepository
-	chatHub      ChatBroadcaster
-	browser      *filesystem.Browser
-	validator    *filesystem.Validator
-	pool         SessionLookup
-	workspaceRepo  repository.WorkspaceRepository
+	msgRepo       *repository.MessageRepository
+	taskRepo      *repository.TaskRepo
+	memberRepo    repository.MemberRepository
+	convRepo      *repository.ConversationRepository
+	chatHub       ChatBroadcaster
+	browser       *filesystem.Browser
+	validator     *filesystem.Validator
+	pool          SessionLookup
+	workspaceRepo repository.WorkspaceRepository
 
 	dispatchWg     sync.WaitGroup
 	dispatchCtx    context.Context

@@ -46,7 +46,7 @@ type ChatClient struct {
 // ChatHub manages all chat WebSocket connections and broadcasts messages
 type ChatHub struct {
 	mu            sync.RWMutex
-	clients       map[string]*ChatClient       // clientID -> client
+	clients       map[string]*ChatClient         // clientID -> client
 	workspaceSubs map[string]map[string]struct{} // workspaceID -> clientIDs
 }
 

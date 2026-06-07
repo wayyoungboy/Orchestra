@@ -32,10 +32,10 @@ func DefaultConfig() Config {
 type SessionState string
 
 const (
-	StateIdle        SessionState = "idle"
-	StateInTurn      SessionState = "in-turn"
+	StateIdle         SessionState = "idle"
+	StateInTurn       SessionState = "in-turn"
 	StateWaitingInput SessionState = "waiting-input"
-	StateTerminated  SessionState = "terminated"
+	StateTerminated   SessionState = "terminated"
 )
 
 // SessionInfo holds metadata about an active session.
@@ -51,13 +51,13 @@ type SessionInfo struct {
 
 // Supervisor manages agent sessions with worker pooling and staleness detection.
 type Supervisor struct {
-	mu              sync.RWMutex
-	sessions        map[string]*runningSession
+	mu                sync.RWMutex
+	sessions          map[string]*runningSession
 	everOwnedSessions map[string]bool
-	config          Config
-	eventBus        *eventbus.EventBus
-	registry        *provider.Registry
-	cancelFunc      context.CancelFunc
+	config            Config
+	eventBus          *eventbus.EventBus
+	registry          *provider.Registry
+	cancelFunc        context.CancelFunc
 }
 
 type runningSession struct {
@@ -83,11 +83,11 @@ func New(cfg Config, eb *eventbus.EventBus, registry *provider.Registry) *Superv
 		eb = eventbus.New()
 	}
 	return &Supervisor{
-		sessions:        make(map[string]*runningSession),
+		sessions:          make(map[string]*runningSession),
 		everOwnedSessions: make(map[string]bool),
-		config:          cfg,
-		eventBus:        eb,
-		registry:        registry,
+		config:            cfg,
+		eventBus:          eb,
+		registry:          registry,
 	}
 }
 
@@ -138,21 +138,21 @@ func (s *Supervisor) StartSession(ctx context.Context, workspaceID, memberID str
 	msgQ := messagequeue.New[provider.AgentMessage](64)
 
 	info := SessionInfo{
-		SessionID:   sessionID,
-		WorkspaceID: workspaceID,
-		MemberID:    memberID,
-		State:       StateInTurn,
-		Provider:    string(prov.Name()),
+		SessionID:     sessionID,
+		WorkspaceID:   workspaceID,
+		MemberID:      memberID,
+		State:         StateInTurn,
+		Provider:      string(prov.Name()),
 		LastMessageAt: time.Now(),
-		CreatedAt:   time.Now(),
+		CreatedAt:     time.Now(),
 	}
 
 	rs := &runningSession{
-		info:     info,
-		session:  sess,
-		provider: prov,
-		msgQueue: msgQ,
-		cancel:   cancel,
+		info:        info,
+		session:     sess,
+		provider:    prov,
+		msgQueue:    msgQ,
+		cancel:      cancel,
 		lastMsgTime: time.Now(),
 		messageBucket: messageBucket{
 			current: make([]provider.AgentMessage, 0, 128),
@@ -165,10 +165,10 @@ func (s *Supervisor) StartSession(ctx context.Context, workspaceID, memberID str
 	s.mu.Unlock()
 
 	s.eventBus.EmitPayload(eventbus.EventSessionCreated, map[string]any{
-		"sessionId": sessionID,
-		"provider":  prov.Name(),
+		"sessionId":   sessionID,
+		"provider":    prov.Name(),
 		"workspaceId": workspaceID,
-		"memberId":  memberID,
+		"memberId":    memberID,
 	})
 	s.eventBus.EmitPayload(eventbus.EventProcessStateChanged, map[string]any{
 		"sessionId": sessionID,

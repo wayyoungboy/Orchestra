@@ -10,10 +10,10 @@ import (
 
 // Saver provides debounced file write with atomic replace semantics.
 type Saver struct {
-	mu         sync.Mutex
-	saveFunc   func() error
-	delay      time.Duration
-	timer      *time.Timer
+	mu          sync.Mutex
+	saveFunc    func() error
+	delay       time.Duration
+	timer       *time.Timer
 	savePending bool
 }
 

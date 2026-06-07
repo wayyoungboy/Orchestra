@@ -120,7 +120,7 @@ func TestSaveAtomicJSON(t *testing.T) {
 	path := filepath.Join(dir, "data.json")
 
 	data := map[string]interface{}{
-		"name": "test",
+		"name":  "test",
 		"count": 42,
 	}
 

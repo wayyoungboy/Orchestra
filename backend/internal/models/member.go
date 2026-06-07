@@ -55,12 +55,12 @@ type MemberCreate struct {
 
 // Presence represents a member's real-time activity status
 type Presence struct {
-	MemberID      string `json:"memberId"`
-	WorkspaceID   string `json:"workspaceId"`
-	Activity      string `json:"activity"`       // "typing", "viewing", "idle"
-	TargetID      string `json:"targetId"`       // conversationId or terminalId
-	TargetType    string `json:"targetType"`     // "conversation" or "terminal"
-	Timestamp     int64  `json:"timestamp"`
+	MemberID    string `json:"memberId"`
+	WorkspaceID string `json:"workspaceId"`
+	Activity    string `json:"activity"`   // "typing", "viewing", "idle"
+	TargetID    string `json:"targetId"`   // conversationId or terminalId
+	TargetType  string `json:"targetType"` // "conversation" or "terminal"
+	Timestamp   int64  `json:"timestamp"`
 }
 
 // PresenceUpdate is the request body for updating presence

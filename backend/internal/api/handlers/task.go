@@ -26,7 +26,7 @@ func NewTaskHandler(taskRepo *repository.TaskRepo, memberRepo repository.MemberR
 
 func (h *TaskHandler) broadcastTaskStatus(task *models.Task, newStatus models.TaskStatus) {
 	h.chatHub.BroadcastRawToWorkspace(task.WorkspaceID, []byte(
-		`{"type":"task_status","workspaceId":"` + task.WorkspaceID + `","taskId":"` + task.ID + `","status":"` + string(newStatus) + `","assigneeId":"` + task.AssigneeID + `","title":"` + task.Title + `"}`,
+		`{"type":"task_status","workspaceId":"`+task.WorkspaceID+`","taskId":"`+task.ID+`","status":"`+string(newStatus)+`","assigneeId":"`+task.AssigneeID+`","title":"`+task.Title+`"}`,
 	))
 }
 
@@ -106,11 +106,11 @@ func (h *TaskHandler) StartTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusInProgress)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":            true,
-		"taskId":        req.TaskID,
-		"status":        models.TaskStatusInProgress,
+		"ok":             true,
+		"taskId":         req.TaskID,
+		"status":         models.TaskStatusInProgress,
 		"conversationId": task.ConversationID,
-		"secretaryId":   task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
@@ -149,11 +149,11 @@ func (h *TaskHandler) CompleteTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusCompleted)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":           true,
-		"taskId":       req.TaskID,
-		"status":       models.TaskStatusCompleted,
+		"ok":             true,
+		"taskId":         req.TaskID,
+		"status":         models.TaskStatusCompleted,
 		"conversationId": task.ConversationID,
-		"secretaryId":  task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
@@ -191,11 +191,11 @@ func (h *TaskHandler) FailTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusFailed)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":            true,
-		"taskId":        req.TaskID,
-		"status":        models.TaskStatusFailed,
+		"ok":             true,
+		"taskId":         req.TaskID,
+		"status":         models.TaskStatusFailed,
 		"conversationId": task.ConversationID,
-		"secretaryId":   task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
@@ -239,11 +239,11 @@ func (h *TaskHandler) AssignTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusAssigned)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":           true,
-		"taskId":       req.TaskID,
-		"status":       models.TaskStatusAssigned,
+		"ok":             true,
+		"taskId":         req.TaskID,
+		"status":         models.TaskStatusAssigned,
 		"conversationId": task.ConversationID,
-		"secretaryId":  task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
@@ -293,11 +293,11 @@ func (h *TaskHandler) CancelTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusCancelled)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":           true,
-		"taskId":       taskID,
-		"status":       models.TaskStatusCancelled,
+		"ok":             true,
+		"taskId":         taskID,
+		"status":         models.TaskStatusCancelled,
 		"conversationId": task.ConversationID,
-		"secretaryId":  task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
