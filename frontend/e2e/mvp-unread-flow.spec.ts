@@ -111,7 +111,13 @@ test.describe.serial('mvp unread sync flow', () => {
       )
       .toBe(1)
 
+    const markReadResponse = page.waitForResponse(
+      (response) => response.url().includes(`/api/workspaces/${workspaceId}/conversations/${alertChannelId}/read`) &&
+        response.request().method() === 'POST',
+    )
     await alertItem.click()
+    const markRead = await markReadResponse
+    expect(markRead.ok()).toBeTruthy()
     await expect(page.getByRole('heading', { name: alertChannelName })).toBeVisible({ timeout: 15_000 })
     await expect(page.locator('.message-text', { hasText: replyText })).toBeVisible({ timeout: 15_000 })
     await expect(alertItem.locator('.unread-badge')).toBeHidden({ timeout: 15_000 })
