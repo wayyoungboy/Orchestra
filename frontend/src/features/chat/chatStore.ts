@@ -55,13 +55,17 @@ export const useChatStore = defineStore('chat', () => {
   const MESSAGE_INITIAL_SIZE = 30
 
   const authStore = useAuthStore()
+  const projectStore = useProjectStore()
 
   let chatWs: WebSocket | null = null
   let chatWsReconnectTimer: ReturnType<typeof setTimeout> | null = null
   let chatWsReconnectAttempts = 0
   const CHAT_WS_MAX_RECONNECT_ATTEMPTS = 10
 
-  const currentUserId = computed(() => authStore.currentUserId || 'default')
+  const currentUserId = computed(() => {
+    if (authStore.currentUserId && authStore.currentUserId !== 'default') return authStore.currentUserId
+    return projectStore.members.find((m: any) => m.roleType === 'owner')?.id || 'default'
+  })
 
   const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeConversationId.value) || null
@@ -337,7 +341,6 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      const projectStore = useProjectStore()
       const { mentionIds, mentionAll } = parseMentions(payload.text, projectStore.members)
 
       await client.post(`/workspaces/${workspaceId.value}/conversations/${payload.conversationId}/messages`, {
@@ -358,19 +361,27 @@ export const useChatStore = defineStore('chat', () => {
   async function createConversation(data: { type: 'channel' | 'dm'; name?: string; memberId?: string }) {
     if (!workspaceId.value) return null
     try {
-      const memberIDs = data.memberId
-        ? [currentUserId.value, data.memberId]
-        : [currentUserId.value]
-
-      const response = await client.post(`/workspaces/${workspaceId.value}/conversations`, {
-        type: data.type,
-        name: data.name || '',
-        memberIDs
-      })
+      const response = data.type === 'dm' && data.memberId
+        ? await client.post(`/workspaces/${workspaceId.value}/conversations/direct`, {
+            userId: currentUserId.value,
+            targetId: data.memberId
+          })
+        : await client.post(`/workspaces/${workspaceId.value}/conversations`, {
+            type: data.type,
+            name: data.name || '',
+            memberIDs: [currentUserId.value]
+          })
 
       const newConv = response.data
-      // Add to local state with empty messages array
-      conversations.value = [...conversations.value, { ...newConv, messages: [] }]
+      const existingIndex = conversations.value.findIndex(c => c.id === newConv.id)
+      if (existingIndex >= 0) {
+        conversations.value[existingIndex] = {
+          ...newConv,
+          messages: conversations.value[existingIndex].messages || []
+        }
+      } else {
+        conversations.value = [...conversations.value, { ...newConv, messages: [] }]
+      }
       return newConv.id
     } catch (e) {
       notifyUserError('Failed to create conversation', e)
@@ -425,7 +436,6 @@ export const useChatStore = defineStore('chat', () => {
     getConversationTitle: (c: any) => {
       if (c.customName) return c.customName
       if (c.type === 'dm' && c.memberIds?.length) {
-        const projectStore = useProjectStore()
         const otherId = c.memberIds.find((id: string) => id !== currentUserId.value)
         if (otherId) {
           const member = projectStore.members.find((m: any) => m.id === otherId)

@@ -60,6 +60,11 @@ if [[ "$run_all_focused_e2e" == "1" || "${ORCHESTRA_RUN_MVP_CHAT_E2E:-}" == "1" 
   ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-mvp-chat-e2e.sh"
 fi
 
+if [[ "$run_all_focused_e2e" == "1" || "${ORCHESTRA_RUN_MVP_DM_E2E:-}" == "1" ]]; then
+  echo "==> MVP direct message flow E2E"
+  ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-mvp-dm-e2e.sh"
+fi
+
 if [[ "$run_all_focused_e2e" == "1" || "${ORCHESTRA_RUN_WORKSPACE_ONBOARDING_E2E:-}" == "1" ]]; then
   echo "==> Workspace onboarding flow E2E"
   ORCHESTRA_SKIP_FRONTEND_BUILD=1 "$ROOT_DIR/scripts/run-workspace-onboarding-e2e.sh"
