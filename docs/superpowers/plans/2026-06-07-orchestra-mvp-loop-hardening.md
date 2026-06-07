@@ -6,7 +6,7 @@
 
 **Architecture:** Treat `chat -> dispatch -> agent session -> chat/task` as the acceptance path. Add focused backend tests, visible outbox diagnostics, frontend state handling, and a README/roadmap update so future work follows the MVP loop instead of broad parity chasing.
 
-**Tech Stack:** Go 1.21+, Gin, SQLite repositories, Vue 3, Pinia, TypeScript, Playwright/Vitest where already available.
+**Tech Stack:** Go 1.25+, Gin, SQLite repositories, Vue 3, Pinia, TypeScript, Playwright/Vitest where already available.
 
 ---
 
@@ -30,6 +30,7 @@ Completed hardening passes:
 - Added root-level Makefile shortcuts (`make verify`, `make verify-focused`, backend/frontend helper targets) so local validation and common dev entry points are discoverable from the repository root.
 - Added a real frontend unit-test script (`pnpm test`) to the default MVP verification gate and fixed the member-session label truncation so existing Vitest coverage passes.
 - Updated README Make command docs and root Makefile help so public command descriptions match the current validation gate.
+- Added a GitHub Actions CI workflow that installs Go, pnpm, tmux, frontend dependencies, and runs the same `make verify` MVP gate used locally.
 - Fixed the default-channel mention dispatch path so explicit `@assistant` / `@secretary` mentions target valid agent members even when the channel has no stored member list, and covered the runtime path from message send to tmux prompt delivery.
 - Fixed queued first-message dispatch during agent startup by flushing the queue on `Connecting -> Online`, and made state-machine transition callbacks safe to read current state without deadlocking.
 - Added backend tmux runtime coverage for the agent result return loop: a secretary creates a task, the assistant starts/completes it, the assistant reports through `/api/internal/chat/send`, the AI message persists in chat with the conversation preview updated, and the report is forwarded into the secretary session for summarization.

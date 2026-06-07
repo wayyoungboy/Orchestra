@@ -54,7 +54,7 @@ The design concepts of this project were inspired by [golutra](https://github.co
 ## Tech Stack
 
 ### Backend
-- **Go 1.21+** - Core runtime
+- **Go 1.25+** - Core runtime
 - **Gin** - HTTP framework
 - **gorilla/websocket** - WebSocket handling
 - **SQLite** - Persistent storage
@@ -70,7 +70,7 @@ The design concepts of this project were inspired by [golutra](https://github.co
 ## Quick Start
 
 ### Prerequisites
-- Go 1.21+
+- Go 1.25+
 - Node.js 18+ (pnpm recommended)
 - tmux (required for agent sessions and the MVP verification gate)
 
