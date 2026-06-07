@@ -108,11 +108,11 @@ function handleDrop(event: DragEvent, targetStatus: Task['status']) {
 
   // Allow only valid status transitions
   const validTransitions: Record<Task['status'], Task['status'][]> = {
-    pending: ['assigned', 'in_progress', 'completed', 'failed', 'cancelled'],
+    pending: ['assigned', 'cancelled'],
     assigned: ['in_progress', 'cancelled'],
-    in_progress: ['completed', 'failed', 'cancelled'],
-    completed: ['in_progress'],
-    failed: ['in_progress'],
+    in_progress: ['completed', 'failed'],
+    completed: [],
+    failed: [],
     cancelled: []
   }
 

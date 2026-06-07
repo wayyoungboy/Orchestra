@@ -35,6 +35,7 @@ Completed hardening passes:
 - Fixed pending-task repository reads with nullable assignees and made task status broadcasts use the post-update task snapshot; the task store now applies assignee/title changes from live task events so reassignment is visible without refresh.
 - Extended live task status events to carry result summaries and failure messages, and taught the task store to apply them so completed/failed task details appear on already-open task boards without a refresh.
 - Aligned the task detail drawer with the full task lifecycle labels/styles so assigned and cancelled tasks render consistently with task cards and the Kanban board.
+- Aligned Kanban drag-and-drop task transitions with the backend task state machine, preventing browser-only moves such as pending directly to completed/failed that would be rejected by the API.
 - Added `ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh` as the one-switch local gate for all focused browser MVP flows.
 - Added `scripts/run-focused-e2e-local.sh` to start a temporary local backend, run the all-focused browser MVP gate, and clean up the backend process after verification.
 - Expanded the default MVP verification gate's Playwright typecheck from a hand-picked focused-spec list to every `frontend/e2e/*.spec.ts`, including Node globals used by API-oriented specs.
