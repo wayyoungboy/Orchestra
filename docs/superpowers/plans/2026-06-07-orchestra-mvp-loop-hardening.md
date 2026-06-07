@@ -31,6 +31,7 @@ Completed hardening passes:
 - Added a real frontend unit-test script (`pnpm test`) to the default MVP verification gate and fixed the member-session label truncation so existing Vitest coverage passes.
 - Updated README Make command docs and root Makefile help so public command descriptions match the current validation gate.
 - Added a GitHub Actions CI workflow that installs Go, pnpm, tmux, frontend dependencies, and runs the same `make verify` MVP gate used locally.
+- Upgraded CI actions and the CI Node runtime to Node 24-compatible versions so the verification gate stays ahead of the GitHub Actions Node 20 deprecation.
 - Made provider registry tests independent of whether the GitHub Actions runner has Claude or Gemini installed, while keeping real provider installation checks environment-aware.
 - Added component coverage and UI labels for icon-only chat send and member actions buttons so keyboard and screen-reader users get stable accessible names.
 - Fixed the default-channel mention dispatch path so explicit `@assistant` / `@secretary` mentions target valid agent members even when the channel has no stored member list, and covered the runtime path from message send to tmux prompt delivery.
