@@ -49,6 +49,7 @@ Completed hardening passes:
 - Made provider registry tests independent of whether the GitHub Actions runner has Claude or Gemini installed, while keeping real provider installation checks environment-aware.
 - Added component coverage and UI labels for icon-only chat send and member actions buttons so keyboard and screen-reader users get stable accessible names.
 - Fixed the default-channel mention dispatch path so explicit `@assistant` / `@secretary` mentions target valid agent members even when the channel has no stored member list, and covered the runtime path from message send to tmux prompt delivery.
+- Added tmux runtime coverage for rapid consecutive `@assistant` messages so the API-to-terminal path proves both prompts reach the same assistant session without losing one under startup/queue timing.
 - Fixed queued first-message dispatch during agent startup by flushing the queue on `Connecting -> Online`, and made state-machine transition callbacks safe to read current state without deadlocking.
 - Added chatbridge coverage for agent assistant output so automatic agent-to-chat messages persist as AI messages and update the conversation preview timestamp.
 - Added backend tmux runtime coverage for the agent result return loop: a secretary creates a task, the assistant starts/completes it, the assistant reports through `/api/internal/chat/send`, the AI message persists in chat with the conversation preview updated, and the report is forwarded into the secretary session for summarization.
