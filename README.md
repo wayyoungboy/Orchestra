@@ -32,6 +32,7 @@ The design concepts of this project were inspired by [golutra](https://github.co
 - **Provider Abstraction**: Pluggable AI provider support (Claude, Gemini) with unified command interface
 - **Native Tool Calling**: AI agents can call Orchestra tools directly (task management, chat, status updates)
 - **Task Management**: Full task lifecycle (create/start/complete/fail) with optimistic locking and Kanban view
+- **Agent Completion Notifications**: Assistant/secretary replies create unread completion notifications and live browser toasts for conversation participants
 - **Internal Chat Routing**: Secretary-to-assistant task forwarding, @mentions, and auto-forwarding of results
 - **Outbox Pattern**: Reliable async message delivery with retry and dead-letter handling
 - **Event Bus**: Internal pub/sub system for decoupled component communication
@@ -343,6 +344,9 @@ ORCHESTRA_RUN_MVP_DM_E2E=1 ./scripts/verify-mvp.sh
 # Include the focused browser MVP unread sync flow in the gate (requires backend)
 ORCHESTRA_RUN_MVP_UNREAD_E2E=1 ./scripts/verify-mvp.sh
 
+# Include the focused browser MVP agent-completion notification flow in the gate (requires backend)
+ORCHESTRA_RUN_MVP_NOTIFICATION_E2E=1 ./scripts/verify-mvp.sh
+
 # Include the focused browser member session flow in the gate (requires backend and tmux)
 ORCHESTRA_RUN_MVP_MEMBER_SESSION_E2E=1 ./scripts/verify-mvp.sh
 
@@ -381,6 +385,9 @@ cd frontend && pnpm test:e2e:mvp-dm
 
 # Focused MVP unread sync browser flow (requires running backend)
 cd frontend && pnpm test:e2e:mvp-unread
+
+# Focused MVP agent-completion notification browser flow (requires running backend)
+cd frontend && pnpm test:e2e:mvp-notification
 
 # Focused member-card agent session browser flow (requires backend and tmux)
 cd frontend && pnpm test:e2e:mvp-member-session

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -21,6 +22,7 @@ type ConversationHandler struct {
 	convRepo          *repository.ConversationRepository
 	msgRepo           *repository.MessageRepository
 	readRepo          *repository.ConversationReadRepository
+	notifRepo         *repository.NotificationRepository
 	memberRepo        repository.MemberRepository
 	wsRepo            repository.WorkspaceRepository
 	registry          *agent.Registry
@@ -43,11 +45,13 @@ func NewConversationHandler(
 	authEnabled bool,
 	baseURL string,
 	outboxWorker *outbox.Worker,
+	notifRepo *repository.NotificationRepository,
 ) *ConversationHandler {
 	return &ConversationHandler{
 		convRepo:          convRepo,
 		msgRepo:           msgRepo,
 		readRepo:          readRepo,
+		notifRepo:         notifRepo,
 		memberRepo:        memberRepo,
 		wsRepo:            wsRepo,
 		registry:          registry,
@@ -1101,6 +1105,8 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 		IsAI:           true,
 	})
 
+	h.createAgentCompletionNotifications(c.Request.Context(), req, msg.ID)
+
 	// Broadcast to WebSocket clients via terminal session
 	if h.registry != nil {
 		sess := h.registry.GetByMember(req.WorkspaceID, req.SenderID)
@@ -1180,6 +1186,91 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 		"ok":        true,
 		"messageId": msg.ID,
 	})
+}
+
+func (h *ConversationHandler) createAgentCompletionNotifications(ctx context.Context, req InternalChatSendRequest, messageID string) {
+	if h.notifRepo == nil || req.ConversationID == "" || req.WorkspaceID == "" || req.SenderID == "" {
+		return
+	}
+
+	senderMember, err := h.memberRepo.GetByID(ctx, req.SenderID)
+	if err != nil || senderMember == nil {
+		return
+	}
+	if senderMember.RoleType != models.RoleAssistant && senderMember.RoleType != models.RoleSecretary {
+		return
+	}
+
+	recipients := make([]string, 0)
+	seen := make(map[string]struct{})
+	if conv, err := h.convRepo.GetByID(req.ConversationID); err == nil && conv != nil {
+		for _, memberID := range conv.MemberIDs {
+			if memberID == "" || memberID == req.SenderID {
+				continue
+			}
+			if _, ok := seen[memberID]; ok {
+				continue
+			}
+			seen[memberID] = struct{}{}
+			recipients = append(recipients, memberID)
+		}
+	}
+
+	if len(recipients) == 0 {
+		members, err := h.memberRepo.ListByWorkspace(ctx, req.WorkspaceID)
+		if err != nil {
+			log.Printf("[notifications] failed to list members for workspace %s: %v", req.WorkspaceID, err)
+			return
+		}
+		for _, member := range members {
+			if member.ID == req.SenderID || member.RoleType == models.RoleAssistant {
+				continue
+			}
+			if _, ok := seen[member.ID]; ok {
+				continue
+			}
+			seen[member.ID] = struct{}{}
+			recipients = append(recipients, member.ID)
+		}
+	}
+
+	titleName := req.SenderName
+	if titleName == "" {
+		titleName = senderMember.Name
+	}
+	if titleName == "" {
+		titleName = "Agent"
+	}
+
+	for _, userID := range recipients {
+		notification := &repository.Notification{
+			WorkspaceID:    req.WorkspaceID,
+			UserID:         userID,
+			Type:           "agent_completion",
+			Title:          titleName + " completed a reply",
+			Body:           req.Text,
+			ConversationID: req.ConversationID,
+			MessageID:      messageID,
+			IsRead:         false,
+		}
+		if err := h.notifRepo.Create(ctx, notification); err != nil {
+			log.Printf("[notifications] failed to create completion notification for %s: %v", userID, err)
+			continue
+		}
+		if h.chatHub != nil {
+			h.chatHub.BroadcastToWorkspace(req.WorkspaceID, ws.ChatEvent{
+				Type:           ws.EventNotification,
+				WorkspaceID:    req.WorkspaceID,
+				ConversationID: req.ConversationID,
+				MessageID:      messageID,
+				SenderID:       userID,
+				SenderName:     titleName,
+				Content:        req.Text,
+				Status:         "agent_completion",
+				UnreadCount:    1,
+			})
+		}
+	}
 }
 
 // GetConversation gets a single conversation by ID

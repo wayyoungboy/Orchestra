@@ -26,6 +26,7 @@ Completed hardening passes:
 - Added a focused MVP chat browser E2E that creates an isolated workspace/member, opens the chat route directly, verifies the general channel and member list load, sends a page message with an @mention, checks persistence through the API, and confirms no failed dispatch diagnostics.
 - Added a focused MVP direct-message browser E2E that creates an isolated workspace/assistant, creates the DM through the UI-backed `/conversations/direct` path, sends a DM, verifies the prompt reaches the assistant terminal session with the same conversation id, posts an assistant reply through the internal chat API, and confirms the reply remains visible and persisted in that DM.
 - Added a focused MVP unread sync browser E2E that opens chat, receives an assistant message in an inactive channel over WebSocket, verifies the unread badge appears without a page refresh, opens the channel, and confirms the badge/API unread count clear.
+- Added backend and focused browser coverage for agent-completion notifications: assistant/secretary internal chat replies now create unread `agent_completion` notifications for conversation participants and emit a live browser toast without refresh.
 - Added a focused workspace onboarding browser E2E that starts from `/`, opens the first-screen workspace creation UI, binds a server path, lands in chat, and verifies the workspace persisted through the API.
 - Added a focused MVP task browser E2E that creates an isolated workspace, secretary, assistant, and assigned task through the API, opens the Tasks page, starts and completes the task through the UI, and verifies the completed task/result through the API.
 - Added `ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh` as the one-switch local gate for all focused browser MVP flows.
@@ -751,7 +752,7 @@ If no code changes are needed, do not create a commit.
 Spec coverage:
 
 - Workspace and member setup are not reimplemented in this first plan because existing routes and UI already cover them; this plan focuses on the measurable message loop.
-- Chat, DM, unread, last-message preview, outbox visibility, frontend delivery state, and roadmap anchoring are covered.
+- Chat, DM, unread, agent-completion notifications, last-message preview, outbox visibility, frontend delivery state, and roadmap anchoring are covered.
 - Full agent CLI correctness is intentionally left to the next plan after these guardrails exist.
 
 Placeholder scan:

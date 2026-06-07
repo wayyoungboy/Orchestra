@@ -4,6 +4,7 @@ import client from '@/shared/api/client'
 import { notifyUserError } from '@/shared/notifyError'
 import { useAuthStore } from '@/features/auth/authStore'
 import { useProjectStore } from '@/features/workspace/projectStore'
+import { useToastStore } from '@/stores/toastStore'
 import type { Conversation } from '@/shared/types/chat'
 import { fetchConversationDispatchDiagnostics, type OutboxDiagnosticItem } from './dispatchDiagnostics'
 
@@ -14,7 +15,7 @@ export interface AgentStatus {
 }
 
 export interface ChatWsEvent {
-  type: 'new_message' | 'message_status' | 'unread_sync'
+  type: 'new_message' | 'message_status' | 'unread_sync' | 'notification'
   workspaceId: string
   conversationId?: string
   messageId?: string
@@ -56,6 +57,7 @@ export const useChatStore = defineStore('chat', () => {
 
   const authStore = useAuthStore()
   const projectStore = useProjectStore()
+  const toastStore = useToastStore()
 
   let chatWs: WebSocket | null = null
   let chatWsReconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -247,6 +249,12 @@ export const useChatStore = defineStore('chat', () => {
           const conv = conversations.value.find(c => c.id === event.conversationId)
           if (conv) conv.unreadCount = event.unreadCount ?? 0
         }
+        break
+      }
+      case 'notification': {
+        if (event.senderId && event.senderId !== currentUserId.value) break
+        const title = event.senderName ? `${event.senderName} completed a reply` : 'Agent completed a reply'
+        toastStore.info(event.content ? `${title}: ${event.content}` : title, 7000)
         break
       }
     }
