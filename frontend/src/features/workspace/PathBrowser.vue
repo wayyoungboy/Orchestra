@@ -87,6 +87,7 @@
             type="text"
             class="w-full bg-white border border-slate-200 rounded-2xl px-5 py-3 text-slate-900 font-bold placeholder-slate-300 focus:border-primary/50 focus:ring-4 focus:ring-primary/5 outline-none transition-all"
             placeholder="工作区显示名称..."
+            @input="workspaceNameEdited = true"
           />
         </div>
         <button
@@ -117,6 +118,7 @@ const emit = defineEmits<{
 
 const currentPath = ref('')
 const workspaceName = ref('')
+const workspaceNameEdited = ref(false)
 const files = ref<FileInfo[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -130,8 +132,9 @@ function defaultWorkspaceNameFromPath(path: string): string {
 function applyPathAndDefaultName(basePath: string, entries: FileInfo[] | null) {
   currentPath.value = basePath
   files.value = entries || []
-  // If user hasn't typed a name yet, or we're just loading, update the name
-  workspaceName.value = defaultWorkspaceNameFromPath(basePath)
+  if (!workspaceNameEdited.value) {
+    workspaceName.value = defaultWorkspaceNameFromPath(basePath)
+  }
 }
 
 onMounted(async () => {
