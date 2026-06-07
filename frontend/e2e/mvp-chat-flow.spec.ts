@@ -14,6 +14,15 @@ async function backendAvailable(request: APIRequestContext) {
   return result.ok()
 }
 
+async function getOwnerMemberId(request: APIRequestContext, workspaceId: string) {
+  const members = await request.get(`${API_URL}/api/workspaces/${workspaceId}/members`)
+  expect(members.ok()).toBeTruthy()
+  const body = (await members.json()) as Array<{ id: string; roleType: string }>
+  const owner = body.find((member) => member.roleType === 'owner')
+  expect(owner?.id).toBeTruthy()
+  return owner!.id
+}
+
 test.describe.serial('mvp chat flow', () => {
   let workspaceId = ''
   let ownerId = ''
@@ -33,9 +42,9 @@ test.describe.serial('mvp chat flow', () => {
       },
     })
     expect(workspace.ok()).toBeTruthy()
-    const workspaceBody = (await workspace.json()) as { id: string; ownerMemberId?: string }
+    const workspaceBody = (await workspace.json()) as { id: string }
     workspaceId = workspaceBody.id
-    ownerId = workspaceBody.ownerMemberId ?? 'default'
+    ownerId = await getOwnerMemberId(request, workspaceId)
 
     const assistant = await request.post(`${API_URL}/api/workspaces/${workspaceId}/members`, {
       data: {

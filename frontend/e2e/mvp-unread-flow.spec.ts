@@ -14,6 +14,15 @@ async function backendAvailable(request: APIRequestContext) {
   return result.ok()
 }
 
+async function getOwnerMemberId(request: APIRequestContext, workspaceId: string) {
+  const members = await request.get(`${API_URL}/api/workspaces/${workspaceId}/members`)
+  expect(members.ok()).toBeTruthy()
+  const body = (await members.json()) as Array<{ id: string; roleType: string }>
+  const owner = body.find((member) => member.roleType === 'owner')
+  expect(owner?.id).toBeTruthy()
+  return owner!.id
+}
+
 test.describe.serial('mvp unread sync flow', () => {
   let workspaceId = ''
   let ownerId = ''
@@ -35,9 +44,9 @@ test.describe.serial('mvp unread sync flow', () => {
       },
     })
     expect(workspace.ok()).toBeTruthy()
-    const workspaceBody = (await workspace.json()) as { id: string; ownerMemberId?: string }
+    const workspaceBody = (await workspace.json()) as { id: string }
     workspaceId = workspaceBody.id
-    ownerId = workspaceBody.ownerMemberId ?? 'default'
+    ownerId = await getOwnerMemberId(request, workspaceId)
 
     const assistant = await request.post(`${API_URL}/api/workspaces/${workspaceId}/members`, {
       data: {
@@ -111,13 +120,20 @@ test.describe.serial('mvp unread sync flow', () => {
       )
       .toBe(1)
 
+    const markReadRequest = page.waitForRequest(
+      (request) => request.url().includes(`/api/workspaces/${workspaceId}/conversations/${alertChannelId}/read`) &&
+        request.method() === 'POST',
+    )
     const markReadResponse = page.waitForResponse(
       (response) => response.url().includes(`/api/workspaces/${workspaceId}/conversations/${alertChannelId}/read`) &&
         response.request().method() === 'POST',
     )
     await alertItem.click()
+    const markReadReq = await markReadRequest
+    expect(markReadReq.postDataJSON()).toMatchObject({ userId: ownerId })
     const markRead = await markReadResponse
     expect(markRead.ok()).toBeTruthy()
+    await expect(markRead.json()).resolves.toMatchObject({ success: true })
     await expect(page.getByRole('heading', { name: alertChannelName })).toBeVisible({ timeout: 15_000 })
     await expect(page.locator('.message-text', { hasText: replyText })).toBeVisible({ timeout: 15_000 })
     await expect(alertItem.locator('.unread-badge')).toBeHidden({ timeout: 15_000 })
