@@ -99,9 +99,11 @@ function handleClose() {
 function getStatusLabel(status: string): string {
   const labels: Record<string, string> = {
     pending: '待处理',
+    assigned: '已分配',
     in_progress: '进行中',
     completed: '已完成',
-    failed: '失败'
+    failed: '失败',
+    cancelled: '已取消'
   }
   return labels[status] || status
 }
@@ -239,6 +241,11 @@ function formatDate(dateStr: string): string {
   color: #64748b;
 }
 
+.status-assigned {
+  background: #fef3c7;
+  color: #a16207;
+}
+
 .status-in_progress {
   background: #dbeafe;
   color: #0369a1;
@@ -252,6 +259,11 @@ function formatDate(dateStr: string): string {
 .status-failed {
   background: #fee2e2;
   color: #991b1b;
+}
+
+.status-cancelled {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .assignee-badge {
