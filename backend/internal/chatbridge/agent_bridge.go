@@ -13,16 +13,18 @@ import (
 // AgentBridge processes A2A/ACP messages and creates chat messages.
 // It bridges agent output to database chat messages + WebSocket broadcasts.
 type AgentBridge struct {
-	mu      sync.Mutex
-	msgRepo *repository.MessageRepository
-	chatHub *ws.ChatHub
+	mu       sync.Mutex
+	msgRepo  *repository.MessageRepository
+	convRepo *repository.ConversationRepository
+	chatHub  *ws.ChatHub
 }
 
 // NewAgentBridge creates a new agent bridge.
-func NewAgentBridge(msgRepo *repository.MessageRepository, chatHub *ws.ChatHub) *AgentBridge {
+func NewAgentBridge(msgRepo *repository.MessageRepository, convRepo *repository.ConversationRepository, chatHub *ws.ChatHub) *AgentBridge {
 	return &AgentBridge{
-		msgRepo: msgRepo,
-		chatHub: chatHub,
+		msgRepo:  msgRepo,
+		convRepo: convRepo,
+		chatHub:  chatHub,
 	}
 }
 
@@ -76,6 +78,11 @@ func (b *AgentBridge) handleAssistantMessage(session SessionInterface, msg *a2a.
 	if err != nil {
 		log.Printf("[agent-bridge] Failed to create message: %v", err)
 		return
+	}
+	if b.convRepo != nil {
+		if err := b.convRepo.UpdateLastMessage(convID, parsed.Content, chatMsg.CreatedAt); err != nil {
+			log.Printf("[agent-bridge] Failed to update conversation preview: %v", err)
+		}
 	}
 
 	// Broadcast to WebSocket clients

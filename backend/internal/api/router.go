@@ -356,7 +356,7 @@ func registerWebSocketRoutes(r *gin.Engine, deps *Dependencies) {
 }
 
 func wireUpIntegrations(deps *Dependencies) {
-	bridge := chatbridge.NewAgentBridge(deps.MsgRepo, ws.GlobalChatHub)
+	bridge := chatbridge.NewAgentBridge(deps.MsgRepo, deps.ConvRepo, ws.GlobalChatHub)
 
 	// Wire bridge to registry sessions via an adapter that bridges the interface types
 	deps.Registry.SetBridge(&bridgeOutputAdapter{bridge: bridge})
