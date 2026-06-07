@@ -235,8 +235,8 @@ watch(
   () => currentWorkspace.value?.id,
   async (workspaceId) => {
     if (!workspaceId) return
-    await chatStore.loadConversations(workspaceId)
     await projectStore.loadMembers(workspaceId)
+    await chatStore.loadConversations(workspaceId)
   },
   { immediate: true }
 )

@@ -311,6 +311,9 @@ ORCHESTRA_RUN_MVP_CHAT_E2E=1 ./scripts/verify-mvp.sh
 # 将聚焦的浏览器 MVP 私聊流程纳入验证入口（需要后端和 tmux）
 ORCHESTRA_RUN_MVP_DM_E2E=1 ./scripts/verify-mvp.sh
 
+# 将聚焦的浏览器 MVP 未读同步流程纳入验证入口（需要后端）
+ORCHESTRA_RUN_MVP_UNREAD_E2E=1 ./scripts/verify-mvp.sh
+
 # 将聚焦的成员卡片 agent 会话流程纳入验证入口（需要后端和 tmux）
 ORCHESTRA_RUN_MVP_MEMBER_SESSION_E2E=1 ./scripts/verify-mvp.sh
 
@@ -346,6 +349,9 @@ cd frontend && pnpm test:e2e:mvp-chat
 
 # 聚焦的 MVP 私聊浏览器流程（需要运行后端和 tmux）
 cd frontend && pnpm test:e2e:mvp-dm
+
+# 聚焦的 MVP 未读同步浏览器流程（需要运行后端）
+cd frontend && pnpm test:e2e:mvp-unread
 
 # 聚焦的成员卡片 agent 会话浏览器流程（需要后端和 tmux）
 cd frontend && pnpm test:e2e:mvp-member-session

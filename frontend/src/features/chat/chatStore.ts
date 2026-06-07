@@ -103,7 +103,9 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function loadConversationsList(wsId: string) {
-    const convResponse = await client.get(`/workspaces/${wsId}/conversations`)
+    const userId = currentUserId.value
+    const query = userId ? `?userId=${encodeURIComponent(userId)}` : ''
+    const convResponse = await client.get(`/workspaces/${wsId}/conversations${query}`)
     const remoteConvs = convResponse.data.timeline || []
     conversations.value = remoteConvs.map((rc: any) => {
       const local = conversations.value.find(lc => lc.id === rc.id)
@@ -234,6 +236,7 @@ export const useChatStore = defineStore('chat', () => {
         break
       }
       case 'unread_sync': {
+        if (event.senderId && event.senderId !== currentUserId.value) break
         if (event.conversationId) {
           const conv = conversations.value.find(c => c.id === event.conversationId)
           if (conv) conv.unreadCount = event.unreadCount ?? 0
