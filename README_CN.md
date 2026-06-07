@@ -174,37 +174,63 @@ Orchestra/
 | 端点 | 方法 | 说明 |
 |------|------|------|
 | `/health` | GET | 健康检查 |
-| `/api/ping` | GET | 测试连接 |
-| `/api/workspaces` | GET | 列出所有工作区 |
-| `/api/workspaces` | POST | 创建工作区 |
-| `/api/workspaces/:id` | GET | 获取工作区详情 |
-| `/api/workspaces/:id/members` | GET | 列出工作区成员 |
-| `/api/workspaces/:id/members` | POST | 添加成员到工作区 |
-| `/api/workspaces/:id/members/:mid` | PUT | 更新成员 |
-| `/api/workspaces/:id/members/:mid` | DELETE | 移除成员 |
-| `/api/workspaces/:id/members/:mid/terminal-session` | GET/POST | 检查、启动或复用成员 agent 会话 |
-| `/api/workspaces/:id/terminal-sessions` | GET | 列出工作区 agent 会话 |
-| `/api/terminals` | POST | 创建终端会话 |
-| `/api/terminals/:id/snapshot` | GET | 读取当前终端面板快照 |
-| `/api/terminals/:id` | DELETE | 关闭终端会话 |
+| `/swagger/*any` | GET | Swagger UI 和 OpenAPI 静态资源 |
+| `/api/auth/config` | GET | 读取认证模式和注册配置 |
+| `/api/auth/login` | POST | 登录并签发认证令牌 |
+| `/api/auth/validate` | POST | 校验认证令牌 |
+| `/api/auth/me` | GET | 读取当前认证用户 |
+| `/api/auth/register` | POST | 注册开放时创建用户 |
+| `/api/workspaces` | GET/POST | 列出或创建工作区 |
+| `/api/workspaces/validate-path` | POST | 校验服务端工作区路径 |
+| `/api/workspaces/:id` | GET/PUT/DELETE | 读取、更新或删除工作区 |
 | `/api/browse` | GET | 浏览服务器路径 |
 | `/api/workspaces/:id/browse` | GET | 浏览指定工作区路径 |
+| `/api/workspaces/:id/search` | GET | 搜索工作区路径 |
+| `/api/workspaces/:id/members` | GET/POST | 列出或添加工作区成员 |
+| `/api/workspaces/:id/members/:memberId` | GET/PUT/DELETE | 读取、更新或移除成员 |
+| `/api/workspaces/:id/members/:memberId/conversations` | DELETE | 删除成员相关会话 |
+| `/api/workspaces/:id/members/:memberId/presence` | POST | 更新成员在线状态/活动 |
+| `/api/workspaces/:id/members/:memberId/terminal-session` | GET/POST | 检查、启动或复用成员 agent 会话 |
+| `/api/workspaces/:id/terminal-sessions` | GET | 列出工作区 agent 会话 |
+| `/api/terminals` | POST | 创建终端会话 |
+| `/api/terminals/:sessionId/snapshot` | GET | 读取当前终端面板快照 |
+| `/api/terminals/:sessionId` | DELETE | 关闭终端会话 |
 | `/api/workspaces/:id/conversations` | GET/POST | 列出或创建会话 |
+| `/api/workspaces/:id/conversations/:convId` | GET/PUT/DELETE | 读取、更新或删除会话 |
 | `/api/workspaces/:id/conversations/direct` | POST | 创建或复用私聊会话 |
+| `/api/workspaces/:id/conversations/:convId/members` | PUT | 替换会话成员 |
 | `/api/workspaces/:id/conversations/:convId/messages` | GET/POST | 列出或发送会话消息 |
+| `/api/workspaces/:id/conversations/:convId/messages` | DELETE | 清空会话消息 |
+| `/api/workspaces/:id/conversations/:convId/messages/:messageId` | DELETE | 删除单条消息 |
 | `/api/workspaces/:id/conversations/:convId/read` | POST | 标记会话已读 |
+| `/api/workspaces/:id/conversations/read-all` | POST | 标记工作区全部会话已读 |
 | `/api/internal/chat/send` | POST | 内部 AI 结果消息 API |
+| `/api/internal/agent-status` | POST | 内部 agent 状态更新 API |
 | `/api/internal/tasks/create` | POST | agent 创建任务 |
+| `/api/internal/tasks/assign` | POST | 分派任务给 agent |
 | `/api/internal/tasks/start` | POST | agent 开始任务 |
 | `/api/internal/tasks/complete` | POST | agent 完成任务 |
 | `/api/internal/tasks/fail` | POST | agent 标记任务失败 |
+| `/api/internal/tasks/cancel` | POST | agent 取消任务 |
 | `/api/internal/tasks/list` | GET | 按 secretary 查询任务 |
+| `/api/internal/workloads/list` | GET | 列出 agent 工作负载 |
 | `/api/workspaces/:id/tasks` | GET | 列出工作区任务 |
 | `/api/workspaces/:id/tasks/:taskId` | GET | 获取任务详情 |
+| `/api/workspaces/:id/tasks/my-tasks` | GET | 列出当前 agent 被分派的任务 |
 | `/api/workspaces/:id/tasks/:taskId/cancel` | POST | 取消任务 |
+| `/api/workspaces/:id/attachments` | GET | 列出工作区附件 |
+| `/api/workspaces/:id/conversations/:convId/attachments` | POST | 上传会话附件 |
+| `/api/workspaces/:id/attachments/:attachmentId` | GET/DELETE | 下载或删除附件 |
+| `/api/workspaces/:id/attachments/:attachmentId/info` | GET | 读取附件元数据 |
 | `/api/api-keys` | GET/POST | 列出或创建 API key |
+| `/api/api-keys/provider/:provider` | GET | 获取指定 provider 的 API key |
 | `/api/api-keys/:id` | DELETE | 删除 API key |
 | `/api/api-keys/test` | POST | 测试 API key |
+| `/api/workspaces/:id/notifications` | GET | 列出工作区通知 |
+| `/api/workspaces/:id/notifications/badge` | GET | 读取通知角标计数 |
+| `/api/workspaces/:id/notifications/:notifId/read` | POST | 标记通知已读 |
+| `/api/workspaces/:id/notifications/read-all` | POST | 标记工作区全部通知已读 |
+| `/api/workspaces/:id/outbox` | GET | 列出工作区 outbox 投递诊断 |
 
 ### WebSocket
 

@@ -203,37 +203,63 @@ Orchestra/
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/api/ping` | GET | Test connection |
-| `/api/workspaces` | GET | List all workspaces |
-| `/api/workspaces` | POST | Create workspace |
-| `/api/workspaces/:id` | GET | Get workspace details |
-| `/api/workspaces/:id/members` | GET | List workspace members |
-| `/api/workspaces/:id/members` | POST | Add member to workspace |
-| `/api/workspaces/:id/members/:mid` | PUT | Update member |
-| `/api/workspaces/:id/members/:mid` | DELETE | Remove member |
-| `/api/workspaces/:id/members/:mid/terminal-session` | GET/POST | Check, start, or reuse a member agent session |
-| `/api/workspaces/:id/terminal-sessions` | GET | List workspace agent sessions |
-| `/api/terminals` | POST | Create terminal session |
-| `/api/terminals/:id/snapshot` | GET | Read current terminal pane snapshot |
-| `/api/terminals/:id` | DELETE | Close terminal session |
+| `/swagger/*any` | GET | Swagger UI and OpenAPI assets |
+| `/api/auth/config` | GET | Read auth mode and registration settings |
+| `/api/auth/login` | POST | Log in and issue an auth token |
+| `/api/auth/validate` | POST | Validate an auth token |
+| `/api/auth/me` | GET | Read the current authenticated user |
+| `/api/auth/register` | POST | Register a user when registration is enabled |
+| `/api/workspaces` | GET/POST | List or create workspaces |
+| `/api/workspaces/validate-path` | POST | Validate a server-side workspace path |
+| `/api/workspaces/:id` | GET/PUT/DELETE | Read, update, or delete a workspace |
 | `/api/browse` | GET | Browse server paths |
 | `/api/workspaces/:id/browse` | GET | Browse paths for a workspace |
+| `/api/workspaces/:id/search` | GET | Search paths inside a workspace |
+| `/api/workspaces/:id/members` | GET/POST | List or add workspace members |
+| `/api/workspaces/:id/members/:memberId` | GET/PUT/DELETE | Read, update, or remove a member |
+| `/api/workspaces/:id/members/:memberId/conversations` | DELETE | Delete conversations for a member |
+| `/api/workspaces/:id/members/:memberId/presence` | POST | Update member presence/activity |
+| `/api/workspaces/:id/members/:memberId/terminal-session` | GET/POST | Check, start, or reuse a member agent session |
+| `/api/workspaces/:id/terminal-sessions` | GET | List workspace agent sessions |
+| `/api/terminals` | POST | Create terminal session |
+| `/api/terminals/:sessionId/snapshot` | GET | Read current terminal pane snapshot |
+| `/api/terminals/:sessionId` | DELETE | Close terminal session |
 | `/api/workspaces/:id/conversations` | GET/POST | List or create conversations |
+| `/api/workspaces/:id/conversations/:convId` | GET/PUT/DELETE | Read, update, or delete a conversation |
 | `/api/workspaces/:id/conversations/direct` | POST | Create or reuse a direct message |
+| `/api/workspaces/:id/conversations/:convId/members` | PUT | Replace conversation membership |
 | `/api/workspaces/:id/conversations/:convId/messages` | GET/POST | List or send conversation messages |
+| `/api/workspaces/:id/conversations/:convId/messages` | DELETE | Clear conversation messages |
+| `/api/workspaces/:id/conversations/:convId/messages/:messageId` | DELETE | Delete a single message |
 | `/api/workspaces/:id/conversations/:convId/read` | POST | Mark a conversation read |
+| `/api/workspaces/:id/conversations/read-all` | POST | Mark all workspace conversations read |
 | `/api/internal/chat/send` | POST | Internal AI result message API |
+| `/api/internal/agent-status` | POST | Internal agent status update API |
 | `/api/internal/tasks/create` | POST | Create task from an agent |
+| `/api/internal/tasks/assign` | POST | Assign a task to an agent |
 | `/api/internal/tasks/start` | POST | Start task from an agent |
 | `/api/internal/tasks/complete` | POST | Complete task from an agent |
 | `/api/internal/tasks/fail` | POST | Fail task from an agent |
+| `/api/internal/tasks/cancel` | POST | Cancel task from an agent |
 | `/api/internal/tasks/list` | GET | List tasks for a secretary |
+| `/api/internal/workloads/list` | GET | List agent workloads |
 | `/api/workspaces/:id/tasks` | GET | List workspace tasks |
 | `/api/workspaces/:id/tasks/:taskId` | GET | Get task details |
+| `/api/workspaces/:id/tasks/my-tasks` | GET | List tasks assigned to the current agent |
 | `/api/workspaces/:id/tasks/:taskId/cancel` | POST | Cancel task |
+| `/api/workspaces/:id/attachments` | GET | List workspace attachments |
+| `/api/workspaces/:id/conversations/:convId/attachments` | POST | Upload a conversation attachment |
+| `/api/workspaces/:id/attachments/:attachmentId` | GET/DELETE | Download or delete an attachment |
+| `/api/workspaces/:id/attachments/:attachmentId/info` | GET | Read attachment metadata |
 | `/api/api-keys` | GET/POST | List or create API keys |
+| `/api/api-keys/provider/:provider` | GET | Get the API key for a provider |
 | `/api/api-keys/:id` | DELETE | Delete API key |
 | `/api/api-keys/test` | POST | Test API key |
+| `/api/workspaces/:id/notifications` | GET | List workspace notifications |
+| `/api/workspaces/:id/notifications/badge` | GET | Read notification badge counts |
+| `/api/workspaces/:id/notifications/:notifId/read` | POST | Mark a notification read |
+| `/api/workspaces/:id/notifications/read-all` | POST | Mark all workspace notifications read |
+| `/api/workspaces/:id/outbox` | GET | List workspace outbox delivery diagnostics |
 
 ### WebSocket
 

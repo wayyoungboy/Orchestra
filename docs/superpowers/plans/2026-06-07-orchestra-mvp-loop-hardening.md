@@ -36,6 +36,7 @@ Completed hardening passes:
 - Extended the backend format gate to run `goimports` through the backend Go module so import organization is checked without requiring a separately installed local binary.
 - Added backend `go vet ./...` to the default MVP verification gate and exposed it as `make backend-vet`.
 - Updated README Make command docs and root Makefile help so public command descriptions match the current validation gate.
+- Aligned the English and Chinese README API endpoint tables with the registered backend REST/WebSocket routes, including auth, workspace path/search, member presence, conversation management, tasks, attachments, notifications, outbox diagnostics, and Swagger.
 - Added a GitHub Actions CI workflow that installs Go, pnpm, tmux, frontend dependencies, and runs the same `make verify` MVP gate used locally.
 - Upgraded CI actions and the CI Node runtime to Node 24-compatible versions so the verification gate stays ahead of the GitHub Actions Node 20 deprecation.
 - Made provider registry tests independent of whether the GitHub Actions runner has Claude or Gemini installed, while keeping real provider installation checks environment-aware.
