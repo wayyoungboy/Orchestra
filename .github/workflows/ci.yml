@@ -54,6 +54,11 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Install Playwright Chromium
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.focused_e2e }}
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Verify MVP gate
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.focused_e2e) }}
         run: make verify

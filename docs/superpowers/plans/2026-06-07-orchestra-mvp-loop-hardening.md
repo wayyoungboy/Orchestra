@@ -39,7 +39,7 @@ Completed hardening passes:
 - Aligned the English and Chinese README API endpoint tables with the registered backend REST/WebSocket routes, including auth, workspace path/search, member presence, conversation management, tasks, attachments, notifications, outbox diagnostics, and Swagger.
 - Added a GitHub Actions CI workflow that installs Go, pnpm, tmux, frontend dependencies, and runs the same `make verify` MVP gate used locally.
 - Upgraded CI actions and the CI Node runtime to Node 24-compatible versions so the verification gate stays ahead of the GitHub Actions Node 20 deprecation.
-- Added a manual GitHub Actions `workflow_dispatch` switch for the full focused browser MVP E2E gate, so maintainers can run `make verify-focused` remotely with a temporary backend before broader workflow QA.
+- Added a manual GitHub Actions `workflow_dispatch` switch for the full focused browser MVP E2E gate, including Playwright Chromium installation, so maintainers can run `make verify-focused` remotely with a temporary backend before broader workflow QA.
 - Made provider registry tests independent of whether the GitHub Actions runner has Claude or Gemini installed, while keeping real provider installation checks environment-aware.
 - Added component coverage and UI labels for icon-only chat send and member actions buttons so keyboard and screen-reader users get stable accessible names.
 - Fixed the default-channel mention dispatch path so explicit `@assistant` / `@secretary` mentions target valid agent members even when the channel has no stored member list, and covered the runtime path from message send to tmux prompt delivery.
