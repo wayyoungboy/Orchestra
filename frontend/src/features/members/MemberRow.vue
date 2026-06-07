@@ -37,6 +37,8 @@
         type="button"
         @click.stop="$emit('toggle-menu', member)"
         :class="['more-btn', menuOpen ? 'is-active' : '']"
+        :aria-label="actionsLabel"
+        :title="actionsLabel"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
@@ -93,6 +95,7 @@ const { t } = useI18n()
 const chatStore = useChatStore()
 
 const displayName = computed(() => props.member.name?.trim() || t('members.unnamedMember'))
+const actionsLabel = computed(() => t('memberRow.actionsLabel', { name: displayName.value }))
 const menuOpen = computed(() => props.menuOpen ?? false)
 const canRemove = computed(() => props.currentUserId ? props.member.id !== props.currentUserId : true)
 const canSendMessage = computed(() => props.currentUserId ? props.member.id !== props.currentUserId : true)

@@ -32,6 +32,7 @@
     "headerChannelInWorkspace": "{name} 中的频道",
     "headerDirectMessage": "私信",
     "inputSend": "发送",
+    "inputUnavailable": "已断线，无法发送消息",
     "inputHint": "Enter 发送，Shift+Enter 换行",
     "inputPlaceholder": "发送到 {name}",
     "emptyStateTitle": "开始对话",
@@ -58,6 +59,7 @@
   },
   "memberRow": {
     "sendMessage": "发消息",
+    "actionsLabel": "{name} 的操作",
     "rename": "重命名",
     "remove": "移除",
     "statusHeading": "状态",

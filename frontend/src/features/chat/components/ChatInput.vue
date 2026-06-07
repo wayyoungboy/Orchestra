@@ -54,7 +54,8 @@
           type="button"
           class="send-btn"
           :disabled="!modelValue.trim() || connectionStatus !== 'connected'"
-          :title="connectionStatus !== 'connected' ? '已断线，无法发送消息' : '发送消息'"
+          :aria-label="sendButtonLabel"
+          :title="sendButtonLabel"
           @click="handleSend"
         >
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,6 +89,7 @@ const chatStore = useChatStore()
 const projectStore = useProjectStore()
 
 const connectionStatus = computed(() => chatStore.connectionStatus)
+const sendButtonLabel = computed(() => connectionStatus.value !== 'connected' ? t('chat.inputUnavailable') : t('chat.inputSend'))
 
 const props = withDefaults(defineProps<{
   modelValue: string

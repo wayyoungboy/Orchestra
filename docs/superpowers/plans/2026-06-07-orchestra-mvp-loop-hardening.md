@@ -31,6 +31,8 @@ Completed hardening passes:
 - Added a real frontend unit-test script (`pnpm test`) to the default MVP verification gate and fixed the member-session label truncation so existing Vitest coverage passes.
 - Updated README Make command docs and root Makefile help so public command descriptions match the current validation gate.
 - Added a GitHub Actions CI workflow that installs Go, pnpm, tmux, frontend dependencies, and runs the same `make verify` MVP gate used locally.
+- Made provider registry tests independent of whether the GitHub Actions runner has Claude or Gemini installed, while keeping real provider installation checks environment-aware.
+- Added component coverage and UI labels for icon-only chat send and member actions buttons so keyboard and screen-reader users get stable accessible names.
 - Fixed the default-channel mention dispatch path so explicit `@assistant` / `@secretary` mentions target valid agent members even when the channel has no stored member list, and covered the runtime path from message send to tmux prompt delivery.
 - Fixed queued first-message dispatch during agent startup by flushing the queue on `Connecting -> Online`, and made state-machine transition callbacks safe to read current state without deadlocking.
 - Added backend tmux runtime coverage for the agent result return loop: a secretary creates a task, the assistant starts/completes it, the assistant reports through `/api/internal/chat/send`, the AI message persists in chat with the conversation preview updated, and the report is forwarded into the secretary session for summarization.
@@ -38,7 +40,7 @@ Completed hardening passes:
 
 The next product gap is expanding regular browser E2E coverage from these focused paths toward a full user-visible workflow QA pass. The member-card session action, Agent Sessions tab, Tasks page, and direct chat-route loading make agent startup, ownership, current screen state, xterm.js output, resize propagation, direct keystrokes, light input, session cleanup, message persistence, explicit mention dispatch, task list rendering, task completion, result reporting, secretary summarization handoff, and backend tmux/API/browser runtime validation usable before that pass.
 
-Validation note: `scripts/verify-mvp.sh`, backend tests, frontend production builds, the focused member-session browser E2E, the focused MVP chat browser E2E, the focused MVP task browser E2E, and the focused terminal browser E2E are passing. Playwright cold-starts slowly in this local `/Volumes` + pnpm environment, and inherited SOCKS proxy variables can break localhost API requests; use the checked-in focused E2E runners so local proxy variables are sanitized before Playwright starts.
+Validation note: `scripts/verify-mvp.sh`, backend tests, frontend production builds, frontend unit tests, the focused member-session browser E2E, the focused MVP chat browser E2E, the focused MVP task browser E2E, and the focused terminal browser E2E are passing. Playwright and Vitest cold-start slowly in this local `/Volumes` + pnpm environment, and inherited SOCKS proxy variables can break localhost API requests; use the checked-in focused E2E runners so local proxy variables are sanitized before Playwright starts.
 
 ---
 

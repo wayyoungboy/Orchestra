@@ -1,8 +1,22 @@
 package provider
 
 import (
+	"context"
 	"testing"
 )
+
+type fakeProvider struct {
+	name      ProviderName
+	installed bool
+}
+
+func (p fakeProvider) Name() ProviderName           { return p.name }
+func (p fakeProvider) DisplayName() string          { return string(p.name) }
+func (p fakeProvider) IsInstalled() bool            { return p.installed }
+func (p fakeProvider) SupportsPermissionMode() bool { return false }
+func (p fakeProvider) StartSession(context.Context, SessionOptions) (AgentSession, error) {
+	return nil, nil
+}
 
 func TestRegistry_RegisterAndGet(t *testing.T) {
 	reg := NewRegistry()
@@ -37,10 +51,9 @@ func TestRegistry_List(t *testing.T) {
 
 func TestRegistry_Installed(t *testing.T) {
 	reg := NewRegistry()
-	reg.Register(NewClaudeProvider("claude"))
-	reg.Register(NewGeminiProvider())
+	reg.Register(fakeProvider{name: ProviderClaude, installed: true})
+	reg.Register(fakeProvider{name: ProviderGemini, installed: false})
 
-	// Claude is installed on this machine
 	installed := reg.Installed()
 	names := make(map[ProviderName]bool)
 	for _, p := range installed {
@@ -49,7 +62,9 @@ func TestRegistry_Installed(t *testing.T) {
 	if !names[ProviderClaude] {
 		t.Error("expected Claude to be installed")
 	}
-	// Gemini may or may not be installed depending on environment
+	if names[ProviderGemini] {
+		t.Error("expected Gemini to be filtered out")
+	}
 }
 
 func TestClaudeProvider_Name(t *testing.T) {

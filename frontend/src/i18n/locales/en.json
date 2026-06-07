@@ -31,6 +31,7 @@
     "headerChannelInWorkspace": "Channel in {name}",
     "headerDirectMessage": "Direct message",
     "inputSend": "Send",
+    "inputUnavailable": "Disconnected, cannot send messages",
     "inputHint": "Press Enter to send, Shift+Enter for new line",
     "inputPlaceholder": "Message {name}",
     "emptyStateTitle": "Start a Conversation",
@@ -57,6 +58,7 @@
   },
   "memberRow": {
     "sendMessage": "Send Message",
+    "actionsLabel": "Actions for {name}",
     "rename": "Rename",
     "remove": "Remove",
     "statusHeading": "Status",
