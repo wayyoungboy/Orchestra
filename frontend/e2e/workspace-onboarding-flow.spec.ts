@@ -58,7 +58,8 @@ test.describe.serial('workspace onboarding flow', () => {
     workspaceId = body.id!
 
     await expect(page).toHaveURL(new RegExp(`/workspace/${workspaceId}/chat`), { timeout: 15_000 })
-    await expect(page.getByRole('heading', { name: workspaceName })).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('.workspace-title')).toHaveText(workspaceName, { timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: /general/i })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('button', { name: /general/i })).toBeVisible({ timeout: 15_000 })
 
     const workspace = await request.get(`${API_URL}/api/workspaces/${workspaceId}`)

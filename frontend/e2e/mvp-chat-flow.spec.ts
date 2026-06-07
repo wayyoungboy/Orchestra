@@ -66,7 +66,8 @@ test.describe.serial('mvp chat flow', () => {
   test('creates workspace members, enters chat, sends a page message, and persists it', async ({ page, request }) => {
     await page.goto(`/workspace/${workspaceId}/chat`)
 
-    await expect(page.getByRole('heading', { name: `E2E Chat ${RUN_ID}` })).toBeVisible({ timeout: 15_000 })
+    await expect(page.locator('.workspace-title')).toHaveText(`E2E Chat ${RUN_ID}`, { timeout: 15_000 })
+    await expect(page.getByRole('heading', { name: /general/i })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByRole('button', { name: /general/i })).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(`Chat Assistant ${RUN_ID}`)).toBeVisible({ timeout: 15_000 })
     await expect(page.locator('.connection-status.connected')).toBeVisible({ timeout: 15_000 })
