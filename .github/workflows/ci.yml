@@ -7,6 +7,12 @@ on:
       - 'codex/**'
   pull_request:
   workflow_dispatch:
+    inputs:
+      focused_e2e:
+        description: 'Run the full focused browser MVP E2E gate'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,7 +20,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -49,4 +55,9 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Verify MVP gate
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.focused_e2e) }}
         run: make verify
+
+      - name: Verify focused browser MVP gate
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.focused_e2e }}
+        run: make verify-focused

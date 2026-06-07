@@ -322,6 +322,9 @@ make verify-focused
 # Start a temporary backend and run every focused browser MVP E2E locally
 ./scripts/run-focused-e2e-local.sh
 
+# On GitHub Actions, run the CI workflow manually with
+# "Run the full focused browser MVP E2E gate" enabled to execute make verify-focused remotely.
+
 # Include every focused browser MVP E2E in one gate (requires backend and tmux)
 ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh
 
