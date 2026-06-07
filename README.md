@@ -323,6 +323,9 @@ cd backend && go test ./internal/api -run TestAssistantResultCompletesTaskAndFor
 # Frontend unit tests
 cd frontend && pnpm test
 
+# Frontend lint check
+cd frontend && pnpm lint:check
+
 # E2E tests (requires running backend)
 cd frontend && pnpm test:e2e
 
@@ -361,6 +364,7 @@ make frontend-install # Install frontend dependencies
 make frontend-dev     # Start frontend dev server
 make frontend-build   # Build frontend
 make frontend-test    # Run frontend unit tests
+make frontend-lint    # Run frontend lint checks
 
 # Backend-only Makefile targets from ./backend (also reachable through the root aliases above)
 make build            # Build binary

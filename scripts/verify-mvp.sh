@@ -21,6 +21,12 @@ echo "==> Frontend unit tests"
   pnpm test
 )
 
+echo "==> Frontend lint check"
+(
+  cd "$ROOT_DIR/frontend"
+  pnpm lint:check
+)
+
 echo "==> Agent terminal Playwright spec typecheck"
 (
   cd "$ROOT_DIR/frontend"

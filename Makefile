@@ -1,4 +1,4 @@
-.PHONY: help verify verify-focused build run test reset-data clean backend-run backend-test backend-reset frontend-install frontend-dev frontend-build frontend-test
+.PHONY: help verify verify-focused build run test reset-data clean backend-run backend-test backend-reset frontend-install frontend-dev frontend-build frontend-test frontend-lint
 
 help:
 	@echo "Orchestra development commands"
@@ -15,6 +15,7 @@ help:
 	@echo "  make frontend-dev   Start the frontend dev server"
 	@echo "  make frontend-build Build the frontend"
 	@echo "  make frontend-test  Run frontend unit tests"
+	@echo "  make frontend-lint  Run frontend lint checks"
 
 verify:
 	./scripts/verify-mvp.sh
@@ -54,3 +55,6 @@ frontend-build:
 
 frontend-test:
 	cd frontend && pnpm test
+
+frontend-lint:
+	cd frontend && pnpm lint:check

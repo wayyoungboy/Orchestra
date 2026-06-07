@@ -294,6 +294,9 @@ cd backend && go test ./internal/api -run TestAssistantResultCompletesTaskAndFor
 # 前端单元测试
 cd frontend && pnpm test
 
+# 前端 lint 检查
+cd frontend && pnpm lint:check
+
 # E2E 测试（需要运行后端）
 cd frontend && pnpm test:e2e
 
@@ -332,6 +335,7 @@ make frontend-install # 安装前端依赖
 make frontend-dev     # 启动前端开发服务器
 make frontend-build   # 构建前端
 make frontend-test    # 运行前端单测
+make frontend-lint    # 运行前端 lint 检查
 
 # ./backend 下的后端 Makefile 目标（也可通过上方根目录别名访问）
 make build            # 构建二进制

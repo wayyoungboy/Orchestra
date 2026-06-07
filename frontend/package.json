@@ -8,6 +8,7 @@
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.ts,.tsx --fix",
+    "lint:check": "eslint . --ext .vue,.ts,.tsx",
     "test": "vitest run",
     "test:e2e": "pnpm run build && playwright test",
     "test:e2e:mvp-chat": "../scripts/run-mvp-chat-e2e.sh",
