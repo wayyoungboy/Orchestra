@@ -54,15 +54,16 @@ jobs:
         working-directory: frontend
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright Chromium
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.focused_e2e }}
-        working-directory: frontend
-        run: pnpm exec playwright install chromium
-
       - name: Verify MVP gate
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.focused_e2e) }}
         run: make verify
 
       - name: Verify focused browser MVP gate
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.focused_e2e }}
-        run: make verify-focused
+        run: |
+          CHROME_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [[ -z "$CHROME_PATH" ]]; then
+            echo "No system Chrome/Chromium executable found on the runner." >&2
+            exit 1
+          fi
+          PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$CHROME_PATH" make verify-focused

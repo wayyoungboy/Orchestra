@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test'
 
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH
+
 /**
  * E2E: Vite preview starts via webServer (reuseExistingServer: true if already running).
  * Backend-dependent tests use request to ORCHESTRA_API_URL (default http://127.0.0.1:8080): health, /api/workspaces.
@@ -22,5 +24,13 @@ export default defineConfig({
         reuseExistingServer: true,
         timeout: 60_000,
       },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        launchOptions: chromiumExecutablePath ? { executablePath: chromiumExecutablePath } : undefined,
+      },
+    },
+  ],
 })
