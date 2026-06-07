@@ -63,7 +63,13 @@ export const useChatStore = defineStore('chat', () => {
   const CHAT_WS_MAX_RECONNECT_ATTEMPTS = 10
 
   const currentUserId = computed(() => {
-    if (authStore.currentUserId && authStore.currentUserId !== 'default') return authStore.currentUserId
+    if (
+      authStore.currentUserId &&
+      authStore.currentUserId !== 'default' &&
+      projectStore.members.some((m: any) => m.id === authStore.currentUserId)
+    ) {
+      return authStore.currentUserId
+    }
     return projectStore.members.find((m: any) => m.roleType === 'owner')?.id || 'default'
   })
 
