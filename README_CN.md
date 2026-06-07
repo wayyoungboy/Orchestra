@@ -318,6 +318,9 @@ ORCHESTRA_RUN_MVP_UNREAD_E2E=1 ./scripts/verify-mvp.sh
 # 将聚焦的浏览器 MVP agent 完成通知流程纳入验证入口（需要后端）
 ORCHESTRA_RUN_MVP_NOTIFICATION_E2E=1 ./scripts/verify-mvp.sh
 
+# 将聚焦的浏览器 MVP 调度诊断流程纳入验证入口（需要后端和 tmux）
+ORCHESTRA_RUN_MVP_DISPATCH_DIAGNOSTICS_E2E=1 ./scripts/verify-mvp.sh
+
 # 将聚焦的成员卡片 agent 会话流程纳入验证入口（需要后端和 tmux）
 ORCHESTRA_RUN_MVP_MEMBER_SESSION_E2E=1 ./scripts/verify-mvp.sh
 
@@ -359,6 +362,9 @@ cd frontend && pnpm test:e2e:mvp-unread
 
 # 聚焦的 MVP agent 完成通知浏览器流程（需要运行后端）
 cd frontend && pnpm test:e2e:mvp-notification
+
+# 聚焦的 MVP 调度诊断浏览器流程（需要运行后端和 tmux）
+cd frontend && pnpm test:e2e:mvp-dispatch-diagnostics
 
 # 聚焦的成员卡片 agent 会话浏览器流程（需要后端和 tmux）
 cd frontend && pnpm test:e2e:mvp-member-session

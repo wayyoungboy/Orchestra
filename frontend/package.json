@@ -15,6 +15,7 @@
     "test:e2e:mvp-dm": "../scripts/run-mvp-dm-e2e.sh",
     "test:e2e:mvp-member-session": "../scripts/run-mvp-member-session-e2e.sh",
     "test:e2e:mvp-notification": "../scripts/run-mvp-notification-e2e.sh",
+    "test:e2e:mvp-dispatch-diagnostics": "../scripts/run-mvp-dispatch-diagnostics-e2e.sh",
     "test:e2e:mvp-task": "../scripts/run-mvp-task-e2e.sh",
     "test:e2e:mvp-unread": "../scripts/run-mvp-unread-e2e.sh",
     "test:e2e:terminal": "../scripts/run-terminal-e2e.sh",

@@ -54,6 +54,7 @@ export const useChatStore = defineStore('chat', () => {
   const hasMoreMessages = ref(true)
   const MESSAGE_PAGE_SIZE = 50
   const MESSAGE_INITIAL_SIZE = 30
+  const DISPATCH_DIAGNOSTIC_REFRESH_DELAYS = [1_000, 3_000]
 
   const authStore = useAuthStore()
   const projectStore = useProjectStore()
@@ -344,6 +345,18 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function scheduleDispatchDiagnosticRefresh(convId: string) {
+    const scheduledWorkspaceId = workspaceId.value
+    if (!scheduledWorkspaceId) return
+    for (const delay of DISPATCH_DIAGNOSTIC_REFRESH_DELAYS) {
+      window.setTimeout(() => {
+        if (workspaceId.value === scheduledWorkspaceId) {
+          void loadDispatchDiagnostics(convId)
+        }
+      }, delay)
+    }
+  }
+
   async function sendMessage(payload: { text: string, conversationId: string }) {
     if (!workspaceId.value) return
     try {
@@ -370,6 +383,7 @@ export const useChatStore = defineStore('chat', () => {
       // Immediate pull after send for optimistic consistency
       await loadMessages(workspaceId.value, payload.conversationId)
       await loadDispatchDiagnostics(payload.conversationId)
+      scheduleDispatchDiagnosticRefresh(payload.conversationId)
     } catch (e) {
       notifyUserError('Failed to send message', e)
     }

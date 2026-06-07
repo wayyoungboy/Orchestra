@@ -887,37 +887,6 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 	}
 
 	for _, memberID := range targets {
-		sess := h.registry.GetByMember(workspaceID, memberID)
-		if sess == nil {
-			// Create session on first message
-			var targetMember *models.Member
-			for _, m := range members {
-				if m.ID == memberID {
-					targetMember = m
-					break
-				}
-			}
-			if targetMember == nil {
-				continue
-			}
-			var err error
-			var wsPath string
-			if ws, err2 := h.wsRepo.GetByID(c.Request.Context(), workspaceID); err2 == nil {
-				wsPath = ws.Path
-			}
-			sess, err = h.registry.AcquireOrCreate(c.Request.Context(), targetMember, wsPath)
-			if err != nil {
-				log.Printf("[chat-forward] Failed to acquire session for member %s: %v", memberID, err)
-				continue
-			}
-			if sess == nil {
-				continue
-			}
-			log.Printf("[chat-forward] Created new session %s for member %s (acp=%v)", sess.ID, memberID, targetMember.ACPEnabled)
-		}
-		sess.SetLastChatTargetConversation(convID)
-
-		// Find member for role check
 		var member *models.Member
 		for _, m := range members {
 			if m.ID == memberID {
@@ -925,20 +894,53 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 				break
 			}
 		}
-
-		memberName := sess.MemberName
+		if member == nil {
+			continue
+		}
+		memberName := member.Name
 		if memberName == "" {
 			memberName = memberID
 		}
+		fullPrompt := h.buildAgentForwardPrompt(workspaceID, convID, memberID, memberName, member, text)
 
-		// Build prompt based on role
-		var fullPrompt string
+		sess := h.registry.GetByMember(workspaceID, memberID)
+		if sess == nil {
+			// Create session on first message
+			var err error
+			var wsPath string
+			if ws, err2 := h.wsRepo.GetByID(c.Request.Context(), workspaceID); err2 == nil {
+				wsPath = ws.Path
+			}
+			sess, err = h.registry.AcquireOrCreate(c.Request.Context(), member, wsPath)
+			if err != nil {
+				log.Printf("[chat-forward] Failed to acquire session for member %s: %v", memberID, err)
+				h.enqueueForwardOutbox(c.Request.Context(), workspaceID, convID, memberID, fullPrompt, fmt.Sprintf("session acquisition failed: %v", err))
+				continue
+			}
+			if sess == nil {
+				h.enqueueForwardOutbox(c.Request.Context(), workspaceID, convID, memberID, fullPrompt, "session unavailable")
+				continue
+			}
+			log.Printf("[chat-forward] Created new session %s for member %s (acp=%v)", sess.ID, memberID, member.ACPEnabled)
+		}
+		if !sess.IsAlive() {
+			h.enqueueForwardOutbox(c.Request.Context(), workspaceID, convID, memberID, fullPrompt, "session is not alive")
+			continue
+		}
+		sess.SetLastChatTargetConversation(convID)
 
-		baseURL := h.baseURL()
-		authHdr := h.authHeader()
+		if err := sess.Dispatch(fullPrompt, "user"); err != nil {
+			h.enqueueForwardOutbox(c.Request.Context(), workspaceID, convID, memberID, fullPrompt, fmt.Sprintf("dispatch failed: %v", err))
+		}
+	}
+}
 
-		if member != nil && member.RoleType == models.RoleSecretary {
-			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
+func (h *ConversationHandler) buildAgentForwardPrompt(workspaceID, convID, memberID, memberName string, member *models.Member, text string) string {
+	baseURL := h.baseURL()
+	authHdr := h.authHeader()
+
+	if member != nil && member.RoleType == models.RoleSecretary {
+		return fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
 
 你是团队的协调者（秘书）。你的职责：
 1. 分析用户需求，拆解为可执行的任务
@@ -973,19 +975,20 @@ curl -s --max-time 10 %s/api/internal/tasks/list?secretaryId=%s
 - 如果助手任务失败，可以重新分配给其他助手。
 
 用户原始请求：%s`,
-				convID,
-				memberID,
-				text,
-				baseURL, workspaceID,
-				baseURL, authHdr,
-				workspaceID, convID, memberID,
-				baseURL, authHdr,
-				workspaceID, convID, memberID,
-				baseURL, memberID,
-				text,
-			)
-		} else {
-			fullPrompt = fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
+			convID,
+			memberID,
+			text,
+			baseURL, workspaceID,
+			baseURL, authHdr,
+			workspaceID, convID, memberID,
+			baseURL, authHdr,
+			workspaceID, convID, memberID,
+			baseURL, memberID,
+			text,
+		)
+	}
+
+	return fmt.Sprintf(`#conversationId{%s}#senderId{%s}[user]: %s
 
 【可用工具 - 使用 curl 命令调用】
 
@@ -1018,25 +1021,26 @@ curl -s --max-time 10 -X POST %s/api/internal/chat/send \
 - 完成任务后直接通过 4 回复汇报结果。
 
 用户原始请求：%s`,
-				convID,
-				memberID,
-				text,
-				baseURL, authHdr,
-				baseURL, authHdr,
-				baseURL, authHdr,
-				baseURL, authHdr,
-				workspaceID, convID, memberID, memberName,
-				text,
-			)
-		}
+		convID,
+		memberID,
+		text,
+		baseURL, authHdr,
+		baseURL, authHdr,
+		baseURL, authHdr,
+		baseURL, authHdr,
+		workspaceID, convID, memberID, memberName,
+		text,
+	)
+}
 
-		if err := sess.Dispatch(fullPrompt, "user"); err != nil && h.outbox != nil {
-			if _, enqueueErr := h.outbox.Enqueue(c.Request.Context(), workspaceID, convID, memberID, memberID, fullPrompt); enqueueErr != nil {
-				log.Printf("[chat-forward] Failed to enqueue to outbox for member %s: %v", memberID, enqueueErr)
-			} else {
-				log.Printf("[chat-forward] Enqueued message to outbox for member %s (dispatch failed: %v)", memberID, err)
-			}
-		}
+func (h *ConversationHandler) enqueueForwardOutbox(ctx context.Context, workspaceID, convID, memberID, fullPrompt, reason string) {
+	if h.outbox == nil {
+		return
+	}
+	if _, enqueueErr := h.outbox.Enqueue(ctx, workspaceID, convID, memberID, memberID, fullPrompt); enqueueErr != nil {
+		log.Printf("[chat-forward] Failed to enqueue to outbox for member %s: %v", memberID, enqueueErr)
+	} else {
+		log.Printf("[chat-forward] Enqueued message to outbox for member %s (%s)", memberID, reason)
 	}
 }
 

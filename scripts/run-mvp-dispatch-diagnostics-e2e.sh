@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+"$ROOT_DIR/scripts/run-playwright-local.sh" e2e/mvp-dispatch-diagnostics-flow.spec.ts
