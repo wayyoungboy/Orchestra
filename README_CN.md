@@ -73,6 +73,12 @@ make build
 make run
 ```
 
+也可以在仓库根目录启动同一个后端服务：
+
+```bash
+make backend-run
+```
+
 ### 前端设置
 
 ```bash
@@ -247,6 +253,10 @@ storage:
 ### 运行测试
 
 ```bash
+# 根目录标准快捷命令
+make verify
+make verify-focused
+
 # 当前 MVP 验证入口
 ./scripts/verify-mvp.sh
 

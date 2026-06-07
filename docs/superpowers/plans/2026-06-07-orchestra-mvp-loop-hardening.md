@@ -27,6 +27,7 @@ Completed hardening passes:
 - Added a focused MVP task browser E2E that creates an isolated workspace, secretary, assistant, and assigned task through the API, opens the Tasks page, starts and completes the task through the UI, and verifies the completed task/result through the API.
 - Added `ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh` as the one-switch local gate for all focused browser MVP flows.
 - Added `scripts/run-focused-e2e-local.sh` to start a temporary local backend, run the all-focused browser MVP gate, and clean up the backend process after verification.
+- Added root-level Makefile shortcuts (`make verify`, `make verify-focused`, backend/frontend helper targets) so local validation and common dev entry points are discoverable from the repository root.
 - Fixed the default-channel mention dispatch path so explicit `@assistant` / `@secretary` mentions target valid agent members even when the channel has no stored member list, and covered the runtime path from message send to tmux prompt delivery.
 - Fixed queued first-message dispatch during agent startup by flushing the queue on `Connecting -> Online`, and made state-machine transition callbacks safe to read current state without deadlocking.
 - Added backend tmux runtime coverage for the agent result return loop: a secretary creates a task, the assistant starts/completes it, the assistant reports through `/api/internal/chat/send`, the AI message persists in chat with the conversation preview updated, and the report is forwarded into the secretary session for summarization.

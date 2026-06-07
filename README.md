@@ -89,6 +89,12 @@ make build
 make run
 ```
 
+From the repository root, the same backend server can be started with:
+
+```bash
+make backend-run
+```
+
 ### Frontend Setup
 
 ```bash
@@ -276,6 +282,10 @@ storage:
 ### Running Tests
 
 ```bash
+# Standard root-level shortcuts
+make verify
+make verify-focused
+
 # Current MVP verification gate
 ./scripts/verify-mvp.sh
 
