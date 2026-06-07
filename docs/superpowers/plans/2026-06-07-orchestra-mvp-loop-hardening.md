@@ -31,6 +31,7 @@ Completed hardening passes:
 - Added backend and focused browser coverage for dispatch failure visibility: failed agent session acquisition or dead sessions now enqueue outbox diagnostics, and the chat page refreshes diagnostics after send so users see the `Delivery issue` warning without a page refresh.
 - Added a focused workspace onboarding browser E2E that starts from `/`, opens the first-screen workspace creation UI, binds a server path, lands in chat, and verifies the workspace persisted through the API.
 - Added a focused MVP task browser E2E that creates an isolated workspace, secretary, assistant, and assigned task through the API, opens the Tasks page, starts and completes the task through the UI, and verifies the completed task/result through the API.
+- Made task status WebSocket events JSON-safe for arbitrary task titles, including quotes, backslashes, and newlines, so the live task board update path does not break on real user-authored task names.
 - Added `ORCHESTRA_RUN_ALL_FOCUSED_E2E=1 ./scripts/verify-mvp.sh` as the one-switch local gate for all focused browser MVP flows.
 - Added `scripts/run-focused-e2e-local.sh` to start a temporary local backend, run the all-focused browser MVP gate, and clean up the backend process after verification.
 - Expanded the default MVP verification gate's Playwright typecheck from a hand-picked focused-spec list to every `frontend/e2e/*.spec.ts`, including Node globals used by API-oriented specs.

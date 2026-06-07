@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -25,9 +26,22 @@ func NewTaskHandler(taskRepo *repository.TaskRepo, memberRepo repository.MemberR
 }
 
 func (h *TaskHandler) broadcastTaskStatus(task *models.Task, newStatus models.TaskStatus) {
-	h.chatHub.BroadcastRawToWorkspace(task.WorkspaceID, []byte(
-		`{"type":"task_status","workspaceId":"`+task.WorkspaceID+`","taskId":"`+task.ID+`","status":"`+string(newStatus)+`","assigneeId":"`+task.AssigneeID+`","title":"`+task.Title+`"}`,
-	))
+	payload, err := taskStatusEventPayload(task, newStatus)
+	if err != nil {
+		return
+	}
+	h.chatHub.BroadcastRawToWorkspace(task.WorkspaceID, payload)
+}
+
+func taskStatusEventPayload(task *models.Task, newStatus models.TaskStatus) ([]byte, error) {
+	return json.Marshal(map[string]string{
+		"type":        "task_status",
+		"workspaceId": task.WorkspaceID,
+		"taskId":      task.ID,
+		"status":      string(newStatus),
+		"assigneeId":  task.AssigneeID,
+		"title":       task.Title,
+	})
 }
 
 // TaskCreateRequest is the request body for creating a task
