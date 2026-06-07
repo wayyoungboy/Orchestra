@@ -58,6 +58,11 @@ test.describe.serial('mvp notification flow', () => {
     expect(assistant.ok()).toBeTruthy()
     assistantId = ((await assistant.json()) as { id: string }).id
 
+    const conversations = await request.get(`${API_URL}/api/workspaces/${workspaceId}/conversations?userId=${ownerId}`)
+    expect(conversations.ok()).toBeTruthy()
+    const conversationsBody = (await conversations.json()) as { defaultChannelId?: string }
+    expect(conversationsBody.defaultChannelId).toBeTruthy()
+
     const dm = await request.post(`${API_URL}/api/workspaces/${workspaceId}/conversations/direct`, {
       data: {
         userId: ownerId,
