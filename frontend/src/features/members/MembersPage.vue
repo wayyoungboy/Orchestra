@@ -204,7 +204,7 @@ function sessionStateClass(member: any) {
 
 function sessionLabel(data: any) {
   const sessionId = data?.sessionId || data?.id || ''
-  return sessionId ? `会话: ${String(sessionId).slice(0, 8)}` : '会话已启动'
+  return sessionId ? `会话: ${String(sessionId).slice(0, 12)}` : '会话已启动'
 }
 
 function isNotFoundError(e: any) {

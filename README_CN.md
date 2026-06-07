@@ -257,7 +257,7 @@ storage:
 make verify
 make verify-focused
 
-# 当前 MVP 验证入口
+# 当前 MVP 验证入口（后端测试、前端构建/单测、focused spec typecheck）
 ./scripts/verify-mvp.sh
 
 # 自动启动临时后端并运行全部 focused browser MVP E2E

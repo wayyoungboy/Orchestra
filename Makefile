@@ -1,4 +1,4 @@
-.PHONY: help verify verify-focused backend-run backend-test backend-reset frontend-install frontend-dev frontend-build
+.PHONY: help verify verify-focused backend-run backend-test backend-reset frontend-install frontend-dev frontend-build frontend-test
 
 help:
 	@echo "Orchestra development commands"
@@ -10,6 +10,7 @@ help:
 	@echo "  make backend-reset  Reset backend SQLite data"
 	@echo "  make frontend-dev   Start the frontend dev server"
 	@echo "  make frontend-build Build the frontend"
+	@echo "  make frontend-test  Run frontend unit tests"
 
 verify:
 	./scripts/verify-mvp.sh
@@ -34,3 +35,6 @@ frontend-dev:
 
 frontend-build:
 	cd frontend && pnpm build
+
+frontend-test:
+	cd frontend && pnpm test

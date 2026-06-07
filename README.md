@@ -286,7 +286,7 @@ storage:
 make verify
 make verify-focused
 
-# Current MVP verification gate
+# Current MVP verification gate (backend tests, frontend build/unit tests, and focused spec typecheck)
 ./scripts/verify-mvp.sh
 
 # Start a temporary backend and run every focused browser MVP E2E locally

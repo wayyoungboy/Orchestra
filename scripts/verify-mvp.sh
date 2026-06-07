@@ -15,6 +15,12 @@ echo "==> Frontend production build"
   pnpm build
 )
 
+echo "==> Frontend unit tests"
+(
+  cd "$ROOT_DIR/frontend"
+  pnpm test
+)
+
 echo "==> Agent terminal Playwright spec typecheck"
 (
   cd "$ROOT_DIR/frontend"
