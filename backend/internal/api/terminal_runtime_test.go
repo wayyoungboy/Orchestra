@@ -76,6 +76,11 @@ func decodeJSON[T any](t *testing.T, w *httptest.ResponseRecorder) T {
 	return out
 }
 
+func terminalSnapshotWithoutHardWraps(content string) string {
+	content = strings.ReplaceAll(content, "\r", "")
+	return strings.ReplaceAll(content, "\n", "")
+}
+
 func TestTerminalRuntimeAPIWorkspaceMemberSessionLifecycle(t *testing.T) {
 	if !tmuxRuntimeAvailable() {
 		t.Skip("tmux not installed")
@@ -428,9 +433,10 @@ func TestAssistantResultCompletesTaskAndForwardsToSecretary(t *testing.T) {
 		}
 		snapshot = decodeJSON[map[string]any](t, snapshotResp)
 		terminalContent, _ := snapshot["content"].(string)
-		if strings.Contains(terminalContent, "#conversationId{"+conversationID+"}") &&
-			strings.Contains(terminalContent, "[助手汇报结果]") &&
-			strings.Contains(terminalContent, reportText) {
+		compactContent := terminalSnapshotWithoutHardWraps(terminalContent)
+		if strings.Contains(compactContent, "#conversationId{"+conversationID+"}") &&
+			strings.Contains(compactContent, "[助手汇报结果]") &&
+			strings.Contains(compactContent, terminalSnapshotWithoutHardWraps(reportText)) {
 			return
 		}
 		time.Sleep(100 * time.Millisecond)
