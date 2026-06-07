@@ -44,12 +44,14 @@ func (h *TaskHandler) broadcastLatestTaskStatus(ctx context.Context, task *model
 
 func taskStatusEventPayload(task *models.Task, newStatus models.TaskStatus) ([]byte, error) {
 	return json.Marshal(map[string]string{
-		"type":        "task_status",
-		"workspaceId": task.WorkspaceID,
-		"taskId":      task.ID,
-		"status":      string(newStatus),
-		"assigneeId":  task.AssigneeID,
-		"title":       task.Title,
+		"type":          "task_status",
+		"workspaceId":   task.WorkspaceID,
+		"taskId":        task.ID,
+		"status":        string(newStatus),
+		"assigneeId":    task.AssigneeID,
+		"title":         task.Title,
+		"resultSummary": task.ResultSummary,
+		"errorMessage":  task.ErrorMessage,
 	})
 }
 

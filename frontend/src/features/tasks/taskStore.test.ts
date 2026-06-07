@@ -40,4 +40,22 @@ describe('taskStore websocket task status handling', () => {
       title: 'Updated title'
     })
   })
+
+  it('updates task result and error details from task_status events', () => {
+    const store = useTaskStore()
+    store.addTask(makeTask({ status: 'in_progress' }))
+
+    store.handleWsTaskStatus({
+      taskId: 'task-1',
+      status: 'completed',
+      resultSummary: 'Completed from another browser',
+      errorMessage: ''
+    })
+
+    expect(store.tasks[0]).toMatchObject({
+      status: 'completed',
+      resultSummary: 'Completed from another browser',
+      errorMessage: ''
+    })
+  })
 })

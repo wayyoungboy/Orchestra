@@ -9,10 +9,12 @@ import (
 
 func TestTaskStatusEventPayloadEscapesTaskTitle(t *testing.T) {
 	task := &models.Task{
-		ID:          "task-1",
-		WorkspaceID: "workspace-1",
-		AssigneeID:  "assistant-1",
-		Title:       "quote \" and slash \\ and newline\n",
+		ID:            "task-1",
+		WorkspaceID:   "workspace-1",
+		AssigneeID:    "assistant-1",
+		Title:         "quote \" and slash \\ and newline\n",
+		ResultSummary: "finished with \"quoted\" result",
+		ErrorMessage:  "previous error with slash \\",
 	}
 
 	payload, err := taskStatusEventPayload(task, models.TaskStatusCompleted)
@@ -42,5 +44,11 @@ func TestTaskStatusEventPayloadEscapesTaskTitle(t *testing.T) {
 	}
 	if event["title"] != task.Title {
 		t.Fatalf("title = %q, want %q", event["title"], task.Title)
+	}
+	if event["resultSummary"] != task.ResultSummary {
+		t.Fatalf("resultSummary = %q, want %q", event["resultSummary"], task.ResultSummary)
+	}
+	if event["errorMessage"] != task.ErrorMessage {
+		t.Fatalf("errorMessage = %q, want %q", event["errorMessage"], task.ErrorMessage)
 	}
 }

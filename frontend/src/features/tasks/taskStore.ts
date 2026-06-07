@@ -198,7 +198,14 @@ export const useTaskStore = defineStore('task', () => {
   /**
    * Handle incoming task_status WebSocket events
    */
-  function handleWsTaskStatus(event: { taskId: string; status: Task['status']; assigneeId?: string; title?: string }) {
+  function handleWsTaskStatus(event: {
+    taskId: string
+    status: Task['status']
+    assigneeId?: string
+    title?: string
+    resultSummary?: string
+    errorMessage?: string
+  }) {
     const task = tasks.value.find(t => t.id === event.taskId)
     if (task) {
       task.status = event.status
@@ -207,6 +214,12 @@ export const useTaskStore = defineStore('task', () => {
       }
       if (event.title !== undefined) {
         task.title = event.title
+      }
+      if (event.resultSummary !== undefined) {
+        task.resultSummary = event.resultSummary
+      }
+      if (event.errorMessage !== undefined) {
+        task.errorMessage = event.errorMessage
       }
     } else {
       // Task not in local cache — refetch from server
