@@ -343,12 +343,23 @@ The focused E2E runners clear inherited HTTP/SOCKS proxy variables for local bro
 ### Make Commands
 
 ```bash
-# Backend Makefile targets
-make build      # Build binary
-make run        # Run server
-make test       # Run tests
-make reset-data # Clean database
-make clean      # Remove build artifacts
+# Root Makefile targets
+make verify           # Backend tests, frontend build/unit tests, focused spec typecheck
+make verify-focused   # Temporary backend + all focused browser MVP E2E
+make backend-run      # Start backend API server
+make backend-test     # Run backend tests
+make backend-reset    # Reset backend SQLite data
+make frontend-install # Install frontend dependencies
+make frontend-dev     # Start frontend dev server
+make frontend-build   # Build frontend
+make frontend-test    # Run frontend unit tests
+
+# Backend-only Makefile targets from ./backend
+make build            # Build binary
+make run              # Run server
+make test             # Run tests
+make reset-data       # Clean database
+make clean            # Remove build artifacts
 ```
 
 ## Roadmap

@@ -314,12 +314,23 @@ ORCHESTRA_API_URL=http://your-server:8080 pnpm test:e2e
 ### Make 命令
 
 ```bash
-# 后端 Makefile 目标
-make build      # 构建二进制
-make run        # 运行服务器
-make test       # 运行测试
-make reset-data # 清理数据库
-make clean      # 删除构建产物
+# 根目录 Makefile 目标
+make verify           # 后端测试、前端构建/单测、focused spec typecheck
+make verify-focused   # 临时后端 + 全部 focused browser MVP E2E
+make backend-run      # 启动后端 API 服务
+make backend-test     # 运行后端测试
+make backend-reset    # 清理后端 SQLite 数据
+make frontend-install # 安装前端依赖
+make frontend-dev     # 启动前端开发服务器
+make frontend-build   # 构建前端
+make frontend-test    # 运行前端单测
+
+# ./backend 下的后端 Makefile 目标
+make build            # 构建二进制
+make run              # 运行服务器
+make test             # 运行测试
+make reset-data       # 清理数据库
+make clean            # 删除构建产物
 ```
 
 ## 开发路线

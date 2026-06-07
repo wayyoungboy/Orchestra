@@ -3,7 +3,7 @@
 help:
 	@echo "Orchestra development commands"
 	@echo ""
-	@echo "  make verify         Run backend tests, frontend build, and focused spec typecheck"
+	@echo "  make verify         Run backend tests, frontend build/unit tests, and focused spec typecheck"
 	@echo "  make verify-focused Run the full local focused MVP browser gate with a temporary backend"
 	@echo "  make backend-run    Start the backend API server"
 	@echo "  make backend-test   Run backend tests"
