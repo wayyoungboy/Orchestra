@@ -22,11 +22,12 @@ type APIKeyHandler struct {
 
 // NewAPIKeyHandler creates a new API key handler
 func NewAPIKeyHandler(keyRepo repository.APIKeyRepository, cfg *config.Config) (*APIKeyHandler, error) {
-	// If encryption key is not set, generate a temporary one for dev mode
 	key := cfg.Security.EncryptionKey
 	if key == "" {
-		// Use a default dev key (NOT SECURE - only for development)
-		key = "dev-mode-encryption-key-32-bytes!!"
+		// Do not substitute a predictable development key. Keeping this handler
+		// unavailable is safer than writing credentials that any checkout can
+		// decrypt.
+		return &APIKeyHandler{keyRepo: keyRepo, config: cfg}, nil
 	}
 	encryptor, err := security.NewKeyEncryptor(key)
 	if err != nil {
@@ -37,6 +38,16 @@ func NewAPIKeyHandler(keyRepo repository.APIKeyRepository, cfg *config.Config) (
 		encryptor: encryptor,
 		config:    cfg,
 	}, nil
+}
+
+func (h *APIKeyHandler) requireEncryption(c *gin.Context) bool {
+	if h.encryptor != nil {
+		return true
+	}
+	c.JSON(http.StatusServiceUnavailable, gin.H{
+		"error": "API key storage is disabled: configure ORCHESTRA_ENCRYPTION_KEY with at least 32 bytes",
+	})
+	return false
 }
 
 // maskKey creates a partially hidden preview of an API key
@@ -55,6 +66,10 @@ func maskKey(key string) string {
 // @Success 200 {array} models.APIKeyResponse
 // @Router /api/api-keys [get]
 func (h *APIKeyHandler) List(c *gin.Context) {
+	if !h.requireEncryption(c) {
+		return
+	}
+
 	keys, err := h.keyRepo.List(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list API keys"})
@@ -67,22 +82,22 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 		decrypted, err := h.encryptor.Decrypt(key.EncryptedKey)
 		if err != nil {
 			responses[i] = models.APIKeyResponse{
-				ID:        key.ID,
-				Provider:  key.Provider,
+				ID:         key.ID,
+				Provider:   key.Provider,
 				KeyPreview: "****",
-				IsValid:   false,
-				CreatedAt: key.CreatedAt,
-				UpdatedAt: key.UpdatedAt,
+				IsValid:    false,
+				CreatedAt:  key.CreatedAt,
+				UpdatedAt:  key.UpdatedAt,
 			}
 			continue
 		}
 		responses[i] = models.APIKeyResponse{
-			ID:        key.ID,
-			Provider:  key.Provider,
+			ID:         key.ID,
+			Provider:   key.Provider,
 			KeyPreview: maskKey(decrypted),
-			IsValid:   true,
-			CreatedAt: key.CreatedAt,
-			UpdatedAt: key.UpdatedAt,
+			IsValid:    true,
+			CreatedAt:  key.CreatedAt,
+			UpdatedAt:  key.UpdatedAt,
 		}
 	}
 
@@ -100,6 +115,10 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 // @Failure 400 {object} map[string]string
 // @Router /api/api-keys [post]
 func (h *APIKeyHandler) Create(c *gin.Context) {
+	if !h.requireEncryption(c) {
+		return
+	}
+
 	var req models.APIKeyCreate
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -219,6 +238,10 @@ func (h *APIKeyHandler) Test(c *gin.Context) {
 	// If key not provided, get stored key
 	key := req.Key
 	if key == "" {
+		if !h.requireEncryption(c) {
+			return
+		}
+
 		stored, err := h.keyRepo.GetByProvider(context.Background(), req.Provider)
 		if err != nil || stored == nil {
 			c.JSON(http.StatusOK, models.APIKeyTestResult{
@@ -349,6 +372,10 @@ func (h *APIKeyHandler) testGoogleKey(key string) models.APIKeyTestResult {
 // @Failure 404 {object} map[string]string
 // @Router /api/api-keys/provider/:provider [get]
 func (h *APIKeyHandler) GetByProvider(c *gin.Context) {
+	if !h.requireEncryption(c) {
+		return
+	}
+
 	provider := models.APIKeyProvider(c.Param("provider"))
 	key, err := h.keyRepo.GetByProvider(context.Background(), provider)
 	if err != nil || key == nil {
@@ -359,22 +386,22 @@ func (h *APIKeyHandler) GetByProvider(c *gin.Context) {
 	decrypted, err := h.encryptor.Decrypt(key.EncryptedKey)
 	if err != nil {
 		c.JSON(http.StatusOK, models.APIKeyResponse{
-			ID:        key.ID,
-			Provider:  key.Provider,
+			ID:         key.ID,
+			Provider:   key.Provider,
 			KeyPreview: "****",
-			IsValid:   false,
-			CreatedAt: key.CreatedAt,
-			UpdatedAt: key.UpdatedAt,
+			IsValid:    false,
+			CreatedAt:  key.CreatedAt,
+			UpdatedAt:  key.UpdatedAt,
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, models.APIKeyResponse{
-		ID:        key.ID,
-		Provider:  key.Provider,
+		ID:         key.ID,
+		Provider:   key.Provider,
 		KeyPreview: maskKey(decrypted),
-		IsValid:   true,
-		CreatedAt: key.CreatedAt,
-		UpdatedAt: key.UpdatedAt,
+		IsValid:    true,
+		CreatedAt:  key.CreatedAt,
+		UpdatedAt:  key.UpdatedAt,
 	})
 }

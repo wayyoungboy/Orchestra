@@ -84,6 +84,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       isAuthenticated.value = true
       currentUser.value = user.username
+      currentUserId.value = user.id || user.ID || 'default'
       
       localStorage.setItem('orchestra.auth.token', token)
       localStorage.setItem('orchestra.user', user.username)

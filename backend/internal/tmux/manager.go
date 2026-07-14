@@ -42,8 +42,9 @@ func (m *Manager) CreateSession(ctx context.Context, name, cwd, command string, 
 	if cwd != "" {
 		allArgs = append(allArgs, "-c", cwd)
 	}
-	allArgs = append(allArgs, command)
-	allArgs = append(allArgs, args...)
+	// tmux runs this value through a shell. Quote every argument before joining
+	// so member-provided ACP arguments cannot become shell syntax.
+	allArgs = append(allArgs, shellJoin(command, args...))
 
 	_, err := m.exec(ctx, allArgs...)
 	return err
@@ -140,9 +141,25 @@ func (m *Manager) GetPID(ctx context.Context, name string) (int, error) {
 // SetupPipePane configures pipe-pane to append output to a log file.
 // The -o flag ensures pipe-pane only activates if not already piped.
 func (m *Manager) SetupPipePane(ctx context.Context, name, logFile string) error {
-	cmd := fmt.Sprintf("cat >> %s", logFile)
+	cmd := "cat >> " + shellQuote(logFile)
 	_, err := m.exec(ctx, "pipe-pane", "-t", name, "-o", cmd)
 	return err
+}
+
+// shellJoin builds a POSIX-shell command from literal argv values. tmux uses a
+// shell to start a pane, so passing command and args as separate tmux arguments
+// is not sufficient to preserve their literal meaning.
+func shellJoin(command string, args ...string) string {
+	quoted := make([]string, 0, len(args)+1)
+	quoted = append(quoted, shellQuote(command))
+	for _, arg := range args {
+		quoted = append(quoted, shellQuote(arg))
+	}
+	return strings.Join(quoted, " ")
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 // exec runs a tmux command with optional socket path.
@@ -168,16 +185,10 @@ func (m *Manager) exec(ctx context.Context, args ...string) (string, error) {
 
 // BuildSessionName creates a tmux session name from Orchestra IDs.
 func BuildSessionName(workspaceID, memberID string) string {
-	// Shorten IDs to avoid tmux name length limits
-	shortWS := workspaceID
-	if len(workspaceID) > 8 {
-		shortWS = workspaceID[:8]
-	}
-	shortM := memberID
-	if len(memberID) > 8 {
-		shortM = memberID[:8]
-	}
-	return fmt.Sprintf("orchestra-%s-%s", shortWS, shortM)
+	// Full IDs keep recovered tmux sessions associated with the exact workspace
+	// and member after a server restart. Typical ULIDs produce a 63-character
+	// name, comfortably below tmux's limit and without prefix collisions.
+	return fmt.Sprintf("orchestra-%s-%s", workspaceID, memberID)
 }
 
 // ParseSessionName extracts workspaceID and memberID from a tmux session name.

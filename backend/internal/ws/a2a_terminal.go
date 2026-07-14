@@ -16,9 +16,9 @@ type ACPTerminalMessage struct {
 	Content string `json:"content,omitempty"`
 
 	// For tool_result
-	ToolUseID string `json:"tool_use_id,omitempty"`
+	ToolUseID  string `json:"tool_use_id,omitempty"`
 	ToolResult string `json:"tool_result,omitempty"`
-	IsError   bool   `json:"is_error,omitempty"`
+	IsError    bool   `json:"is_error,omitempty"`
 
 	// Legacy resize support (not used, kept for UI compatibility)
 	Cols int `json:"cols,omitempty"`
@@ -91,13 +91,12 @@ func (h *A2ATerminalHandler) readLoop(conn *websocket.Conn, session *a2a.Session
 
 // writeLoop writes A2A messages (converted to ACP format) to WebSocket.
 func (h *A2ATerminalHandler) writeLoop(conn *websocket.Conn, session *a2a.Session) error {
-	streamCh := make(chan []byte, 256)
-	session.SetChatStreamSink(streamCh)
-	defer session.SetChatStreamSink(nil)
+	outputCh, streamCh, errorCh, unsubscribe := session.SubscribeTerminal()
+	defer unsubscribe()
 
 	for {
 		select {
-		case msg, ok := <-session.OutputChan:
+		case msg, ok := <-outputCh:
 			if !ok {
 				return nil
 			}
@@ -109,12 +108,18 @@ func (h *A2ATerminalHandler) writeLoop(conn *websocket.Conn, session *a2a.Sessio
 				return err
 			}
 
-		case streamJSON := <-streamCh:
+		case streamJSON, ok := <-streamCh:
+			if !ok {
+				return nil
+			}
 			if err := conn.WriteMessage(websocket.TextMessage, streamJSON); err != nil {
 				return err
 			}
 
-		case err := <-session.ErrorChan:
+		case err, ok := <-errorCh:
+			if !ok {
+				return nil
+			}
 			h.sendMessage(conn, a2a.ACPTerminalResponse{
 				Type:  "error",
 				Error: err.Error(),

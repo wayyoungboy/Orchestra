@@ -11,8 +11,8 @@ func TestLoadDefault(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	if cfg.Server.HTTPAddr != ":8080" {
-		t.Errorf("expected default HTTPAddr :8080, got %s", cfg.Server.HTTPAddr)
+	if cfg.Server.HTTPAddr != "127.0.0.1:8080" {
+		t.Errorf("expected default HTTPAddr 127.0.0.1:8080, got %s", cfg.Server.HTTPAddr)
 	}
 	if cfg.Terminal.MaxSessions != 10 {
 		t.Errorf("expected default MaxSessions 10, got %d", cfg.Terminal.MaxSessions)

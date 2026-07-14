@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/orchestra/backend/pkg/utils"
+)
 
 // TaskStatus represents the current state of a task
 type TaskStatus string
@@ -131,30 +135,5 @@ func NewTask(create TaskCreate) *Task {
 }
 
 func generateTaskID() string {
-	return "task_" + generateULID()
-}
-
-func generateULID() string {
-	// Simple ULID-like ID generation
-	now := time.Now().UnixMilli()
-	return encodeTime(now) + randomString(10)
-}
-
-func encodeTime(ms int64) string {
-	const charset = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-	var result [10]byte
-	for i := 9; i >= 0; i-- {
-		result[i] = charset[ms%32]
-		ms /= 32
-	}
-	return string(result[:])
-}
-
-func randomString(n int) string {
-	const charset = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
-	}
-	return string(b)
+	return "task_" + utils.GenerateID()
 }

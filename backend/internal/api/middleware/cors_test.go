@@ -45,6 +45,12 @@ func TestIsValidOrigin(t *testing.T) {
 			expected:       false,
 		},
 		{
+			name:           "wildcard rejects lookalike suffix",
+			origin:         "https://evil-example.com",
+			allowedOrigins: []string{"*.example.com"},
+			expected:       false,
+		},
+		{
 			name:           "empty origin",
 			origin:         "",
 			allowedOrigins: []string{"http://localhost:3000"},

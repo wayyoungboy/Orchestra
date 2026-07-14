@@ -39,8 +39,9 @@ func isValidOrigin(origin string, allowedOrigins []string) bool {
 	for _, allowed := range allowedOrigins {
 		// Support wildcard subdomain matching (e.g., "*.example.com")
 		if strings.HasPrefix(allowed, "*.") {
-			domain := allowed[2:]
-			if strings.HasSuffix(originURL.Host, domain) || originURL.Host == domain[1:] {
+			domain := strings.ToLower(allowed[2:])
+			host := strings.ToLower(originURL.Hostname())
+			if host == domain || strings.HasSuffix(host, "."+domain) {
 				return true
 			}
 			continue

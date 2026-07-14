@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,21 +15,70 @@ import (
 type TaskHandler struct {
 	taskRepo   *repository.TaskRepo
 	memberRepo repository.MemberRepository
+	wsRepo     repository.WorkspaceRepository
+	convRepo   *repository.ConversationRepository
 	chatHub    *ws.ChatHub
 }
 
-func NewTaskHandler(taskRepo *repository.TaskRepo, memberRepo repository.MemberRepository, chatHub *ws.ChatHub) *TaskHandler {
+func NewTaskHandler(taskRepo *repository.TaskRepo, memberRepo repository.MemberRepository, wsRepo repository.WorkspaceRepository, convRepo *repository.ConversationRepository, chatHub *ws.ChatHub) *TaskHandler {
 	return &TaskHandler{
 		taskRepo:   taskRepo,
 		memberRepo: memberRepo,
+		wsRepo:     wsRepo,
+		convRepo:   convRepo,
 		chatHub:    chatHub,
 	}
 }
 
 func (h *TaskHandler) broadcastTaskStatus(task *models.Task, newStatus models.TaskStatus) {
-	h.chatHub.BroadcastRawToWorkspace(task.WorkspaceID, []byte(
-		`{"type":"task_status","workspaceId":"` + task.WorkspaceID + `","taskId":"` + task.ID + `","status":"` + string(newStatus) + `","assigneeId":"` + task.AssigneeID + `","title":"` + task.Title + `"}`,
-	))
+	if h.chatHub == nil {
+		return
+	}
+	payload, err := json.Marshal(map[string]string{
+		"type":        "task_status",
+		"workspaceId": task.WorkspaceID,
+		"taskId":      task.ID,
+		"status":      string(newStatus),
+		"assigneeId":  task.AssigneeID,
+		"title":       task.Title,
+	})
+	if err == nil {
+		h.chatHub.BroadcastRawToWorkspace(task.WorkspaceID, payload)
+	}
+}
+
+func (h *TaskHandler) requireWorkspace(c *gin.Context, workspaceID string) bool {
+	if workspaceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace id required"})
+		return false
+	}
+	if _, err := h.wsRepo.GetByID(c.Request.Context(), workspaceID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
+		return false
+	}
+	return true
+}
+
+func (h *TaskHandler) memberInWorkspace(c *gin.Context, workspaceID, memberID string, role models.MemberRole) bool {
+	member, err := h.memberRepo.GetByID(c.Request.Context(), memberID)
+	if err != nil || member == nil || member.WorkspaceID != workspaceID || (role != "" && member.RoleType != role) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "member does not have the required workspace role"})
+		return false
+	}
+	return true
+}
+
+func (h *TaskHandler) taskForWorkspace(c *gin.Context, taskID string) (*models.Task, bool) {
+	workspaceID := c.Param("id")
+	if !h.requireWorkspace(c, workspaceID) {
+		return nil, false
+	}
+	task, err := h.taskRepo.GetByID(c.Request.Context(), taskID)
+	if err != nil || task == nil || task.WorkspaceID != workspaceID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+		return nil, false
+	}
+	return task, true
 }
 
 // TaskCreateRequest is the request body for creating a task
@@ -49,6 +100,29 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	req.WorkspaceID = strings.TrimSpace(req.WorkspaceID)
+	req.ConversationID = strings.TrimSpace(req.ConversationID)
+	req.SecretaryID = strings.TrimSpace(req.SecretaryID)
+	req.AssigneeID = strings.TrimSpace(req.AssigneeID)
+	req.Title = strings.TrimSpace(req.Title)
+	if req.Title == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "title is required"})
+		return
+	}
+	if !h.requireWorkspace(c, req.WorkspaceID) {
+		return
+	}
+	conv, err := h.convRepo.GetByID(req.ConversationID)
+	if err != nil || conv == nil || conv.WorkspaceID != req.WorkspaceID {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation does not belong to workspace"})
+		return
+	}
+	if !h.memberInWorkspace(c, req.WorkspaceID, req.SecretaryID, models.RoleSecretary) {
+		return
+	}
+	if req.AssigneeID != "" && !h.memberInWorkspace(c, req.WorkspaceID, req.AssigneeID, models.RoleAssistant) {
+		return
+	}
 
 	task := models.NewTask(models.TaskCreate{
 		WorkspaceID:    req.WorkspaceID,
@@ -65,6 +139,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.broadcastTaskStatus(task, task.Status)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"ok":     true,
@@ -106,11 +181,11 @@ func (h *TaskHandler) StartTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusInProgress)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":            true,
-		"taskId":        req.TaskID,
-		"status":        models.TaskStatusInProgress,
+		"ok":             true,
+		"taskId":         req.TaskID,
+		"status":         models.TaskStatusInProgress,
 		"conversationId": task.ConversationID,
-		"secretaryId":   task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
@@ -149,11 +224,11 @@ func (h *TaskHandler) CompleteTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusCompleted)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":           true,
-		"taskId":       req.TaskID,
-		"status":       models.TaskStatusCompleted,
+		"ok":             true,
+		"taskId":         req.TaskID,
+		"status":         models.TaskStatusCompleted,
 		"conversationId": task.ConversationID,
-		"secretaryId":  task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
@@ -191,11 +266,11 @@ func (h *TaskHandler) FailTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusFailed)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":            true,
-		"taskId":        req.TaskID,
-		"status":        models.TaskStatusFailed,
+		"ok":             true,
+		"taskId":         req.TaskID,
+		"status":         models.TaskStatusFailed,
 		"conversationId": task.ConversationID,
-		"secretaryId":   task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
@@ -227,8 +302,13 @@ func (h *TaskHandler) AssignTask(c *gin.Context) {
 	updates := map[string]interface{}{
 		"updated_at": time.Now().UnixMilli(),
 	}
+	req.AssigneeID = strings.TrimSpace(req.AssigneeID)
 	if req.AssigneeID != "" {
+		if !h.memberInWorkspace(c, task.WorkspaceID, req.AssigneeID, models.RoleAssistant) {
+			return
+		}
 		updates["assignee_id"] = req.AssigneeID
+		updates["assigned_at"] = time.Now().UnixMilli()
 	}
 
 	if err := h.taskRepo.UpdateStatus(c.Request.Context(), req.TaskID, models.TaskStatusAssigned, updates); err != nil {
@@ -239,11 +319,11 @@ func (h *TaskHandler) AssignTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusAssigned)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":           true,
-		"taskId":       req.TaskID,
-		"status":       models.TaskStatusAssigned,
+		"ok":             true,
+		"taskId":         req.TaskID,
+		"status":         models.TaskStatusAssigned,
 		"conversationId": task.ConversationID,
-		"secretaryId":  task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
@@ -268,10 +348,19 @@ func (h *TaskHandler) CancelTask(c *gin.Context) {
 		taskID = req.TaskID
 	}
 
-	task, err := h.taskRepo.GetByID(c.Request.Context(), taskID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
-		return
+	var task *models.Task
+	var err error
+	if c.Param("id") != "" {
+		task, _ = h.taskForWorkspace(c, taskID)
+		if task == nil {
+			return
+		}
+	} else {
+		task, err = h.taskRepo.GetByID(c.Request.Context(), taskID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+			return
+		}
 	}
 
 	if !models.IsValidTaskTransition(task.Status, models.TaskStatusCancelled) {
@@ -293,19 +382,18 @@ func (h *TaskHandler) CancelTask(c *gin.Context) {
 	h.broadcastTaskStatus(task, models.TaskStatusCancelled)
 
 	c.JSON(http.StatusOK, gin.H{
-		"ok":           true,
-		"taskId":       taskID,
-		"status":       models.TaskStatusCancelled,
+		"ok":             true,
+		"taskId":         taskID,
+		"status":         models.TaskStatusCancelled,
 		"conversationId": task.ConversationID,
-		"secretaryId":  task.SecretaryID,
+		"secretaryId":    task.SecretaryID,
 	})
 }
 
 // ListTasks returns tasks for a workspace
 func (h *TaskHandler) ListTasks(c *gin.Context) {
 	workspaceID := c.Param("id")
-	if workspaceID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace id required"})
+	if !h.requireWorkspace(c, workspaceID) {
 		return
 	}
 
@@ -335,9 +423,8 @@ func (h *TaskHandler) GetTask(c *gin.Context) {
 		return
 	}
 
-	task, err := h.taskRepo.GetByID(c.Request.Context(), taskID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
+	task, ok := h.taskForWorkspace(c, taskID)
+	if !ok {
 		return
 	}
 
@@ -349,9 +436,16 @@ func (h *TaskHandler) GetTask(c *gin.Context) {
 
 // GetMyTasks returns tasks assigned to a specific member
 func (h *TaskHandler) GetMyTasks(c *gin.Context) {
+	workspaceID := c.Param("id")
+	if !h.requireWorkspace(c, workspaceID) {
+		return
+	}
 	memberID := c.Query("memberId")
 	if memberID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "memberId required"})
+		return
+	}
+	if !h.memberInWorkspace(c, workspaceID, memberID, "") {
 		return
 	}
 
@@ -361,9 +455,16 @@ func (h *TaskHandler) GetMyTasks(c *gin.Context) {
 		return
 	}
 
+	workspaceTasks := make([]*models.Task, 0, len(tasks))
+	for _, task := range tasks {
+		if task.WorkspaceID == workspaceID {
+			workspaceTasks = append(workspaceTasks, task)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"ok":    true,
-		"tasks": tasks,
+		"tasks": workspaceTasks,
 	})
 }
 
@@ -372,6 +473,9 @@ func (h *TaskHandler) ListWorkloads(c *gin.Context) {
 	workspaceID := c.Query("workspaceId")
 	if workspaceID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "workspaceId required"})
+		return
+	}
+	if !h.requireWorkspace(c, workspaceID) {
 		return
 	}
 

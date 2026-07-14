@@ -73,7 +73,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       const response = await client.get(`/workspaces/${currentWorkspace.value.id}/search`, {
         params: { q: query, limit: 50 }
       })
-      searchResults.value = response.data || []
+      const data = response.data
+      searchResults.value = Array.isArray(data) ? data : (data?.results || [])
       return searchResults.value
     } catch (e) {
       notifyUserError('Search failed', e)

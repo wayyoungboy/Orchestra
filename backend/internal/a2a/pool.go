@@ -2,11 +2,13 @@ package a2a
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"sync"
 	"time"
 
 	"github.com/orchestra/backend/internal/models"
+	"github.com/orchestra/backend/internal/security"
 	"github.com/orchestra/backend/internal/tmux"
 	"github.com/orchestra/backend/pkg/utils"
 )
@@ -20,6 +22,8 @@ type Pool struct {
 	outputHook    func(*Session, *ACPMessage)
 	idleTimeout   time.Duration
 	workspacePath string
+	whitelist     *security.Whitelist
+	maxSessions   int
 }
 
 // SessionConfig contains parameters for creating a session.
@@ -50,6 +54,22 @@ func (p *Pool) SetManager(m *tmux.Manager) {
 	p.manager = m
 }
 
+// SetExecutionPolicy applies the configured command and workspace boundaries
+// to every subsequently created agent session.
+func (p *Pool) SetExecutionPolicy(whitelist *security.Whitelist) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.whitelist = whitelist
+}
+
+// SetMaxSessions limits concurrently active agent sessions. A non-positive
+// value keeps the pool unbounded for backwards-compatible tests only.
+func (p *Pool) SetMaxSessions(maxSessions int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.maxSessions = maxSessions
+}
+
 // Acquire creates or retrieves a session for a member.
 func (p *Pool) Acquire(ctx context.Context, config SessionConfig) (*Session, error) {
 	p.mu.Lock()
@@ -74,6 +94,9 @@ func (p *Pool) Acquire(ctx context.Context, config SessionConfig) (*Session, err
 	if config.Member == nil || !config.Member.ACPEnabled || config.Member.ACPCommand == "" {
 		return nil, nil
 	}
+	if p.maxSessions > 0 && len(p.sessions) >= p.maxSessions {
+		return nil, fmt.Errorf("maximum number of agent sessions reached (%d)", p.maxSessions)
+	}
 
 	return p.createTmuxSession(ctx, config)
 }
@@ -88,6 +111,9 @@ func (p *Pool) createTmuxSession(ctx context.Context, config SessionConfig) (*Se
 
 	// Build command with agent-specific flags (stream-json, etc.)
 	command, args = buildAgentCommand(command, args)
+	if err := p.validateExecutionConfig(command, config.WorkspaceDir); err != nil {
+		return nil, err
+	}
 
 	sessionID := config.ID
 	if sessionID == "" {
@@ -120,8 +146,10 @@ func (p *Pool) createTmuxSession(ctx context.Context, config SessionConfig) (*Se
 		log.Printf("[a2a-pool] Failed to setup pipe-pane: %v", err)
 	}
 
-	// Start output reader (from current end, skip existing content)
-	if err := tmuxSess.StartOutputReader(ctx, false); err != nil {
+	// The HTTP request context ends as soon as session creation returns. Output
+	// capture must instead live for the tmux session lifetime and is cancelled by
+	// TmuxSession.Stop/Kill.
+	if err := tmuxSess.StartOutputReader(context.Background(), false); err != nil {
 		log.Printf("[a2a-pool] Failed to start output reader: %v", err)
 	}
 
@@ -139,6 +167,10 @@ func (p *Pool) createTmuxSession(ctx context.Context, config SessionConfig) (*Se
 	// Create the Orchestra Session wrapper
 	sess := NewSession(sessionID, config.WorkspaceID, config.MemberID, config.MemberName, config.TerminalType, tmuxSess)
 
+	// Tmux owns the real log reader. Forward its messages to the Session-owned
+	// channel, which the pool consumes exactly once and then fans out.
+	go p.forwardTmuxOutput(sess, tmuxSess)
+
 	// Start output processing goroutine
 	go p.processOutput(sess)
 
@@ -147,6 +179,22 @@ func (p *Pool) createTmuxSession(ctx context.Context, config SessionConfig) (*Se
 
 	log.Printf("[a2a-pool] Created tmux session %s for member %s (tmux: %s)", sessionID, config.MemberName, tmuxName)
 	return sess, nil
+}
+
+func (p *Pool) validateExecutionConfig(command, workspaceDir string) error {
+	if p.whitelist == nil {
+		return nil
+	}
+	if err := p.whitelist.ValidateCommand(command); err != nil {
+		return fmt.Errorf("agent command %q: %w", command, err)
+	}
+	if workspaceDir == "" {
+		return fmt.Errorf("agent workspace directory is required")
+	}
+	if err := p.whitelist.ValidatePath(workspaceDir); err != nil {
+		return fmt.Errorf("agent workspace %q: %w", workspaceDir, err)
+	}
+	return nil
 }
 
 // RecoverSessions scans tmux for existing Orchestra sessions and reconstructs state.
@@ -189,12 +237,14 @@ func (p *Pool) RecoverSessions(ctx context.Context) error {
 		}
 
 		// Start output reader from beginning of log
-		if err := tmuxSess.StartOutputReader(ctx, true); err != nil {
+		// Recovery also outlives the bounded startup scan context.
+		if err := tmuxSess.StartOutputReader(context.Background(), true); err != nil {
 			log.Printf("[a2a-pool] Failed to start output reader for recovered %s: %v", tmuxName, err)
 		}
 
 		// Create wrapper session
 		sess := NewSession(sessionID, wsID, memberID, "recovered", "", tmuxSess)
+		go p.forwardTmuxOutput(sess, tmuxSess)
 		go p.processOutput(sess)
 		p.sessions[sessionID] = sess
 
@@ -202,6 +252,41 @@ func (p *Pool) RecoverSessions(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (p *Pool) forwardTmuxOutput(sess *Session, tmuxSess *tmux.TmuxSession) {
+	for {
+		select {
+		case msg := <-tmuxSess.OutputChan:
+			if msg == nil {
+				continue
+			}
+			forwarded := &ACPMessage{
+				Type:    MessageType(msg.Type),
+				Content: msg.Content,
+			}
+			select {
+			case sess.OutputChan <- forwarded:
+			case <-sess.DoneChan:
+				return
+			}
+
+		case err := <-tmuxSess.ErrorChan:
+			if err == nil {
+				continue
+			}
+			select {
+			case sess.ErrorChan <- err:
+			case <-sess.DoneChan:
+				return
+			}
+
+		case <-tmuxSess.DoneChan:
+			return
+		case <-sess.DoneChan:
+			return
+		}
+	}
 }
 
 // Get retrieves a session by ID.
@@ -297,6 +382,7 @@ func (p *Pool) processOutput(sess *Session) {
 			if !ok {
 				return
 			}
+			sess.PublishOutput(msg)
 			// Check if session was released from pool
 			p.mu.RLock()
 			_, exists := p.sessions[sess.ID]
@@ -345,6 +431,7 @@ func (p *Pool) processOutput(sess *Session) {
 
 		case err := <-sess.ErrorChan:
 			log.Printf("[a2a-pool] Error from session %s: %v", sess.MemberName, err)
+			sess.PublishError(err)
 		}
 	}
 }

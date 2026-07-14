@@ -4,6 +4,7 @@ import client from '@/shared/api/client'
 import { notifyUserError } from '@/shared/notifyError'
 import { useAuthStore } from '@/features/auth/authStore'
 import { useProjectStore } from '@/features/workspace/projectStore'
+import { useTaskStore, type Task } from '@/features/tasks/taskStore'
 import type { Conversation } from '@/shared/types/chat'
 
 export interface AgentStatus {
@@ -13,7 +14,7 @@ export interface AgentStatus {
 }
 
 export interface ChatWsEvent {
-  type: 'new_message' | 'message_status' | 'unread_sync'
+  type: 'new_message' | 'message_status' | 'task_status' | 'unread_sync'
   workspaceId: string
   conversationId?: string
   messageId?: string
@@ -24,6 +25,9 @@ export interface ChatWsEvent {
   isAi?: boolean
   status?: string
   unreadCount?: number
+  taskId?: string
+  assigneeId?: string
+  title?: string
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -42,13 +46,22 @@ export const useChatStore = defineStore('chat', () => {
   const MESSAGE_INITIAL_SIZE = 30
 
   const authStore = useAuthStore()
+  const projectStore = useProjectStore()
 
   let chatWs: WebSocket | null = null
+  let chatWsWorkspaceId: string | null = null
   let chatWsReconnectTimer: ReturnType<typeof setTimeout> | null = null
   let chatWsReconnectAttempts = 0
   const CHAT_WS_MAX_RECONNECT_ATTEMPTS = 10
 
-  const currentUserId = computed(() => authStore.currentUserId || 'default')
+  // Chat messages belong to a workspace member. Authentication users are
+  // intentionally separate from member personas, so use the workspace owner
+  // for human actions instead of leaking an unrelated auth-user ID into chat.
+  const currentUserId = computed(() =>
+    projectStore.members.find(member => member.roleType === 'owner')?.id ||
+    authStore.currentUserId ||
+    'default'
+  )
 
   const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeConversationId.value) || null
@@ -67,11 +80,21 @@ export const useChatStore = defineStore('chat', () => {
    * Load conversations via HTTP (history) then connect WebSocket for real-time updates
    */
   async function loadConversations(wsId: string) {
+    if (workspaceId.value !== wsId) {
+      conversations.value = []
+      activeConversationId.value = null
+      oldestMessageId.value = null
+      hasMoreMessages.value = true
+      agentStatuses.value = {}
+    }
     workspaceId.value = wsId
     loading.value = true
     try {
       // 1. Fetch conversation list + messages via HTTP (load history)
-      await loadConversationsList(wsId)
+      await Promise.all([
+        loadConversationsList(wsId),
+        projectStore.loadMembers(wsId)
+      ])
       if (activeConversationId.value) {
         await loadMessages(wsId, activeConversationId.value)
       }
@@ -104,7 +127,7 @@ export const useChatStore = defineStore('chat', () => {
    */
   function connectChatWebSocket(wsId: string) {
     // Skip if already connected to the same workspace
-    if (chatWs?.readyState === WebSocket.OPEN) {
+    if (chatWs?.readyState === WebSocket.OPEN && chatWsWorkspaceId === wsId) {
       console.log('[ChatWS] already connected, skipping')
       return
     }
@@ -118,6 +141,7 @@ export const useChatStore = defineStore('chat', () => {
       chatWs.onopen = null
       chatWs.close()
       chatWs = null
+      chatWsWorkspaceId = null
     }
     if (chatWsReconnectTimer) {
       clearTimeout(chatWsReconnectTimer)
@@ -132,6 +156,7 @@ export const useChatStore = defineStore('chat', () => {
 
     connectionStatus.value = 'reconnecting'
     chatWs = new WebSocket(wsUrl)
+    chatWsWorkspaceId = wsId
 
     chatWs.onopen = () => {
       connectionStatus.value = 'connected'
@@ -214,6 +239,17 @@ export const useChatStore = defineStore('chat', () => {
         }
         break
       }
+      case 'task_status': {
+        if (event.taskId && event.status) {
+          useTaskStore().handleWsTaskStatus({
+            taskId: event.taskId,
+            status: event.status as Task['status'],
+            assigneeId: event.assigneeId,
+            title: event.title
+          })
+        }
+        break
+      }
       case 'unread_sync': {
         if (event.conversationId) {
           const conv = conversations.value.find(c => c.id === event.conversationId)
@@ -226,9 +262,14 @@ export const useChatStore = defineStore('chat', () => {
 
   function disconnectChatWebSocket() {
     if (chatWs) {
+      chatWs.onclose = null
+      chatWs.onerror = null
+      chatWs.onmessage = null
+      chatWs.onopen = null
       chatWs.close()
       chatWs = null
     }
+    chatWsWorkspaceId = null
     if (chatWsReconnectTimer) {
       clearTimeout(chatWsReconnectTimer)
       chatWsReconnectTimer = null
@@ -304,8 +345,7 @@ export const useChatStore = defineStore('chat', () => {
       const senderName = authStore.currentUser || 'User'
 
       if (senderId === 'default') {
-        const projectStore = useProjectStore()
-        const owner = projectStore.members.find((m: any) => m.roleType === 'owner')
+        const owner = projectStore.members.find((member) => member.roleType === 'owner')
         if (owner) {
           senderId = owner.id
         }
@@ -333,7 +373,8 @@ export const useChatStore = defineStore('chat', () => {
       const response = await client.post(`/workspaces/${workspaceId.value}/conversations`, {
         type: data.type,
         name: data.name || '',
-        memberIDs
+        memberIDs,
+        targetId: data.memberId || ''
       })
 
       const newConv = response.data

@@ -43,6 +43,7 @@
             </div>
 
             <div :class="['message-bubble', isMe(item.message) ? 'my-bubble' : 'other-bubble']">
+              <!-- eslint-disable-next-line vue/no-v-html -- renderMarkdownSafe uses a strict allowlist. -->
               <div
                 class="message-text"
                 v-html="renderMessageHtml(item.message)"
@@ -122,7 +123,7 @@ const groupedMessages = computed(() => {
   return props.messages.map(m => ({ type: 'message', message: m }))
 })
 
-function scrollToBottom(behavior: ScrollBehavior = 'auto') {
+function scrollToBottom(behavior: 'auto' | 'smooth' | 'instant' = 'auto') {
   nextTick(() => {
     if (listRef.value) {
       listRef.value.scrollTo({ top: listRef.value.scrollHeight, behavior })

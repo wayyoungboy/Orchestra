@@ -94,6 +94,7 @@ import { ref, onMounted } from 'vue'
 import client from '@/shared/api/client'
 import { useWorkspaceStore } from '@/features/workspace/workspaceStore'
 import { notifyUserError } from '@/shared/notifyError'
+import type { MemberRole } from '@/shared/types/member'
 import AddMemberModal from './AddMemberModal.vue'
 import EditMemberModal from './EditMemberModal.vue'
 import ConfirmModal from '@/shared/components/ConfirmModal.vue'
@@ -129,7 +130,15 @@ async function loadMembers() {
   }
 }
 
-async function handleInviteMember(data: any) {
+interface InviteMemberData {
+  name: string
+  roleType: MemberRole
+  command: string
+  terminalType: string
+  args: string[]
+}
+
+async function handleInviteMember(data: InviteMemberData) {
   const wsId = workspaceStore.currentWorkspace?.id
   if (!wsId) return
 
@@ -137,6 +146,11 @@ async function handleInviteMember(data: any) {
     await client.post(`/workspaces/${wsId}/members`, {
       name: data.name,
       roleType: data.roleType,
+      terminalType: data.terminalType,
+      terminalCommand: data.command,
+      acpEnabled: true,
+      acpCommand: data.command,
+      acpArgs: data.args,
     })
     showAddModal.value = false
     await loadMembers()

@@ -3,9 +3,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -41,9 +44,12 @@ import (
 // @description Type "Bearer" followed by a space and JWT token.
 func main() {
 	// Load configuration
-	cfg, err := config.Load("configs/config.yaml")
+	cfg, err := config.Load(serverConfigPath())
 	if err != nil {
 		log.Fatalf("load config: %v", err)
+	}
+	if err := validateStartupConfig(cfg); err != nil {
+		log.Fatalf("invalid security configuration: %v", err)
 	}
 
 	// Initialize database
@@ -58,23 +64,19 @@ func main() {
 		log.Fatalf("migrate database: %v", err)
 	}
 
-	// Initialize security whitelist
-	security.NewWhitelist(
+	// This policy is passed to the session pool and enforced immediately before
+	// tmux starts an agent process.
+	whitelist := security.NewWhitelist(
 		cfg.Security.AllowedCommands,
 		cfg.Security.AllowedPaths,
 	)
 
-	var encryptor *security.KeyEncryptor
-	if cfg.Security.EncryptionKey != "" {
-		encryptor, err = security.NewKeyEncryptor(cfg.Security.EncryptionKey)
-		if err != nil {
-			log.Fatalf("init encryptor: %v", err)
+	// A deployment with authentication must explicitly provide the first admin;
+	// do not create a known default password.
+	if cfg.Auth.Enabled {
+		if err := ensureBootstrapAdmin(db); err != nil {
+			log.Fatalf("bootstrap administrator: %v", err)
 		}
-	}
-
-	// Create default user if auth is enabled and no users exist
-	if cfg.Auth.Enabled && cfg.Auth.JWTSecret != "" {
-		ensureDefaultUserAndWorkspace(db)
 	}
 
 	// Initialize A2A pool for agent communication (tmux-backed)
@@ -83,6 +85,8 @@ func main() {
 		cfg.Terminal.IdleTimeout,
 		workspacePath,
 	)
+	a2aPool.SetExecutionPolicy(whitelist)
+	a2aPool.SetMaxSessions(cfg.Terminal.MaxSessions)
 
 	// Recover existing tmux sessions on startup
 	recoverCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -125,79 +129,84 @@ func main() {
 		}
 	}
 
-	_ = encryptor // TODO: use encryptor for API key encryption
 }
 
-// ensureDefaultUserAndWorkspace creates a default admin user, workspace, and member if none exist
-func ensureDefaultUserAndWorkspace(db *storage.Database) {
+func serverConfigPath() string {
+	if path := strings.TrimSpace(os.Getenv("ORCHESTRA_CONFIG")); path != "" {
+		return path
+	}
+	return "configs/config.yaml"
+}
+
+func validateStartupConfig(cfg *config.Config) error {
+	if cfg.Auth.Enabled && cfg.Auth.JWTSecret == "" {
+		return fmt.Errorf("authentication is enabled but no JWT secret is configured")
+	}
+	if cfg.Auth.AllowRegistration {
+		return fmt.Errorf("self-registration is unavailable until workspace-level user authorization exists")
+	}
+	if !cfg.Auth.Enabled && !isLoopbackAddress(cfg.Server.HTTPAddr) {
+		return fmt.Errorf("authentication must be enabled when listening on a non-loopback address")
+	}
+	return nil
+}
+
+func isLoopbackAddress(address string) bool {
+	host, _, err := net.SplitHostPort(address)
+	if err != nil {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// ensureBootstrapAdmin creates the first administrator from explicit
+// deployment secrets. It deliberately never creates a predictable account.
+func ensureBootstrapAdmin(db *storage.Database) error {
 	userRepo := repository.NewUserRepository(db.DB())
-	wsRepo := repository.NewWorkspaceRepository(db.DB())
-	memberRepo := repository.NewMemberRepository(db.DB())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	users, err := userRepo.List(ctx)
 	if err != nil {
-		log.Printf("Failed to list users: %v", err)
-		return
+		return fmt.Errorf("list users: %w", err)
 	}
 
-	if len(users) > 0 {
-		return // Already has users, nothing to do
+	if len(users) == 1 {
+		return nil
+	}
+	if len(users) > 1 {
+		return fmt.Errorf("authenticated mode currently supports one administrator; migrate users only after workspace-level authorization is available")
 	}
 
-	// Create default user
-	hash, err := security.HashPassword("orchestra")
+	username := strings.TrimSpace(os.Getenv("ORCHESTRA_ADMIN_USERNAME"))
+	password := os.Getenv("ORCHESTRA_ADMIN_PASSWORD")
+	if len(username) < 3 || len(username) > 50 {
+		return fmt.Errorf("ORCHESTRA_ADMIN_USERNAME must be 3-50 characters for the first authenticated startup")
+	}
+	if len(password) < 12 {
+		return fmt.Errorf("ORCHESTRA_ADMIN_PASSWORD must be at least 12 characters for the first authenticated startup")
+	}
+
+	hash, err := security.HashPassword(password)
 	if err != nil {
-		log.Printf("Failed to hash default password: %v", err)
-		return
+		return fmt.Errorf("hash administrator password: %w", err)
 	}
 
 	user := &models.User{
 		ID:           utils.GenerateID(),
-		Username:     "orchestra",
+		Username:     username,
 		PasswordHash: hash,
 		CreatedAt:    time.Now(),
 	}
 
 	if err := userRepo.Create(ctx, user); err != nil {
-		log.Printf("Failed to create default user: %v", err)
-		return
+		return fmt.Errorf("create administrator: %w", err)
 	}
-	log.Println("Created default user: orchestra (password: orchestra)")
-
-	// Create default workspace
-	ws := &models.Workspace{
-		ID:           utils.GenerateID(),
-		Name:         "My First Workspace",
-		Path:         ".",
-		LastOpenedAt: time.Now(),
-		CreatedAt:    time.Now(),
-	}
-
-	if err := wsRepo.Create(ctx, ws); err != nil {
-		log.Printf("Failed to create default workspace: %v", err)
-		return
-	}
-	log.Printf("Created default workspace: %s (path: .)", ws.Name)
-
-	// Create owner member for the default workspace
-	member := &models.Member{
-		ID:                utils.GenerateID(),
-		WorkspaceID:       ws.ID,
-		Name:              "orchestra",
-		RoleType:          models.RoleOwner,
-		TerminalType:      "native",
-		TerminalCommand:   "/bin/bash",
-		AutoStartTerminal: true,
-		Status:            "online",
-		CreatedAt:         time.Now(),
-	}
-
-	if err := memberRepo.Create(ctx, member); err != nil {
-		log.Printf("Failed to create default member: %v", err)
-		return
-	}
-	log.Printf("Created default member: %s (owner) in workspace %s", member.Name, ws.Name)
+	log.Printf("Created bootstrap administrator %q", user.Username)
+	return nil
 }

@@ -105,11 +105,18 @@
       v-if="showInviteMenu"
       @select="handleInviteMember"
     />
+
+    <AddMemberModal
+      v-if="showAgentInviteModal"
+      :mode="inviteMode"
+      @close="showAgentInviteModal = false"
+      @invite="handleAgentInvite"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick, computed } from 'vue'
+import { ref, nextTick, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useChatStore } from './chatStore'
@@ -122,6 +129,8 @@ import ChatInput from './components/ChatInput.vue'
 import MembersSidebar from './components/MembersSidebar.vue'
 import InviteMenu from './components/InviteMenu.vue'
 import CreateConversationModal from './components/CreateConversationModal.vue'
+import AddMemberModal from '@/features/members/AddMemberModal.vue'
+import type { MemberRole } from '@/shared/types/member'
 
 const { t } = useI18n()
 const chatStore = useChatStore()
@@ -136,6 +145,8 @@ const showMembersSidebar = ref(true)
 const showSearchPanel = ref(false)
 const showCreateConvModal = ref(false)
 const showInviteMenu = ref(false)
+const showAgentInviteModal = ref(false)
+const inviteMode = ref<'assistant' | 'secretary'>('assistant')
 const searchQuery = ref('')
 const messagesListRef = ref<any>(null)
 
@@ -215,10 +226,31 @@ function handleSearch() {
 
 async function handleInviteMember(type: 'secretary' | 'assistant') {
   showInviteMenu.value = false
-  if (!currentWorkspace.value) return
-  const name = type === 'secretary' ? 'Secretary' : 'Assistant'
-  const created = await projectStore.addMember({ name, roleType: type })
+  inviteMode.value = type
+  showAgentInviteModal.value = true
+}
+
+interface AgentInviteData {
+  name: string
+  roleType: MemberRole
+  command: string
+  terminalType: string
+  args: string[]
+}
+
+async function handleAgentInvite(data: AgentInviteData) {
+  const created = await projectStore.addMember({
+    name: data.name,
+    roleType: data.roleType,
+    terminalType: data.terminalType,
+    terminalCommand: data.command,
+    acpEnabled: true,
+    acpCommand: data.command,
+    acpArgs: data.args,
+  })
   if (created) {
+    showAgentInviteModal.value = false
+    if (!currentWorkspace.value) return
     await projectStore.loadMembers(currentWorkspace.value.id, { silent: true })
   }
 }
@@ -231,17 +263,6 @@ async function jumpToResult(res: any) {
   }
 }
 
-onMounted(async () => {
-  if (currentWorkspace.value) {
-    await chatStore.loadConversations(currentWorkspace.value.id)
-    await projectStore.loadMembers(currentWorkspace.value.id)
-  }
-})
-
-onBeforeUnmount(() => {
-  // Don't disconnect here — the store handles reconnection.
-  // Disconnect only when navigating away from workspace entirely.
-})
 </script>
 
 <style scoped>

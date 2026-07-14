@@ -67,6 +67,12 @@ func TestGateway_checkOrigin(t *testing.T) {
 			expected:       false,
 		},
 		{
+			name:           "wildcard rejects lookalike suffix",
+			allowedOrigins: []string{"*.example.com"},
+			origin:         "https://evil-example.com",
+			expected:       false,
+		},
+		{
 			name:           "empty origin",
 			allowedOrigins: []string{"http://localhost:3000"},
 			origin:         "",
