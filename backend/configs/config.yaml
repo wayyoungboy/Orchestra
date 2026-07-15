@@ -1,5 +1,7 @@
 server:
-  http_addr: ":8080"
+  # Bind to loopback by default. Remote deployments must set a public address
+  # deliberately and configure authentication plus an encryption key.
+  http_addr: "127.0.0.1:8080"
 
 terminal:
   max_sessions: 32

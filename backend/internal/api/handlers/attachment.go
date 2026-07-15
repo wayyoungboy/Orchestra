@@ -20,12 +20,13 @@ type AttachmentHandler struct {
 	msgRepo     *repository.MessageRepository
 	convRepo    *repository.ConversationRepository
 	attachRepo  *repository.AttachmentRepository
+	memberRepo  repository.MemberRepository
 	uploadDir   string
 	maxFileSize int64
 }
 
 // NewAttachmentHandler creates a new attachment handler
-func NewAttachmentHandler(msgRepo *repository.MessageRepository, convRepo *repository.ConversationRepository, attachRepo *repository.AttachmentRepository, uploadDir string) *AttachmentHandler {
+func NewAttachmentHandler(msgRepo *repository.MessageRepository, convRepo *repository.ConversationRepository, attachRepo *repository.AttachmentRepository, memberRepo repository.MemberRepository, uploadDir string) *AttachmentHandler {
 	if uploadDir == "" {
 		uploadDir = "./uploads"
 	}
@@ -36,9 +37,23 @@ func NewAttachmentHandler(msgRepo *repository.MessageRepository, convRepo *repos
 		msgRepo:     msgRepo,
 		convRepo:    convRepo,
 		attachRepo:  attachRepo,
+		memberRepo:  memberRepo,
 		uploadDir:   uploadDir,
 		maxFileSize: 50 * 1024 * 1024, // 50MB default
 	}
+}
+
+func (h *AttachmentHandler) conversationInWorkspace(c *gin.Context, workspaceID, convID string) bool {
+	conv, err := h.convRepo.GetByID(convID)
+	if err != nil || conv == nil || conv.WorkspaceID != workspaceID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return false
+	}
+	return true
+}
+
+func attachmentFilenameMatchesID(filename, attachmentID string) bool {
+	return strings.TrimSuffix(filename, filepath.Ext(filename)) == attachmentID
 }
 
 // UploadAttachment handles file upload for a conversation
@@ -66,11 +81,13 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "senderId is required"})
 		return
 	}
+	sender, err := h.memberRepo.GetByID(c.Request.Context(), senderID)
+	if err != nil || sender == nil || sender.WorkspaceID != workspaceID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "sender member not found"})
+		return
+	}
 
-	// Verify conversation exists
-	conv, err := h.convRepo.GetByID(convID)
-	if err != nil || conv == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+	if !h.conversationInWorkspace(c, workspaceID, convID) {
 		return
 	}
 
@@ -81,6 +98,11 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 		return
 	}
 	defer file.Close()
+	originalFilename := filepath.Base(strings.TrimSpace(header.Filename))
+	if originalFilename == "" || originalFilename == "." {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "file name is required"})
+		return
+	}
 
 	// Check file size
 	if header.Size > h.maxFileSize {
@@ -89,7 +111,7 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 	}
 
 	// Generate unique filename
-	ext := filepath.Ext(header.Filename)
+	ext := filepath.Ext(originalFilename)
 	fileID := utils.GenerateID()
 	fileName := fileID + ext
 
@@ -113,7 +135,7 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 	}
 
 	// Detect MIME type
-	mimeType := detectMimeType(header.Filename, dstPath)
+	mimeType := detectMimeType(originalFilename, dstPath)
 	isImage := strings.HasPrefix(mimeType, "image/")
 
 	// Create message with attachment
@@ -122,7 +144,7 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 		SenderID:       senderID,
 		Content: repository.MessageContent{
 			Type: "attachment",
-			Text: header.Filename,
+			Text: originalFilename,
 		},
 		IsAI: false,
 	})
@@ -136,7 +158,7 @@ func (h *AttachmentHandler) UploadAttachment(c *gin.Context) {
 	// Create attachment record in database
 	attachment := &models.Attachment{
 		ID:          fileID,
-		FileName:    header.Filename,
+		FileName:    originalFilename,
 		FilePath:    dstPath,
 		FileSize:    header.Size,
 		MimeType:    mimeType,
@@ -194,7 +216,7 @@ func (h *AttachmentHandler) DownloadAttachment(c *gin.Context) {
 	// Try to get from database first
 	if h.attachRepo != nil {
 		attachment, err := h.attachRepo.GetByID(c.Request.Context(), attachmentID)
-		if err == nil && attachment != nil {
+		if err == nil && attachment != nil && attachment.WorkspaceID == workspaceID {
 			c.FileAttachment(attachment.FilePath, attachment.FileName)
 			return
 		}
@@ -211,7 +233,7 @@ func (h *AttachmentHandler) DownloadAttachment(c *gin.Context) {
 
 	var filePath string
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), attachmentID) {
+		if attachmentFilenameMatchesID(f.Name(), attachmentID) {
 			filePath = filepath.Join(uploadPath, f.Name())
 			break
 		}
@@ -249,6 +271,9 @@ func (h *AttachmentHandler) ListAttachments(c *gin.Context) {
 	var err error
 
 	if conversationID != "" {
+		if !h.conversationInWorkspace(c, workspaceID, conversationID) {
+			return
+		}
 		attachments, err = h.attachRepo.ListByConversation(c.Request.Context(), conversationID)
 	} else {
 		attachments, err = h.attachRepo.ListByWorkspace(c.Request.Context(), workspaceID)
@@ -287,7 +312,7 @@ func (h *AttachmentHandler) DeleteAttachment(c *gin.Context) {
 
 	// Get attachment to find file path
 	attachment, err := h.attachRepo.GetByID(c.Request.Context(), attachmentID)
-	if err != nil {
+	if err != nil || attachment.WorkspaceID != c.Param("id") {
 		c.JSON(http.StatusNotFound, gin.H{"error": "attachment not found"})
 		return
 	}
@@ -323,7 +348,7 @@ func (h *AttachmentHandler) GetAttachmentInfo(c *gin.Context) {
 	// Try to get from database first
 	if h.attachRepo != nil {
 		attachment, err := h.attachRepo.GetByID(c.Request.Context(), attachmentID)
-		if err == nil && attachment != nil {
+		if err == nil && attachment != nil && attachment.WorkspaceID == c.Param("id") {
 			c.JSON(http.StatusOK, attachment)
 			return
 		}
@@ -340,7 +365,7 @@ func (h *AttachmentHandler) GetAttachmentInfo(c *gin.Context) {
 	}
 
 	for _, f := range files {
-		if strings.HasPrefix(f.Name(), attachmentID) {
+		if attachmentFilenameMatchesID(f.Name(), attachmentID) {
 			filePath := filepath.Join(uploadPath, f.Name())
 			info, err := f.Info()
 			if err != nil {

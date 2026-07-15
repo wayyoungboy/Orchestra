@@ -1,9 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
 
 /**
- * E2E: Vite preview starts via webServer (reuseExistingServer: true if already running).
- * Backend-dependent tests use request to ORCHESTRA_API_URL (default http://127.0.0.1:8080): health, /api/workspaces.
- * Run: `make run` in backend, then `pnpm test:e2e`
+ * E2E starts an isolated, auth-disabled Orchestra backend and proxies Vite
+ * preview traffic to it. Override the URLs only when testing an external stack.
  */
 export default defineConfig({
   testDir: './e2e',
@@ -14,11 +13,26 @@ export default defineConfig({
     baseURL: process.env.ORCHESTRA_E2E_BASE_URL ?? 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
   },
-  webServer: {
-    command: 'pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: true,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: 'go run ./cmd/server',
+      cwd: '../backend',
+      env: {
+        ORCHESTRA_CONFIG: 'configs/config.e2e.yaml'
+      },
+      url: process.env.ORCHESTRA_API_URL ?? 'http://127.0.0.1:18080/health',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+    {
+      command: 'pnpm exec vite preview --host 127.0.0.1 --port 5173 --strictPort',
+      env: {
+        ORCHESTRA_API_URL: process.env.ORCHESTRA_API_URL ?? 'http://127.0.0.1:18080'
+      },
+      url: process.env.ORCHESTRA_E2E_BASE_URL ?? 'http://127.0.0.1:5173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 60_000,
+    }
+  ],
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 })

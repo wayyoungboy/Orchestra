@@ -46,7 +46,10 @@ func (h *MemberHandler) List(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	_ = ensureWorkspaceOwner(c.Request.Context(), h.repo, ws, "")
+	if err := ensureWorkspaceOwner(c.Request.Context(), h.repo, ws, ""); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 
 	members, err := h.repo.ListByWorkspace(c.Request.Context(), workspaceID)
 	if err != nil {
@@ -68,10 +71,11 @@ func (h *MemberHandler) List(c *gin.Context) {
 // @Failure 404 {object} map[string]string
 // @Router /api/workspaces/{id}/members/{memberId} [get]
 func (h *MemberHandler) Get(c *gin.Context) {
+	workspaceID := c.Param("id")
 	memberID := c.Param("memberId")
 
 	member, err := h.repo.GetByID(c.Request.Context(), memberID)
-	if err != nil {
+	if err != nil || member == nil || member.WorkspaceID != workspaceID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "member not found"})
 		return
 	}
@@ -169,10 +173,11 @@ func (h *MemberHandler) Create(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/workspaces/{id}/members/{memberId} [put]
 func (h *MemberHandler) Update(c *gin.Context) {
+	workspaceID := c.Param("id")
 	id := c.Param("memberId")
 
 	m, err := h.repo.GetByID(c.Request.Context(), id)
-	if err != nil {
+	if err != nil || m == nil || m.WorkspaceID != workspaceID {
 		c.JSON(http.StatusNotFound, gin.H{"error": "member not found"})
 		return
 	}
@@ -185,10 +190,22 @@ func (h *MemberHandler) Update(c *gin.Context) {
 	}
 
 	if v, ok := patch["name"].(string); ok {
-		m.Name = v
+		name := strings.TrimSpace(v)
+		if name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+			return
+		}
+		m.Name = name
 	}
 	if v, ok := patch["roleType"].(string); ok {
-		m.RoleType = models.MemberRole(v)
+		role := models.MemberRole(v)
+		switch role {
+		case models.RoleOwner, models.RoleSecretary, models.RoleAssistant:
+			m.RoleType = role
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid roleType"})
+			return
+		}
 	}
 	if v, ok := patch["avatar"].(string); ok {
 		m.Avatar = v
@@ -274,13 +291,20 @@ func (h *MemberHandler) Update(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/workspaces/{id}/members/{memberId} [delete]
 func (h *MemberHandler) Delete(c *gin.Context) {
+	workspaceID := c.Param("id")
 	id := c.Param("memberId")
+	member, err := h.repo.GetByID(c.Request.Context(), id)
+	if err != nil || member == nil || member.WorkspaceID != workspaceID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "member not found"})
+		return
+	}
 	if err := h.repo.Delete(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusNoContent, nil)
 }
+
 // UpdatePresence updates a member's real-time presence status
 // @Summary Update member presence
 // @Description Update a member's real-time activity status (typing, viewing, etc.)
@@ -296,6 +320,11 @@ func (h *MemberHandler) Delete(c *gin.Context) {
 func (h *MemberHandler) UpdatePresence(c *gin.Context) {
 	memberID := c.Param("memberId")
 	workspaceID := c.Param("id")
+	member, err := h.repo.GetByID(c.Request.Context(), memberID)
+	if err != nil || member == nil || member.WorkspaceID != workspaceID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "member not found"})
+		return
+	}
 
 	var req models.PresenceUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {

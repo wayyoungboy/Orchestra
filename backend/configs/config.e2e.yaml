@@ -1,0 +1,25 @@
+server:
+  http_addr: "127.0.0.1:18080"
+  upload_dir: "/tmp/orchestra-e2e-uploads"
+
+terminal:
+  max_sessions: 2
+  idle_timeout: 1m
+
+security:
+  allowed_commands:
+    - cat
+  allowed_paths:
+    - /tmp
+  allowed_origins:
+    - "http://127.0.0.1:5173"
+
+storage:
+  database: "/tmp/orchestra-e2e.db"
+  workspaces: "/tmp"
+
+auth:
+  enabled: false
+  jwt_secret: ""
+  jwt_expiration: 24h
+  allow_registration: false

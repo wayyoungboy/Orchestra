@@ -110,11 +110,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useTaskStore, type Task } from './taskStore'
 import { useWorkspaceStore } from '../workspace/workspaceStore'
-import { getChatSocket } from '@/shared/socket/chat'
 import TaskCard from './TaskCard.vue'
 import TaskActionModal from './components/TaskActionModal.vue'
 import TaskDetailDrawer from './components/TaskDetailDrawer.vue'
@@ -218,19 +217,6 @@ watch(workspaceId, async (id) => {
   }
 }, { immediate: true })
 
-// Listen for task_status WebSocket events
-let wsUnsub: (() => void) | null = null
-onMounted(() => {
-  wsUnsub = getChatSocket().onMessage((msg: any) => {
-    if (msg.type === 'task_status') {
-      taskStore.handleWsTaskStatus(msg)
-    }
-  })
-})
-
-onBeforeUnmount(() => {
-  wsUnsub?.()
-})
 </script>
 
 <style scoped>

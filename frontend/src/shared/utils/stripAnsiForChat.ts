@@ -1,3 +1,4 @@
+/* eslint-disable no-control-regex -- ANSI escape sequences necessarily contain control ranges. */
 /**
  * Strip ANSI / OSC / common orphan CSI tokens so PTY output is readable as plain chat text.
  */

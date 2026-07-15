@@ -45,4 +45,9 @@ export function displayMemberStatus(m: Member): MemberStatus {
 export interface MemberCreate {
   name: string
   roleType: MemberRole
+  terminalType?: string
+  terminalCommand?: string
+  acpEnabled?: boolean
+  acpCommand?: string
+  acpArgs?: string[]
 }

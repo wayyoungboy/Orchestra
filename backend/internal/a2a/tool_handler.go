@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -13,8 +14,8 @@ import (
 
 	"github.com/orchestra/backend/internal/filesystem"
 	"github.com/orchestra/backend/internal/models"
-	"github.com/orchestra/backend/pkg/utils"
 	"github.com/orchestra/backend/internal/storage/repository"
+	"github.com/orchestra/backend/pkg/utils"
 )
 
 // ChatBroadcaster is an interface for broadcasting chat messages.
@@ -31,20 +32,22 @@ type SessionLookup interface {
 
 // ToolHandler executes Orchestra tools on behalf of A2A sessions.
 type ToolHandler struct {
-	msgRepo      *repository.MessageRepository
-	taskRepo     *repository.TaskRepo
-	memberRepo   repository.MemberRepository
-	convRepo     *repository.ConversationRepository
-	chatHub      ChatBroadcaster
-	browser      *filesystem.Browser
-	validator    *filesystem.Validator
-	pool         SessionLookup
-	workspaceRepo  repository.WorkspaceRepository
+	msgRepo       *repository.MessageRepository
+	taskRepo      *repository.TaskRepo
+	memberRepo    repository.MemberRepository
+	convRepo      *repository.ConversationRepository
+	chatHub       ChatBroadcaster
+	browser       *filesystem.Browser
+	validator     *filesystem.Validator
+	pool          SessionLookup
+	workspaceRepo repository.WorkspaceRepository
 
 	dispatchWg     sync.WaitGroup
 	dispatchCtx    context.Context
 	dispatchCancel context.CancelFunc
 }
+
+const maxAgentFileContentSize = 1 << 20 // 1 MiB
 
 func NewToolHandler(
 	msgRepo *repository.MessageRepository,
@@ -146,6 +149,15 @@ func (h *ToolHandler) handleChatSend(ctx context.Context, toolUse *ToolUseMessag
 	if err := ParseToolInput(toolUse.Input, &input); err != nil {
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
 	}
+	if _, err := h.sessionMember(ctx, sess); err != nil {
+		return toolError(toolUse, err)
+	}
+	if err := h.conversationInSessionWorkspace(input.ConversationID, sess); err != nil {
+		return toolError(toolUse, err)
+	}
+	if strings.TrimSpace(input.Text) == "" {
+		return toolError(toolUse, fmt.Errorf("message text is required"))
+	}
 
 	msg, err := h.msgRepo.Create(repository.MessageCreate{
 		ConversationID: input.ConversationID,
@@ -183,6 +195,25 @@ func (h *ToolHandler) handleTaskCreate(ctx context.Context, toolUse *ToolUseMess
 	if err := ParseToolInput(toolUse.Input, &input); err != nil {
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
 	}
+	member, err := h.sessionMember(ctx, sess)
+	if err != nil {
+		return toolError(toolUse, err)
+	}
+	if member.RoleType != models.RoleSecretary {
+		return toolError(toolUse, fmt.Errorf("only a secretary can create tasks"))
+	}
+	if err := h.conversationInSessionWorkspace(input.ConversationID, sess); err != nil {
+		return toolError(toolUse, err)
+	}
+	if strings.TrimSpace(input.Title) == "" {
+		return toolError(toolUse, fmt.Errorf("task title is required"))
+	}
+	if input.AssigneeID != "" {
+		assignee, err := h.memberRepo.GetByID(ctx, input.AssigneeID)
+		if err != nil || assignee == nil || assignee.WorkspaceID != sess.WorkspaceID || assignee.RoleType != models.RoleAssistant {
+			return toolError(toolUse, fmt.Errorf("assignee must be an assistant in this workspace"))
+		}
+	}
 
 	now := time.Now().UnixMilli()
 	task := &models.Task{
@@ -207,6 +238,7 @@ func (h *ToolHandler) handleTaskCreate(ctx context.Context, toolUse *ToolUseMess
 	if err := h.taskRepo.Create(ctx, task); err != nil {
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to create task: %v", err)}
 	}
+	h.broadcastTaskStatus(task, task.Status)
 
 	// Dispatch task to assignee via their session
 	if input.AssigneeID != "" && h.pool != nil {
@@ -240,6 +272,10 @@ func (h *ToolHandler) dispatchTaskToAssignee(task *models.Task) {
 		}
 		if member == nil {
 			log.Printf("[a2a] Task dispatch: assignee member %s not found", task.AssigneeID)
+			return
+		}
+		if member.WorkspaceID != task.WorkspaceID || member.RoleType != models.RoleAssistant {
+			log.Printf("[a2a] Task dispatch: assignee %s is not an assistant in workspace %s", member.ID, task.WorkspaceID)
 			return
 		}
 
@@ -303,6 +339,10 @@ func (h *ToolHandler) handleTaskStart(ctx context.Context, toolUse *ToolUseMessa
 	if err := ParseToolInput(toolUse.Input, &input); err != nil {
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
 	}
+	task, err := h.taskAssignedToSession(ctx, input.TaskID, sess)
+	if err != nil {
+		return toolError(toolUse, err)
+	}
 
 	now := time.Now().UnixMilli()
 	updates := map[string]interface{}{"updated_at": now, "started_at": now}
@@ -320,6 +360,7 @@ func (h *ToolHandler) handleTaskStart(ctx context.Context, toolUse *ToolUseMessa
 			}
 			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to start task: %v", err)}
 		}
+		h.broadcastTaskStatus(task, models.TaskStatusInProgress)
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"in_progress"}`}
 	}
 
@@ -330,6 +371,10 @@ func (h *ToolHandler) handleTaskComplete(ctx context.Context, toolUse *ToolUseMe
 	var input TaskCompleteInput
 	if err := ParseToolInput(toolUse.Input, &input); err != nil {
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
+	}
+	task, err := h.taskAssignedToSession(ctx, input.TaskID, sess)
+	if err != nil {
+		return toolError(toolUse, err)
 	}
 
 	now := time.Now().UnixMilli()
@@ -348,6 +393,7 @@ func (h *ToolHandler) handleTaskComplete(ctx context.Context, toolUse *ToolUseMe
 			}
 			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to complete task: %v", err)}
 		}
+		h.broadcastTaskStatus(task, models.TaskStatusCompleted)
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"completed"}`}
 	}
 
@@ -358,6 +404,10 @@ func (h *ToolHandler) handleTaskFail(ctx context.Context, toolUse *ToolUseMessag
 	var input TaskFailInput
 	if err := ParseToolInput(toolUse.Input, &input); err != nil {
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
+	}
+	task, err := h.taskAssignedToSession(ctx, input.TaskID, sess)
+	if err != nil {
+		return toolError(toolUse, err)
 	}
 
 	now := time.Now().UnixMilli()
@@ -376,6 +426,7 @@ func (h *ToolHandler) handleTaskFail(ctx context.Context, toolUse *ToolUseMessag
 			}
 			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to mark task as failed: %v", err)}
 		}
+		h.broadcastTaskStatus(task, models.TaskStatusFailed)
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true,"status":"failed"}`}
 	}
 
@@ -388,7 +439,7 @@ func (h *ToolHandler) handleWorkloadList(ctx context.Context, toolUse *ToolUseMe
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
 	}
 
-	stats, err := h.taskRepo.GetWorkloadStats(ctx, input.WorkspaceID)
+	stats, err := h.taskRepo.GetWorkloadStats(ctx, sess.WorkspaceID)
 	if err != nil {
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to get workload stats: %v", err)}
 	}
@@ -404,6 +455,15 @@ func (h *ToolHandler) handleAgentStatus(ctx context.Context, toolUse *ToolUseMes
 	}
 
 	log.Printf("[a2a] Agent status update from %s: status=%s, message=%s", sess.MemberName, input.Status, input.Message)
+	if h.chatHub != nil {
+		h.chatHub.BroadcastToWorkspace(sess.WorkspaceID, map[string]interface{}{
+			"type":        "message_status",
+			"workspaceId": sess.WorkspaceID,
+			"senderId":    sess.MemberID,
+			"status":      input.Status,
+			"content":     input.Message,
+		})
+	}
 	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: `{"success":true}`}
 }
 
@@ -413,14 +473,12 @@ func (h *ToolHandler) handleFileRead(ctx context.Context, toolUse *ToolUseMessag
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
 	}
 
-	absPath := filepath.Join(sess.WorkspaceID, input.Path)
-	if h.validator != nil {
-		if err := h.validator.ValidatePath(absPath); err != nil {
-			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Path not allowed: %v", err)}
-		}
+	absPath, err := h.sessionWorkspacePath(ctx, sess, input.Path, false)
+	if err != nil {
+		return toolError(toolUse, err)
 	}
 
-	content, err := os.ReadFile(absPath)
+	content, err := readAgentFile(absPath)
 	if err != nil {
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to read file: %v", err)}
 	}
@@ -434,11 +492,12 @@ func (h *ToolHandler) handleFileWrite(ctx context.Context, toolUse *ToolUseMessa
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
 	}
 
-	absPath := filepath.Join(sess.WorkspaceID, input.Path)
-	if h.validator != nil {
-		if err := h.validator.ValidatePath(absPath); err != nil {
-			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Path not allowed: %v", err)}
-		}
+	absPath, err := h.sessionWorkspacePath(ctx, sess, input.Path, false)
+	if err != nil {
+		return toolError(toolUse, err)
+	}
+	if len(input.Content) > maxAgentFileContentSize {
+		return toolError(toolUse, fmt.Errorf("file content exceeds the %d byte limit", maxAgentFileContentSize))
 	}
 
 	if err := os.MkdirAll(filepath.Dir(absPath), 0755); err != nil {
@@ -458,11 +517,9 @@ func (h *ToolHandler) handleFileList(ctx context.Context, toolUse *ToolUseMessag
 		return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Invalid input: %v", err)}
 	}
 
-	absPath := filepath.Join(sess.WorkspaceID, input.Path)
-	if h.validator != nil {
-		if err := h.validator.ValidatePath(absPath); err != nil {
-			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Path not allowed: %v", err)}
-		}
+	absPath, err := h.sessionWorkspacePath(ctx, sess, input.Path, true)
+	if err != nil {
+		return toolError(toolUse, err)
 	}
 
 	if h.browser != nil {
@@ -481,7 +538,10 @@ func (h *ToolHandler) handleFileList(ctx context.Context, toolUse *ToolUseMessag
 
 	var result []map[string]any
 	for _, e := range entries {
-		info, _ := e.Info()
+		info, err := e.Info()
+		if err != nil {
+			return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: fmt.Sprintf("Failed to inspect directory entry: %v", err)}
+		}
 		result = append(result, map[string]any{
 			"name":    e.Name(),
 			"isDir":   e.IsDir(),
@@ -492,6 +552,130 @@ func (h *ToolHandler) handleFileList(ctx context.Context, toolUse *ToolUseMessag
 
 	data, _ := json.Marshal(result)
 	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, Content: string(data)}
+}
+
+func toolError(toolUse *ToolUseMessage, err error) *ToolResult {
+	return &ToolResult{Type: TypeToolResult, ToolUseID: toolUse.ToolUseID, IsError: true, Content: err.Error()}
+}
+
+func (h *ToolHandler) sessionMember(ctx context.Context, sess *Session) (*models.Member, error) {
+	if sess == nil || sess.WorkspaceID == "" || sess.MemberID == "" {
+		return nil, fmt.Errorf("session is missing workspace or member identity")
+	}
+	if h.memberRepo == nil {
+		return nil, fmt.Errorf("member repository is unavailable")
+	}
+	member, err := h.memberRepo.GetByID(ctx, sess.MemberID)
+	if err != nil || member == nil || member.WorkspaceID != sess.WorkspaceID {
+		return nil, fmt.Errorf("session member does not belong to this workspace")
+	}
+	return member, nil
+}
+
+func (h *ToolHandler) conversationInSessionWorkspace(conversationID string, sess *Session) error {
+	if sess == nil || strings.TrimSpace(conversationID) == "" {
+		return fmt.Errorf("conversation id is required")
+	}
+	conv, err := h.convRepo.GetByID(conversationID)
+	if err != nil || conv == nil || conv.WorkspaceID != sess.WorkspaceID {
+		return fmt.Errorf("conversation does not belong to this workspace")
+	}
+	return nil
+}
+
+func (h *ToolHandler) taskAssignedToSession(ctx context.Context, taskID string, sess *Session) (*models.Task, error) {
+	if sess == nil || strings.TrimSpace(taskID) == "" {
+		return nil, fmt.Errorf("task id is required")
+	}
+	task, err := h.taskRepo.GetByID(ctx, taskID)
+	if err != nil || task == nil || task.WorkspaceID != sess.WorkspaceID {
+		return nil, fmt.Errorf("task does not belong to this workspace")
+	}
+	if task.AssigneeID != sess.MemberID {
+		return nil, fmt.Errorf("task is not assigned to this agent")
+	}
+	return task, nil
+}
+
+func (h *ToolHandler) sessionWorkspacePath(ctx context.Context, sess *Session, requestedPath string, allowRoot bool) (string, error) {
+	if sess == nil || sess.WorkspaceID == "" {
+		return "", fmt.Errorf("session is missing workspace identity")
+	}
+	if h.workspaceRepo == nil {
+		return "", fmt.Errorf("workspace repository is unavailable")
+	}
+	workspace, err := h.workspaceRepo.GetByID(ctx, sess.WorkspaceID)
+	if err != nil || workspace == nil || strings.TrimSpace(workspace.Path) == "" {
+		return "", fmt.Errorf("workspace path is unavailable")
+	}
+
+	root, err := filepath.Abs(workspace.Path)
+	if err != nil {
+		return "", fmt.Errorf("resolve workspace path: %w", err)
+	}
+	root = filepath.Clean(root)
+	if requestedPath == "" {
+		if !allowRoot {
+			return "", fmt.Errorf("path is required")
+		}
+		requestedPath = "."
+	}
+	if filepath.IsAbs(requestedPath) {
+		return "", fmt.Errorf("absolute paths are not allowed")
+	}
+
+	path := filepath.Join(root, requestedPath)
+	workspaceValidator := filesystem.NewValidator([]string{root})
+	if err := workspaceValidator.ValidatePath(path); err != nil {
+		return "", fmt.Errorf("path is outside the workspace: %w", err)
+	}
+	if h.validator != nil {
+		if err := h.validator.ValidatePath(path); err != nil {
+			return "", fmt.Errorf("path is not allowed: %w", err)
+		}
+	}
+	return path, nil
+}
+
+func readAgentFile(path string) ([]byte, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if info.IsDir() {
+		return nil, fmt.Errorf("path is a directory")
+	}
+	if info.Size() > maxAgentFileContentSize {
+		return nil, fmt.Errorf("file exceeds the %d byte limit", maxAgentFileContentSize)
+	}
+	content, err := io.ReadAll(io.LimitReader(file, maxAgentFileContentSize+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(content) > maxAgentFileContentSize {
+		return nil, fmt.Errorf("file exceeds the %d byte limit", maxAgentFileContentSize)
+	}
+	return content, nil
+}
+
+func (h *ToolHandler) broadcastTaskStatus(task *models.Task, status models.TaskStatus) {
+	if h.chatHub == nil {
+		return
+	}
+	h.chatHub.BroadcastToWorkspace(task.WorkspaceID, map[string]interface{}{
+		"type":        "task_status",
+		"workspaceId": task.WorkspaceID,
+		"taskId":      task.ID,
+		"status":      string(status),
+		"assigneeId":  task.AssigneeID,
+		"title":       task.Title,
+	})
 }
 
 // ToolResult represents the result of a tool execution.

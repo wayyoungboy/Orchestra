@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,12 +10,13 @@ import (
 )
 
 type TerminalHandler struct {
-	pool   *a2a.Pool
-	wsRepo repository.WorkspaceRepository
+	pool       *a2a.Pool
+	wsRepo     repository.WorkspaceRepository
+	memberRepo repository.MemberRepository
 }
 
-func NewTerminalHandler(pool *a2a.Pool, wsRepo repository.WorkspaceRepository) *TerminalHandler {
-	return &TerminalHandler{pool: pool, wsRepo: wsRepo}
+func NewTerminalHandler(pool *a2a.Pool, wsRepo repository.WorkspaceRepository, memberRepo repository.MemberRepository) *TerminalHandler {
+	return &TerminalHandler{pool: pool, wsRepo: wsRepo, memberRepo: memberRepo}
 }
 
 // CreateSessionRequest represents the request body for creating a terminal session
@@ -52,22 +54,11 @@ func (h *TerminalHandler) CreateSession(c *gin.Context) {
 		return
 	}
 
-	// Get workspace path if needed
-	workspacePath := ""
-	if req.WorkspaceID != "" {
-		ws, err := h.wsRepo.GetByID(c.Request.Context(), req.WorkspaceID)
-		if err == nil {
-			workspacePath = ws.Path
-		}
+	config, err := h.sessionConfig(c, req.WorkspaceID, req.MemberID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-
-	config := a2a.SessionConfig{
-		WorkspaceID:  req.WorkspaceID,
-		MemberID:     req.MemberID,
-		MemberName:   req.MemberName,
-		TerminalType: req.TerminalType,
-	}
-	_ = workspacePath // A2A agents handle their own filesystem
 
 	session, err := h.pool.Acquire(c.Request.Context(), config)
 	if err != nil {
@@ -181,15 +172,10 @@ func (h *TerminalHandler) GetOrCreateSessionForMember(c *gin.Context) {
 		return
 	}
 
-	// Parse optional request body
-	var req CreateSessionRequest
-	c.ShouldBindJSON(&req) // Ignore error - body is optional
-
-	config := a2a.SessionConfig{
-		WorkspaceID:  workspaceID,
-		MemberID:     memberID,
-		MemberName:   req.MemberName,
-		TerminalType: req.TerminalType,
+	config, err := h.sessionConfig(c, workspaceID, memberID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	session, err := h.pool.Acquire(c.Request.Context(), config)
@@ -206,4 +192,29 @@ func (h *TerminalHandler) GetOrCreateSessionForMember(c *gin.Context) {
 		SessionID: session.ID,
 		PID:       0,
 	})
+}
+
+func (h *TerminalHandler) sessionConfig(c *gin.Context, workspaceID, memberID string) (a2a.SessionConfig, error) {
+	if workspaceID == "" || memberID == "" {
+		return a2a.SessionConfig{}, fmt.Errorf("workspaceId and memberId are required")
+	}
+
+	workspace, err := h.wsRepo.GetByID(c.Request.Context(), workspaceID)
+	if err != nil || workspace == nil {
+		return a2a.SessionConfig{}, fmt.Errorf("workspace not found")
+	}
+
+	member, err := h.memberRepo.GetByID(c.Request.Context(), memberID)
+	if err != nil || member == nil || member.WorkspaceID != workspaceID {
+		return a2a.SessionConfig{}, fmt.Errorf("member not found in workspace")
+	}
+
+	return a2a.SessionConfig{
+		WorkspaceID:  workspaceID,
+		WorkspaceDir: workspace.Path,
+		MemberID:     member.ID,
+		MemberName:   member.Name,
+		TerminalType: member.TerminalType,
+		Member:       member,
+	}, nil
 }

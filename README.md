@@ -139,6 +139,25 @@ Restart both dev processes after pulling changes:
 
 > Note: Go has no hot reload; Vite HMR may miss some edge cases.
 
+### Security and remote deployments
+
+Orchestra binds to `127.0.0.1:8080` by default. It is designed as a
+single-administrator control plane until user-to-workspace authorization is
+implemented. Do not expose it through a public address without authentication.
+
+For a remote deployment, configure these secrets before the first start:
+
+```bash
+export ORCHESTRA_JWT_SECRET='at-least-32-random-bytes'
+export ORCHESTRA_ADMIN_USERNAME='admin'
+export ORCHESTRA_ADMIN_PASSWORD='a-long-unique-password'
+export ORCHESTRA_ENCRYPTION_KEY='at-least-32-random-bytes'
+```
+
+`ORCHESTRA_ENCRYPTION_KEY` is required to use stored provider API keys. The
+application does not fall back to a predictable development key, and self
+registration remains disabled until workspace-level user authorization exists.
+
 ## Project Structure
 
 ```
@@ -205,7 +224,6 @@ Orchestra/
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/api/ping` | GET | Test connection |
 | `/api/workspaces` | GET | List all workspaces |
 | `/api/workspaces` | POST | Create workspace |
 | `/api/workspaces/:id` | GET | Get workspace details |
@@ -216,15 +234,13 @@ Orchestra/
 | `/api/terminals` | POST | Create terminal session |
 | `/api/terminals/:id` | DELETE | Close terminal session |
 | `/api/browse` | GET | Browse server paths |
-| `/api/conversations/:workspaceId` | GET | Get chat history |
-| `/api/conversations/:workspaceId/messages` | POST | Send chat message |
-| `/api/tasks` | POST | Create task |
-| `/api/tasks/:id` | PATCH | Update task status |
-| `/api/tasks/:id/start` | POST | Start task |
-| `/api/tasks/:id/complete` | POST | Complete task |
-| `/api/tasks/:id/fail` | POST | Fail task |
-| `/api/keys` | GET/POST/DELETE | API key management |
-| `/api/keys/:id/test` | POST | Test API key |
+| `/api/workspaces/:id/conversations` | GET/POST | List or create conversations |
+| `/api/workspaces/:id/conversations/:convId/messages` | GET/POST | Read or send messages |
+| `/api/workspaces/:id/tasks` | GET | List workspace tasks |
+| `/api/internal/tasks/*` | POST | Agent task lifecycle callbacks |
+| `/api/api-keys` | GET/POST | API key management |
+| `/api/api-keys/:id` | DELETE | Remove an API key |
+| `/api/api-keys/test` | POST | Test an API key |
 
 ### WebSocket
 
@@ -239,13 +255,15 @@ Configuration file: `backend/configs/config.yaml`
 
 Environment variables:
 - `ORCHESTRA_ENCRYPTION_KEY` - API key encryption key (32+ bytes)
+- `ORCHESTRA_JWT_SECRET` - enables JWT authentication
+- `ORCHESTRA_ADMIN_USERNAME` / `ORCHESTRA_ADMIN_PASSWORD` - required to bootstrap the first authenticated administrator
 - `ORCHESTRA_CONFIG` - Custom config file path
 
 ### Default Configuration
 
 ```yaml
 server:
-  http_addr: ":8080"
+  http_addr: "127.0.0.1:8080"
 
 terminal:
   max_sessions: 10
@@ -279,6 +297,8 @@ Orchestra can run both Claude Code and Codex as tmux-backed agent terminals.
 
 Make sure each command appears in `security.allowed_commands`, then create an Assistant member with ACP enabled and set `acpCommand` to `claude` or `codex`. The local skills helper also detects `~/.claude/skills` and `~/.codex/skills` and can symlink Orchestra skills into both:
 
+Command names such as `codex` allow PATH lookup only; an absolute executable path must be explicitly listed. Do not add a shell unless it is an intentional, trusted execution option.
+
 ```bash
 cd backend
 go run ./cmd/cli providers
@@ -301,10 +321,10 @@ cd backend && make test
 # Frontend unit tests
 cd frontend && pnpm test
 
-# E2E tests (requires running backend)
+# E2E tests (starts an isolated backend automatically)
 cd frontend && pnpm test:e2e
 
-# E2E with custom backend URL
+# E2E against an existing backend
 ORCHESTRA_API_URL=http://your-server:8080 pnpm test:e2e
 ```
 

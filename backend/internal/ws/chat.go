@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/orchestra/backend/pkg/utils"
 )
 
 // ChatEventType defines the type of chat event
@@ -46,7 +47,7 @@ type ChatClient struct {
 // ChatHub manages all chat WebSocket connections and broadcasts messages
 type ChatHub struct {
 	mu            sync.RWMutex
-	clients       map[string]*ChatClient       // clientID -> client
+	clients       map[string]*ChatClient         // clientID -> client
 	workspaceSubs map[string]map[string]struct{} // workspaceID -> clientIDs
 }
 
@@ -232,14 +233,5 @@ func (h *ChatHandler) Handle(workspaceID string, conn *websocket.Conn) error {
 }
 
 func generateClientID() string {
-	return "chat-" + time.Now().Format("20060102150405") + "-" + randomString(8)
-}
-
-func randomString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz0123456789"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[time.Now().Nanosecond()%len(letters)]
-	}
-	return string(b)
+	return "chat-" + utils.GenerateID()
 }

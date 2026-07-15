@@ -17,18 +17,17 @@ type AuthConfig struct {
 	LegacyToken string // For backward compatibility with ORCHESTRA_AUTH_TOKEN
 }
 
-// DefaultAuthConfig returns default auth config from environment
-func DefaultAuthConfig(jwtSecret string) AuthConfig {
-	// Check if auth is explicitly disabled
-	authDisabled := os.Getenv("ORCHESTRA_AUTH_DISABLED") == "true"
+// DefaultAuthConfig derives middleware settings from the already-resolved
+// application config. Authentication must not be inferred from merely having a
+// JWT secret: operators may keep a secret configured while explicitly running
+// the local control plane with authentication disabled.
+func DefaultAuthConfig(authEnabled bool, jwtSecret string) AuthConfig {
+	if os.Getenv("ORCHESTRA_AUTH_DISABLED") == "true" {
+		authEnabled = false
+	}
 
 	// Legacy token support
 	legacyToken := os.Getenv("ORCHESTRA_AUTH_TOKEN")
-
-	// Auth is enabled if:
-	// 1. Not explicitly disabled
-	// 2. Either legacy token is set OR JWT secret is set
-	authEnabled := !authDisabled && (legacyToken != "" || jwtSecret != "")
 
 	var jwtConfig *security.JWTConfig
 	if jwtSecret != "" {
@@ -37,7 +36,7 @@ func DefaultAuthConfig(jwtSecret string) AuthConfig {
 
 	return AuthConfig{
 		Enabled:     authEnabled,
-		Disabled:    authDisabled,
+		Disabled:    !authEnabled,
 		JWTConfig:   jwtConfig,
 		LegacyToken: legacyToken,
 	}

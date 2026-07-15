@@ -5,13 +5,17 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"strings"
 	"sync"
 	"time"
 )
+
+const maxLogLineSize = 10 * 1024 * 1024
 
 // MessageType matches a2a.MessageType but defined here to avoid import cycles.
 type MessageType string
@@ -224,23 +228,24 @@ func (s *TmuxSession) readLogFile(ctx context.Context) {
 			return
 		}
 
-		scanner := bufio.NewScanner(file)
-		scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024) // 10MB max line
-
-		readAny := false
-		for scanner.Scan() {
-			readAny = true
-			line := scanner.Text()
-			if line != "" {
-				s.ParseAndEmit(line)
+		if info, err := file.Stat(); err != nil {
+			file.Close()
+			s.ErrorChan <- fmt.Errorf("stat log file: %w", err)
+			return
+		} else if s.readOffset > info.Size() {
+			// pipe-pane may recreate its target file; start reading the new file.
+			s.readOffset = 0
+			if _, err := file.Seek(0, 0); err != nil {
+				file.Close()
+				s.ErrorChan <- fmt.Errorf("rewind log file: %w", err)
+				return
 			}
-			// Update offset
-			s.readOffset = fileOffset(scanner, file)
 		}
 
-		if err := scanner.Err(); err != nil {
+		readAny, err := s.readAvailableLogLines(file)
+		if err != nil {
 			file.Close()
-			s.ErrorChan <- fmt.Errorf("log scanner: %w", err)
+			s.ErrorChan <- fmt.Errorf("read log file: %w", err)
 			return
 		}
 
@@ -264,11 +269,40 @@ func (s *TmuxSession) readLogFile(ctx context.Context) {
 	}
 }
 
-// fileOffset returns the current file position after the last successful scan.
-func fileOffset(scanner *bufio.Scanner, file *os.File) int64 {
-	// Approximate: use current file position
-	pos, _ := file.Seek(0, 1)
-	return pos
+// readAvailableLogLines emits only complete newline-delimited records. Leaving
+// a partial record unread is essential: pipe-pane can append the rest later,
+// and treating the fragment as a complete agent message corrupts JSON output.
+func (s *TmuxSession) readAvailableLogLines(file *os.File) (bool, error) {
+	reader := bufio.NewReaderSize(file, 64*1024)
+	line := make([]byte, 0, 64*1024)
+	readAny := false
+
+	for {
+		fragment, err := reader.ReadSlice('\n')
+		line = append(line, fragment...)
+		if len(line) > maxLogLineSize {
+			return false, fmt.Errorf("log line exceeds the %d byte limit", maxLogLineSize)
+		}
+
+		switch {
+		case err == nil:
+			readAny = true
+			s.readOffset += int64(len(line))
+			text := strings.TrimSuffix(string(line[:len(line)-1]), "\r")
+			if text != "" {
+				s.ParseAndEmit(text)
+			}
+			line = line[:0]
+		case errors.Is(err, bufio.ErrBufferFull):
+			continue
+		case errors.Is(err, io.EOF):
+			// Do not advance the offset for an incomplete final line. It will be
+			// read again after pipe-pane appends its terminating newline.
+			return readAny, nil
+		default:
+			return false, err
+		}
+	}
 }
 
 // ParseAndEmit parses a line of agent output and emits the appropriate ACP message.

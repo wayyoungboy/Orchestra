@@ -59,6 +59,15 @@ func (m *ACPMessage) ParseErrorMessage() (*ErrorMessage, error) {
 	return &msg, nil
 }
 
+// ParseSystemMessage parses an ACPMessage as a system message.
+func (m *ACPMessage) ParseSystemMessage() (*SystemMessage, error) {
+	var msg SystemMessage
+	if err := json.Unmarshal(m.Content, &msg); err != nil {
+		return nil, err
+	}
+	return &msg, nil
+}
+
 // ParseToolUseMessage parses an ACPMessage as a tool use message.
 func (m *ACPMessage) ParseToolUseMessage() (*ToolUseMessage, error) {
 	var msg ToolUseMessage
@@ -80,15 +89,17 @@ type Session struct {
 	// Tmux session (replaces localRunner and A2A client)
 	tmuxSession *tmux.TmuxSession
 
-	mu               sync.Mutex
-	lastActive       time.Time
-	createdAt        time.Time
-	lastChatConvID   string
-	chatStreamMu     sync.Mutex
-	chatStream       chan<- []byte
-	streamSpanMu     sync.Mutex
-	streamSpanID     string
-	streamSeq        uint64
+	mu             sync.Mutex
+	lastActive     time.Time
+	createdAt      time.Time
+	lastChatConvID string
+	terminalSubsMu sync.RWMutex
+	outputSubs     map[chan *ACPMessage]struct{}
+	chatStreamSubs map[chan []byte]struct{}
+	errorSubs      map[chan error]struct{}
+	streamSpanMu   sync.Mutex
+	streamSpanID   string
+	streamSeq      uint64
 
 	// Output channels for ACPBridge / AgentBridge compatibility
 	OutputChan chan *ACPMessage
@@ -123,6 +134,9 @@ func NewSession(id, workspaceID, memberID, memberName, terminalType string, tmux
 		OutputChan:      make(chan *ACPMessage, 256),
 		ErrorChan:       make(chan error, 16),
 		DoneChan:        make(chan struct{}),
+		outputSubs:      make(map[chan *ACPMessage]struct{}),
+		chatStreamSubs:  make(map[chan []byte]struct{}),
+		errorSubs:       make(map[chan error]struct{}),
 		subscriptions:   make(map[string]func()),
 		pendingToolUses: make(map[string]string),
 	}
@@ -208,6 +222,7 @@ func (s *Session) Release() {
 	if s.tmuxSession != nil {
 		s.tmuxSession.Stop()
 	}
+	s.closeTerminalSubscribers()
 
 	s.mu.Lock()
 	s.released = true
@@ -230,6 +245,7 @@ func (s *Session) Kill() {
 	if s.tmuxSession != nil {
 		s.tmuxSession.Kill()
 	}
+	s.closeTerminalSubscribers()
 
 	s.mu.Lock()
 	s.released = true
@@ -297,26 +313,84 @@ func (s *Session) NextStreamSeq() uint64 {
 	return s.streamSeq
 }
 
-// SetChatStreamSink sets the channel for streaming chat data.
-func (s *Session) SetChatStreamSink(ch chan<- []byte) {
-	s.chatStreamMu.Lock()
-	defer s.chatStreamMu.Unlock()
-	s.chatStream = ch
+// SubscribeTerminal creates a dedicated stream for one terminal WebSocket.
+// Pool owns OutputChan and fans messages out to these subscriptions, so chat,
+// tool execution, and multiple viewers cannot consume each other's events.
+func (s *Session) SubscribeTerminal() (<-chan *ACPMessage, <-chan []byte, <-chan error, func()) {
+	output := make(chan *ACPMessage, 256)
+	chatStream := make(chan []byte, 256)
+	errors := make(chan error, 16)
+
+	s.terminalSubsMu.Lock()
+	s.outputSubs[output] = struct{}{}
+	s.chatStreamSubs[chatStream] = struct{}{}
+	s.errorSubs[errors] = struct{}{}
+	s.terminalSubsMu.Unlock()
+
+	var once sync.Once
+	return output, chatStream, errors, func() {
+		once.Do(func() {
+			s.terminalSubsMu.Lock()
+			delete(s.outputSubs, output)
+			delete(s.chatStreamSubs, chatStream)
+			delete(s.errorSubs, errors)
+			close(output)
+			close(chatStream)
+			close(errors)
+			s.terminalSubsMu.Unlock()
+		})
+	}
 }
 
-// TrySendChatStream sends data to the chat stream sink if configured.
-func (s *Session) TrySendChatStream(data []byte) {
-	s.chatStreamMu.Lock()
-	ch := s.chatStream
-	s.chatStreamMu.Unlock()
-
-	if ch != nil {
+// PublishOutput sends an agent event to each terminal subscriber without
+// blocking the agent pipeline on a slow browser.
+func (s *Session) PublishOutput(msg *ACPMessage) {
+	s.terminalSubsMu.RLock()
+	defer s.terminalSubsMu.RUnlock()
+	for ch := range s.outputSubs {
 		select {
-		case ch <- data:
-		case <-time.After(5 * time.Second):
-			log.Printf("[a2a] WARN: output channel full for session %s, message dropped", s.ID)
+		case ch <- msg:
+		default:
+			log.Printf("[a2a] WARN: terminal output dropped for session %s", s.ID)
 		}
 	}
+}
+
+// PublishError sends an error to each terminal subscriber.
+func (s *Session) PublishError(err error) {
+	s.terminalSubsMu.RLock()
+	defer s.terminalSubsMu.RUnlock()
+	for ch := range s.errorSubs {
+		select {
+		case ch <- err:
+		default:
+			log.Printf("[a2a] WARN: terminal error dropped for session %s", s.ID)
+		}
+	}
+}
+
+// TrySendChatStream sends data to every terminal subscriber.
+func (s *Session) TrySendChatStream(data []byte) {
+	s.terminalSubsMu.RLock()
+	defer s.terminalSubsMu.RUnlock()
+	for ch := range s.chatStreamSubs {
+		select {
+		case ch <- data:
+		default:
+			log.Printf("[a2a] WARN: terminal chat stream dropped for session %s", s.ID)
+		}
+	}
+}
+
+func (s *Session) closeTerminalSubscribers() {
+	s.terminalSubsMu.Lock()
+	defer s.terminalSubsMu.Unlock()
+	// WebSocket writers also select on DoneChan and then invoke their own
+	// unsubscribe callback. Do not close the per-client channels here: that
+	// callback may already be pending and would otherwise double-close them.
+	s.outputSubs = make(map[chan *ACPMessage]struct{})
+	s.chatStreamSubs = make(map[chan []byte]struct{})
+	s.errorSubs = make(map[chan error]struct{})
 }
 
 // CaptureScrollback captures the last N lines of pane output (for recovery).
@@ -400,13 +474,13 @@ func ConvertACPToWS(msg *ACPMessage) *ACPTerminalResponse {
 		}
 
 	case TypeSystem:
-		parsed, err := msg.ParseErrorMessage()
+		parsed, err := msg.ParseSystemMessage()
 		if err != nil {
 			return nil
 		}
 		return &ACPTerminalResponse{
 			Type:   "status",
-			Status: parsed.Error,
+			Status: parsed.Message,
 		}
 
 	default:

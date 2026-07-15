@@ -32,15 +32,15 @@ type Dependencies struct {
 	JWTConfig  *security.JWTConfig
 
 	// Repositories
-	WorkspaceRepo  repository.WorkspaceRepository
-	MemberRepo     repository.MemberRepository
-	ConvRepo       *repository.ConversationRepository
-	MsgRepo        *repository.MessageRepository
-	ReadRepo       *repository.ConversationReadRepository
-	UserRepo       repository.UserRepository
-	AttachRepo     *repository.AttachmentRepository
-	TaskRepo       *repository.TaskRepo
-	APIKeyRepo     repository.APIKeyRepository
+	WorkspaceRepo repository.WorkspaceRepository
+	MemberRepo    repository.MemberRepository
+	ConvRepo      *repository.ConversationRepository
+	MsgRepo       *repository.MessageRepository
+	ReadRepo      *repository.ConversationReadRepository
+	UserRepo      repository.UserRepository
+	AttachRepo    *repository.AttachmentRepository
+	TaskRepo      *repository.TaskRepo
+	APIKeyRepo    repository.APIKeyRepository
 
 	// Handlers (created by registerRepositories)
 	WsHandler         *handlers.WorkspaceHandler
@@ -100,17 +100,17 @@ func registerRepositories(db *storage.Database, cfg *config.Config, r *gin.Engin
 
 	wsHandler := handlers.NewWorkspaceHandler(wsRepo, memberRepo, msgRepo, browser)
 	memberHandler := handlers.NewMemberHandler(memberRepo, wsRepo, ws.GlobalChatHub)
-	terminalHandler := handlers.NewTerminalHandler(a2aPool, wsRepo)
+	terminalHandler := handlers.NewTerminalHandler(a2aPool, wsRepo, memberRepo)
 	convHandler := handlers.NewConversationHandler(convRepo, msgRepo, readRepo, memberRepo, wsRepo, a2aPool, ws.GlobalChatHub, cfg.Server.HTTPAddr, cfg.Auth.Enabled, baseURL)
-	attachmentHandler := handlers.NewAttachmentHandler(msgRepo, convRepo, attachRepo, cfg.Server.UploadDir)
-	taskHandler := handlers.NewTaskHandler(taskRepo, memberRepo, ws.GlobalChatHub)
+	attachmentHandler := handlers.NewAttachmentHandler(msgRepo, convRepo, attachRepo, memberRepo, cfg.Server.UploadDir)
+	taskHandler := handlers.NewTaskHandler(taskRepo, memberRepo, wsRepo, convRepo, ws.GlobalChatHub)
 	apiKeyHandler, err := handlers.NewAPIKeyHandler(apiKeyRepo, cfg)
 	if err != nil {
 		panic("failed to create API key handler: " + err.Error())
 	}
 	authHandler := handlers.NewAuthHandler(userRepo, jwtConfig, cfg.Auth.Enabled)
 
-	authConfig := middleware.DefaultAuthConfig(cfg.Auth.JWTSecret)
+	authConfig := middleware.DefaultAuthConfig(cfg.Auth.Enabled, cfg.Auth.JWTSecret)
 
 	r.Use(middleware.Logger())
 	r.Use(middleware.CORS(cfg.Security.AllowedOrigins))
@@ -162,9 +162,8 @@ func registerAuthRoutes(r *gin.Engine, deps *Dependencies) {
 		authGroup.POST("/validate", deps.AuthHandler.ValidateToken)
 		authGroup.GET("/me", middleware.Auth(deps.AuthConfig), deps.AuthHandler.GetCurrentUser)
 
-		if deps.Cfg.Auth.AllowRegistration {
-			authGroup.POST("/register", deps.AuthHandler.Register)
-		}
+		// Orchestra currently has a single-control-plane authorization model.
+		// Do not expose self-registration until user-to-workspace RBAC exists.
 	}
 }
 

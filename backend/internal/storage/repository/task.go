@@ -50,12 +50,7 @@ func (r *TaskRepo) GetByID(ctx context.Context, id string) (*models.Task, error)
 		FROM tasks WHERE id = ?
 	`
 	task := &models.Task{}
-	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
-		&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
-		&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-		&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
-	)
+	err := scanTask(r.db.QueryRowContext(ctx, query, id), task)
 	if err != nil {
 		return nil, err
 	}
@@ -92,16 +87,14 @@ func (r *TaskRepo) ListByWorkspace(ctx context.Context, workspaceID string, stat
 	var tasks []*models.Task
 	for rows.Next() {
 		task := &models.Task{}
-		err := rows.Scan(
-			&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
-			&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
-			&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-			&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
-		)
+		err := scanTask(rows, task)
 		if err != nil {
 			return nil, err
 		}
 		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return tasks, nil
 }
@@ -124,16 +117,14 @@ func (r *TaskRepo) ListByAssignee(ctx context.Context, assigneeID string) ([]*mo
 	var tasks []*models.Task
 	for rows.Next() {
 		task := &models.Task{}
-		err := rows.Scan(
-			&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
-			&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
-			&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-			&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
-		)
+		err := scanTask(rows, task)
 		if err != nil {
 			return nil, err
 		}
 		tasks = append(tasks, task)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return tasks, nil
 }
@@ -156,18 +147,52 @@ func (r *TaskRepo) ListBySecretary(ctx context.Context, secretaryID string) ([]*
 	var tasks []*models.Task
 	for rows.Next() {
 		task := &models.Task{}
-		err := rows.Scan(
-			&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
-			&task.Title, &task.Description, &task.Status, &task.AssigneeID, &task.Priority,
-			&task.DeadlineAt, &task.AssignedAt, &task.StartedAt, &task.CompletedAt,
-			&task.ResultSummary, &task.ErrorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
-		)
+		err := scanTask(rows, task)
 		if err != nil {
 			return nil, err
 		}
 		tasks = append(tasks, task)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return tasks, nil
+}
+
+type taskRowScanner interface {
+	Scan(dest ...interface{}) error
+}
+
+func scanTask(row taskRowScanner, task *models.Task) error {
+	var (
+		description   sql.NullString
+		assigneeID    sql.NullString
+		resultSummary sql.NullString
+		errorMessage  sql.NullString
+		deadlineAt    sql.NullInt64
+		assignedAt    sql.NullInt64
+		startedAt     sql.NullInt64
+		completedAt   sql.NullInt64
+	)
+
+	if err := row.Scan(
+		&task.ID, &task.WorkspaceID, &task.ConversationID, &task.SecretaryID,
+		&task.Title, &description, &task.Status, &assigneeID, &task.Priority,
+		&deadlineAt, &assignedAt, &startedAt, &completedAt,
+		&resultSummary, &errorMessage, &task.Version, &task.CreatedAt, &task.UpdatedAt,
+	); err != nil {
+		return err
+	}
+
+	task.Description = description.String
+	task.AssigneeID = assigneeID.String
+	task.DeadlineAt = deadlineAt.Int64
+	task.AssignedAt = assignedAt.Int64
+	task.StartedAt = startedAt.Int64
+	task.CompletedAt = completedAt.Int64
+	task.ResultSummary = resultSummary.String
+	task.ErrorMessage = errorMessage.String
+	return nil
 }
 
 func (r *TaskRepo) UpdateStatus(ctx context.Context, id string, status models.TaskStatus, updates map[string]interface{}) error {
@@ -279,6 +304,9 @@ func (r *TaskRepo) GetWorkloadStats(ctx context.Context, workspaceID string) ([]
 			"completedTaskCount": completedCount,
 			"status":             status,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return results, nil
 }

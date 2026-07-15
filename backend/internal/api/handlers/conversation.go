@@ -17,15 +17,15 @@ import (
 )
 
 type ConversationHandler struct {
-	convRepo         *repository.ConversationRepository
-	msgRepo          *repository.MessageRepository
-	readRepo         *repository.ConversationReadRepository
-	memberRepo       repository.MemberRepository
-	wsRepo           repository.WorkspaceRepository
-	a2aPool          *a2a.Pool
-	chatHub          *ws.ChatHub
-	serverAddr       string
-	authEnabled      bool
+	convRepo          *repository.ConversationRepository
+	msgRepo           *repository.MessageRepository
+	readRepo          *repository.ConversationReadRepository
+	memberRepo        repository.MemberRepository
+	wsRepo            repository.WorkspaceRepository
+	a2aPool           *a2a.Pool
+	chatHub           *ws.ChatHub
+	serverAddr        string
+	authEnabled       bool
 	configuredBaseURL string
 }
 
@@ -77,10 +77,10 @@ func (h *ConversationHandler) authHeader() string {
 }
 
 type ConversationListResponse struct {
-	Pinned          []ConversationDTO `json:"pinned"`
-	Timeline        []ConversationDTO `json:"timeline"`
-	DefaultChannelID string           `json:"defaultChannelId,omitempty"`
-	TotalUnreadCount int              `json:"totalUnreadCount"`
+	Pinned           []ConversationDTO `json:"pinned"`
+	Timeline         []ConversationDTO `json:"timeline"`
+	DefaultChannelID string            `json:"defaultChannelId,omitempty"`
+	TotalUnreadCount int               `json:"totalUnreadCount"`
 }
 
 type ConversationDTO struct {
@@ -111,14 +111,82 @@ type CreateConversationRequest struct {
 	TargetID  string   `json:"targetId,omitempty"`
 }
 
+// requireWorkspace makes every workspace-scoped endpoint fail closed when the
+// path contains an unknown workspace ID.
+func (h *ConversationHandler) requireWorkspace(c *gin.Context) bool {
+	workspaceID := c.Param("id")
+	if workspaceID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace id required"})
+		return false
+	}
+	if _, err := h.wsRepo.GetByID(c.Request.Context(), workspaceID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
+		return false
+	}
+	return true
+}
+
+// conversationForRequest ensures a nested conversation is owned by the
+// workspace named in the URL. IDs are globally addressable in SQLite, so this
+// check must happen before every nested read or mutation.
+func (h *ConversationHandler) conversationForRequest(c *gin.Context) (*repository.Conversation, bool) {
+	workspaceID := c.Param("id")
+	convID := c.Param("convId")
+	if workspaceID == "" || convID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace and conversation id required"})
+		return nil, false
+	}
+	conv, err := h.convRepo.GetByID(convID)
+	if err != nil || conv == nil || conv.WorkspaceID != workspaceID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return nil, false
+	}
+	return conv, true
+}
+
+func (h *ConversationHandler) validateConversationMembers(c *gin.Context, workspaceID string, memberIDs []string, targetID string) bool {
+	members, err := h.memberRepo.ListByWorkspace(c.Request.Context(), workspaceID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return false
+	}
+	known := make(map[string]struct{}, len(members))
+	for _, member := range members {
+		known[member.ID] = struct{}{}
+	}
+	seen := make(map[string]struct{}, len(memberIDs))
+	for _, memberID := range memberIDs {
+		if _, ok := known[memberID]; !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown member id: " + memberID})
+			return false
+		}
+		if _, duplicate := seen[memberID]; duplicate {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "member ids must be unique"})
+			return false
+		}
+		seen[memberID] = struct{}{}
+	}
+	if targetID != "" {
+		if _, ok := known[targetID]; !ok {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown target member id"})
+			return false
+		}
+		if _, included := seen[targetID]; !included {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "target member must be included in memberIds"})
+			return false
+		}
+	}
+	return true
+}
+
 // SendMessageRequest is the JSON body for POST .../messages.
 // Extra fields (conversationType, mentions, timestamp) may be sent by the web client for forward compatibility; only the fields below are persisted today.
 // ClientTraceID is optional idempotency / correlation (e.g. UUID); not stored in DB until a migration adds a column.
 type SendMessageRequest struct {
-	Text           string `json:"text"`
-	SenderID       string `json:"senderId"`
-	SenderName     string `json:"senderName"`
-	ClientTraceID  string `json:"clientTraceId,omitempty"`
+	Text          string `json:"text"`
+	SenderID      string `json:"senderId"`
+	SenderName    string `json:"senderName"`
+	ClientTraceID string `json:"clientTraceId,omitempty"`
 }
 
 // List lists all conversations in a workspace
@@ -135,8 +203,7 @@ type SendMessageRequest struct {
 // @Router /api/workspaces/{id}/conversations [get]
 func (h *ConversationHandler) List(c *gin.Context) {
 	workspaceID := c.Param("id")
-	if workspaceID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace id required"})
+	if !h.requireWorkspace(c) {
 		return
 	}
 
@@ -188,13 +255,13 @@ func (h *ConversationHandler) List(c *gin.Context) {
 
 	for _, conv := range conversations {
 		dto := ConversationDTO{
-			ID:        conv.ID,
-			Type:      string(conv.Type),
-			TargetID:  conv.TargetID,
-			MemberIDs: conv.MemberIDs,
+			ID:         conv.ID,
+			Type:       string(conv.Type),
+			TargetID:   conv.TargetID,
+			MemberIDs:  conv.MemberIDs,
 			CustomName: conv.Name,
-			Pinned:    conv.Pinned,
-			Muted:     conv.Muted,
+			Pinned:     conv.Pinned,
+			Muted:      conv.Muted,
 		}
 
 		if unread, ok := unreadCounts[conv.ID]; ok {
@@ -237,14 +304,37 @@ func (h *ConversationHandler) List(c *gin.Context) {
 // @Router /api/workspaces/{id}/conversations [post]
 func (h *ConversationHandler) Create(c *gin.Context) {
 	workspaceID := c.Param("id")
-	if workspaceID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace id required"})
+	if !h.requireWorkspace(c) {
 		return
 	}
 
 	var req CreateConversationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.Type = strings.ToLower(strings.TrimSpace(req.Type))
+	req.Name = strings.TrimSpace(req.Name)
+	req.TargetID = strings.TrimSpace(req.TargetID)
+	for i := range req.MemberIDs {
+		req.MemberIDs[i] = strings.TrimSpace(req.MemberIDs[i])
+	}
+	switch repository.ConversationType(req.Type) {
+	case repository.ConversationTypeChannel:
+		if req.Name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "channel name is required"})
+			return
+		}
+	case repository.ConversationTypeDM:
+		if req.TargetID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "targetId is required for direct messages"})
+			return
+		}
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid conversation type"})
+		return
+	}
+	if !h.validateConversationMembers(c, workspaceID, req.MemberIDs, req.TargetID) {
 		return
 	}
 
@@ -260,13 +350,13 @@ func (h *ConversationHandler) Create(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, ConversationDTO{
-		ID:        conv.ID,
-		Type:      string(conv.Type),
-		TargetID:  conv.TargetID,
-		MemberIDs: conv.MemberIDs,
+		ID:         conv.ID,
+		Type:       string(conv.Type),
+		TargetID:   conv.TargetID,
+		MemberIDs:  conv.MemberIDs,
 		CustomName: conv.Name,
-		Pinned:    conv.Pinned,
-		Muted:     conv.Muted,
+		Pinned:     conv.Pinned,
+		Muted:      conv.Muted,
 	})
 }
 
@@ -285,11 +375,11 @@ func (h *ConversationHandler) Create(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/workspaces/{id}/conversations/{convId}/messages [get]
 func (h *ConversationHandler) GetMessages(c *gin.Context) {
-	convID := c.Param("convId")
-	if convID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation id required"})
+	conv, ok := h.conversationForRequest(c)
+	if !ok {
 		return
 	}
+	convID := conv.ID
 
 	limit := 200
 	if l := c.Query("limit"); l != "" {
@@ -339,15 +429,24 @@ func (h *ConversationHandler) GetMessages(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/workspaces/{id}/conversations/{convId}/messages [post]
 func (h *ConversationHandler) SendMessage(c *gin.Context) {
-	convID := c.Param("convId")
-	if convID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation id required"})
+	conv, ok := h.conversationForRequest(c)
+	if !ok {
 		return
 	}
+	convID := conv.ID
 
 	var req SendMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.Text = strings.TrimSpace(req.Text)
+	req.SenderID = strings.TrimSpace(req.SenderID)
+	if req.Text == "" || req.SenderID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "text and senderId are required"})
+		return
+	}
+	if !h.validateConversationMembers(c, c.Param("id"), []string{req.SenderID}, "") {
 		return
 	}
 
@@ -412,11 +511,11 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/workspaces/{id}/conversations/{convId} [put]
 func (h *ConversationHandler) UpdateSettings(c *gin.Context) {
-	convID := c.Param("convId")
-	if convID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation id required"})
+	conv, ok := h.conversationForRequest(c)
+	if !ok {
 		return
 	}
+	convID := conv.ID
 
 	var req map[string]interface{}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -444,11 +543,11 @@ func (h *ConversationHandler) UpdateSettings(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/workspaces/{id}/conversations/{convId} [delete]
 func (h *ConversationHandler) Delete(c *gin.Context) {
-	convID := c.Param("convId")
-	if convID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation id required"})
+	conv, ok := h.conversationForRequest(c)
+	if !ok {
 		return
 	}
+	convID := conv.ID
 
 	// Delete messages first
 	h.msgRepo.DeleteByConversation(convID)
@@ -473,11 +572,11 @@ func (h *ConversationHandler) Delete(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/workspaces/{id}/conversations/{convId}/messages [delete]
 func (h *ConversationHandler) ClearMessages(c *gin.Context) {
-	convID := c.Param("convId")
-	if convID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation id required"})
+	conv, ok := h.conversationForRequest(c)
+	if !ok {
 		return
 	}
+	convID := conv.ID
 
 	if err := h.msgRepo.DeleteByConversation(convID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -511,11 +610,11 @@ type markReadBody struct {
 // @Failure 500 {object} map[string]string
 // @Router /api/workspaces/{id}/conversations/{convId}/read [post]
 func (h *ConversationHandler) MarkConversationRead(c *gin.Context) {
-	convID := c.Param("convId")
-	if convID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation id required"})
+	conv, ok := h.conversationForRequest(c)
+	if !ok {
 		return
 	}
+	convID := conv.ID
 	var body markReadBody
 	if err := c.ShouldBindJSON(&body); err != nil {
 		body.UserID = c.Query("userId")
@@ -526,6 +625,9 @@ func (h *ConversationHandler) MarkConversationRead(c *gin.Context) {
 	}
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "userId required"})
+		return
+	}
+	if !h.validateConversationMembers(c, c.Param("id"), []string{userID}, "") {
 		return
 	}
 	ts, err := h.msgRepo.LatestMessageTime(convID)
@@ -558,13 +660,15 @@ func (h *ConversationHandler) MarkConversationRead(c *gin.Context) {
 // @Router /api/workspaces/{id}/conversations/read-all [post]
 func (h *ConversationHandler) MarkAllConversationsRead(c *gin.Context) {
 	workspaceID := c.Param("id")
-	if workspaceID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace id required"})
+	if !h.requireWorkspace(c) {
 		return
 	}
 	var body markReadBody
 	if err := c.ShouldBindJSON(&body); err != nil || body.UserID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "userId required"})
+		return
+	}
+	if !h.validateConversationMembers(c, workspaceID, []string{body.UserID}, "") {
 		return
 	}
 	conversations, err := h.convRepo.ListByWorkspace(workspaceID)
@@ -609,18 +713,8 @@ type setConversationMembersBody struct {
 // @Router /api/workspaces/{id}/conversations/{convId}/members [put]
 func (h *ConversationHandler) SetConversationMembers(c *gin.Context) {
 	workspaceID := c.Param("id")
-	convID := c.Param("convId")
-	if workspaceID == "" || convID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace and conversation id required"})
-		return
-	}
-	conv, err := h.convRepo.GetByID(convID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
-		return
-	}
-	if conv.WorkspaceID != workspaceID {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "conversation not in workspace"})
+	conv, ok := h.conversationForRequest(c)
+	if !ok {
 		return
 	}
 	if conv.Type != repository.ConversationTypeChannel {
@@ -632,26 +726,17 @@ func (h *ConversationHandler) SetConversationMembers(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	members, err := h.memberRepo.ListByWorkspace(c.Request.Context(), workspaceID)
-	if err != nil {
+	for i := range body.MemberIDs {
+		body.MemberIDs[i] = strings.TrimSpace(body.MemberIDs[i])
+	}
+	if !h.validateConversationMembers(c, workspaceID, body.MemberIDs, "") {
+		return
+	}
+	if err := h.convRepo.SetMemberIDs(conv.ID, body.MemberIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	valid := make(map[string]struct{}, len(members))
-	for _, m := range members {
-		valid[m.ID] = struct{}{}
-	}
-	for _, id := range body.MemberIDs {
-		if _, ok := valid[id]; !ok {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "unknown member id: " + id})
-			return
-		}
-	}
-	if err := h.convRepo.SetMemberIDs(convID, body.MemberIDs); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	updated, err := h.convRepo.GetByID(convID)
+	updated, err := h.convRepo.GetByID(conv.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -783,13 +868,11 @@ func (h *ConversationHandler) forwardUserTextToAgent(c *gin.Context, workspaceID
 			add(mid)
 		}
 	case repository.ConversationTypeChannel:
-		// For channels, forward only to secretaries
-		for _, mid := range conv.MemberIDs {
-			for _, m := range members {
-				if m.ID == mid && m.RoleType == models.RoleSecretary {
-					add(mid)
-					break
-				}
+		// An empty member list denotes the workspace-wide default channel.
+		// Explicit lists restrict forwarding to the selected secretaries.
+		for _, m := range members {
+			if m.RoleType == models.RoleSecretary && (len(conv.MemberIDs) == 0 || memberSliceContains(conv.MemberIDs, m.ID)) {
+				add(m.ID)
 			}
 		}
 	}
@@ -965,8 +1048,26 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 		return
 	}
 
+	req.ConversationID = strings.TrimSpace(req.ConversationID)
+	req.WorkspaceID = strings.TrimSpace(req.WorkspaceID)
+	req.SenderID = strings.TrimSpace(req.SenderID)
+	req.Text = strings.TrimSpace(req.Text)
 	if req.ConversationID == "" || req.WorkspaceID == "" || req.SenderID == "" || req.Text == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "conversationId, workspaceId, senderId, and text are required"})
+		return
+	}
+	if _, err := h.wsRepo.GetByID(c.Request.Context(), req.WorkspaceID); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
+		return
+	}
+	conv, err := h.convRepo.GetByID(req.ConversationID)
+	if err != nil || conv == nil || conv.WorkspaceID != req.WorkspaceID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+		return
+	}
+	sender, err := h.memberRepo.GetByID(c.Request.Context(), req.SenderID)
+	if err != nil || sender == nil || sender.WorkspaceID != req.WorkspaceID {
+		c.JSON(http.StatusNotFound, gin.H{"error": "sender member not found"})
 		return
 	}
 
@@ -1087,11 +1188,8 @@ func (h *ConversationHandler) InternalChatSend(c *gin.Context) {
 // @Failure 404 {object} map[string]string
 // @Router /api/workspaces/{id}/conversations/{convId} [get]
 func (h *ConversationHandler) GetConversation(c *gin.Context) {
-	convID := c.Param("convId")
-
-	conv, err := h.convRepo.GetByID(convID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "conversation not found"})
+	conv, ok := h.conversationForRequest(c)
+	if !ok {
 		return
 	}
 
@@ -1121,7 +1219,11 @@ func (h *ConversationHandler) GetConversation(c *gin.Context) {
 // @Failure 500 {object} map[string]string
 // @Router /api/workspaces/{id}/conversations/{convId}/messages/{messageId} [delete]
 func (h *ConversationHandler) DeleteMessage(c *gin.Context) {
-	convID := c.Param("convId")
+	conv, ok := h.conversationForRequest(c)
+	if !ok {
+		return
+	}
+	convID := conv.ID
 	msgID := c.Param("messageId")
 
 	// Verify message belongs to this conversation
@@ -1138,6 +1240,7 @@ func (h *ConversationHandler) DeleteMessage(c *gin.Context) {
 
 	c.JSON(http.StatusNoContent, nil)
 }
+
 // UpdateAgentStatus updates an AI agent's activity status
 // @Summary Update agent status
 // @Description Update an AI agent's current activity status (thinking, reading file, etc.)

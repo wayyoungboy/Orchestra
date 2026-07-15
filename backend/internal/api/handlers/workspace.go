@@ -3,7 +3,9 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -62,7 +64,10 @@ func (h *WorkspaceHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "workspace not found"})
 		return
 	}
-	_ = ensureWorkspaceOwner(c.Request.Context(), h.memberRepo, ws, "")
+	if err := ensureWorkspaceOwner(c.Request.Context(), h.memberRepo, ws, ""); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, ws)
 }
 
@@ -84,15 +89,20 @@ func (h *WorkspaceHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Verify path exists
-	exists, err := h.browser.PathExists(req.Path)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	req.Name = strings.TrimSpace(req.Name)
+	req.Path = strings.TrimSpace(req.Path)
+	if req.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "workspace name is required"})
 		return
 	}
-	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "path does not exist"})
+
+	validation := h.browser.ValidatePath(req.Path)
+	if !validation.Exists || !validation.IsDir || !validation.Readable {
+		message := validation.Error
+		if message == "" {
+			message = "workspace path must be a readable directory"
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": message})
 		return
 	}
 
@@ -200,14 +210,14 @@ func (h *WorkspaceHandler) Update(c *gin.Context) {
 		ws.Name = req.Name
 	}
 	if req.Path != "" {
-		// Verify new path exists
-		exists, err := h.browser.PathExists(req.Path)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if !exists {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "path does not exist"})
+		req.Path = strings.TrimSpace(req.Path)
+		validation := h.browser.ValidatePath(req.Path)
+		if !validation.Exists || !validation.IsDir || !validation.Readable {
+			message := validation.Error
+			if message == "" {
+				message = "workspace path must be a readable directory"
+			}
+			c.JSON(http.StatusBadRequest, gin.H{"error": message})
 			return
 		}
 		ws.Path = req.Path
@@ -241,13 +251,16 @@ func (h *WorkspaceHandler) Browse(c *gin.Context) {
 		return
 	}
 
-	subPath := c.Query("path")
-	fullPath := ws.Path
-	if subPath != "" {
-		fullPath = subPath
+	fullPath, err := workspaceBrowsePath(ws.Path, c.Query("path"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
-
-	files, err := h.browser.ListDir(fullPath, true)
+	// A workspace browser is deliberately narrower than the global workspace
+	// picker. A path under another allowed root must not be reachable through a
+	// workspace-specific browse route.
+	workspaceBrowser := filesystem.NewBrowser(filesystem.NewValidator([]string{ws.Path}))
+	files, err := workspaceBrowser.ListDir(fullPath, true)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -257,6 +270,20 @@ func (h *WorkspaceHandler) Browse(c *gin.Context) {
 		"basePath": fullPath,
 		"files":    files,
 	})
+}
+
+func workspaceBrowsePath(workspacePath, requestedPath string) (string, error) {
+	fullPath := workspacePath
+	if requestedPath != "" {
+		fullPath = requestedPath
+		if !filepath.IsAbs(fullPath) {
+			fullPath = filepath.Join(workspacePath, fullPath)
+		}
+	}
+	if err := filesystem.NewValidator([]string{workspacePath}).ValidatePath(fullPath); err != nil {
+		return "", err
+	}
+	return fullPath, nil
 }
 
 // BrowseRoot browses files from root/home directory
@@ -345,6 +372,7 @@ func (h *WorkspaceHandler) Search(c *gin.Context) {
 		"results": results,
 	})
 }
+
 // ValidatePath validates a path for workspace creation
 // @Summary Validate workspace path
 // @Description Validate if a path is suitable for a workspace (exists, readable, writable)

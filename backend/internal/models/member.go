@@ -31,9 +31,9 @@ type Member struct {
 
 	// A2A configuration - Agent-to-Agent Protocol
 	A2AEnabled   bool    `json:"a2aEnabled"`
-	A2AAgentURL  *string `json:"a2aAgentUrl,omitempty"`  // A2A agent service endpoint
-	A2AAuthType  *string `json:"a2aAuthType,omitempty"`  // "none", "api_key", "oauth2"
-	A2AAuthToken *string `json:"a2aAuthToken,omitempty"` // Auth token for A2A requests
+	A2AAgentURL  *string `json:"a2aAgentUrl,omitempty"` // A2A agent service endpoint
+	A2AAuthType  *string `json:"a2aAuthType,omitempty"` // "none", "api_key", "oauth2"
+	A2AAuthToken *string `json:"-"`                     // Stored credential; never expose it in an API response.
 }
 
 type MemberCreate struct {
@@ -55,12 +55,12 @@ type MemberCreate struct {
 
 // Presence represents a member's real-time activity status
 type Presence struct {
-	MemberID      string `json:"memberId"`
-	WorkspaceID   string `json:"workspaceId"`
-	Activity      string `json:"activity"`       // "typing", "viewing", "idle"
-	TargetID      string `json:"targetId"`       // conversationId or terminalId
-	TargetType    string `json:"targetType"`     // "conversation" or "terminal"
-	Timestamp     int64  `json:"timestamp"`
+	MemberID    string `json:"memberId"`
+	WorkspaceID string `json:"workspaceId"`
+	Activity    string `json:"activity"`   // "typing", "viewing", "idle"
+	TargetID    string `json:"targetId"`   // conversationId or terminalId
+	TargetType  string `json:"targetType"` // "conversation" or "terminal"
+	Timestamp   int64  `json:"timestamp"`
 }
 
 // PresenceUpdate is the request body for updating presence

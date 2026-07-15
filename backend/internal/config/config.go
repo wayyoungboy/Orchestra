@@ -21,10 +21,10 @@ type TerminalConfig struct {
 }
 
 type SecurityConfig struct {
-	EncryptionKey    string   `yaml:"encryption_key"`
-	AllowedCommands  []string `yaml:"allowed_commands"`
-	AllowedPaths     []string `yaml:"allowed_paths"`
-	AllowedOrigins   []string `yaml:"allowed_origins"`
+	EncryptionKey   string   `yaml:"encryption_key"`
+	AllowedCommands []string `yaml:"allowed_commands"`
+	AllowedPaths    []string `yaml:"allowed_paths"`
+	AllowedOrigins  []string `yaml:"allowed_origins"`
 }
 
 type StorageConfig struct {
@@ -42,7 +42,10 @@ type AuthConfig struct {
 func Default() *Config {
 	return &Config{
 		Server: ServerConfig{
-			HTTPAddr:  ":8080",
+			// A terminal-control plane must not be exposed to the network by
+			// accident. Deployments that need remote access should bind a public
+			// address explicitly and enable authentication.
+			HTTPAddr:  "127.0.0.1:8080",
 			UploadDir: "./uploads",
 		},
 		Terminal: TerminalConfig{
@@ -52,8 +55,10 @@ func Default() *Config {
 		Security: SecurityConfig{
 			EncryptionKey:   "",
 			AllowedCommands: []string{"claude", "gemini", "codex", "qwen"},
-			AllowedPaths:    []string{},
-			AllowedOrigins:  []string{"http://localhost:3000", "http://localhost:5173"},
+			// Keep the out-of-the-box local control plane usable. Public
+			// deployments should replace this with explicit project roots.
+			AllowedPaths:   []string{"~"},
+			AllowedOrigins: []string{"http://localhost:3000", "http://localhost:5173"},
 		},
 		Storage: StorageConfig{
 			Database:   "./data/orchestra.db",
